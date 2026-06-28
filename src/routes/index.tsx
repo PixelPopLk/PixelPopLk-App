@@ -491,7 +491,7 @@ function HomePage() {
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 grid place-items-center mb-4 animate-bounce">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/15 grid place-items-center mb-4 animate-bounce">
                 <Sparkles className="w-8 h-8 text-primary animate-pulse" />
               </div>
 
@@ -618,9 +618,10 @@ function Hero({
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
                     </button>
+                    {/* 'no-popunder' පන්තිය (Class) එක් කිරීමෙන් ඇඩ් එක මඟහැරීම */}
                     <button
                       onClick={() => onDetails(String(current.id))}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-medium hover:bg-card transition cursor-pointer"
+                      className="no-popunder inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-medium hover:bg-card transition cursor-pointer"
                     >
                       Details
                     </button>
@@ -851,9 +852,10 @@ function SubtitleCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.3) }}
     >
+      {/* 'no-popunder' පන්තිය (Class) එක් කිරීමෙන් ඇඩ් එක මඟහැරීම */}
       <button
-        onClick={() => onDetails(String(item.id))} // පෝස්ටරය ක්ලික් කළ විට සෘජුවම Details පිටුවට යයි
-        className="group block text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
+        onClick={() => onDetails(String(item.id))}
+        className="no-popunder group block text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
       >
         <div className="relative aspect-[2/3] bg-muted overflow-hidden">
           {poster ? (
@@ -931,4 +933,4 @@ function Footer() {
       </div>
     </footer>
   );
-      }
+       }
