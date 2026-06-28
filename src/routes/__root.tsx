@@ -139,7 +139,14 @@ const MONETAG_POPUNDER_URL = "https://omg10.com/4/11202064";
 function MonetagPopunder() {
   useEffect(() => {
     let fired = false;
-    const handler = () => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // 'no-popunder' පන්තිය (Class) සහිත මූලද්‍රව්‍ය ක්ලික් කළහොත් දැන්වීම් පෙන්වීම මඟහරියි
+      if (target.closest(".no-popunder")) {
+        return;
+      }
+
       if (fired) return;
       fired = true;
       window.removeEventListener("click", handler, true);
@@ -170,4 +177,4 @@ function RootComponent() {
       <Outlet />
     </QueryClientProvider>
   );
-       }
+}
