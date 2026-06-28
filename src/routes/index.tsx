@@ -233,8 +233,13 @@ function HomePage() {
     }
   };
 
-  // 🔥 1. Trigger Anti-Cheat & Open Monetag Ad
-  const handleItemClick = (id: string) => {
+  // 🔥 1. Poster හෝ details click කළ විට සෘජුවම අදාළ පිටුවට යයි (දැන්වීම් හෝ countdown ක්‍රියාත්මක නොවේ)
+  const handleDetailsClick = (id: string) => {
+    navigate({ to: "/content/$id", params: { id } });
+  };
+
+  // 🔥 2. Download බටන් ක්ලික් කළ විට පමණක් Monetag ඇඩ් එක සහ countdown ක්‍රියාත්මක වේ
+  const handleDownloadClick = (id: string) => {
     completedRef.current = false;
     setTargetId(id);
     setCountdown(5);
@@ -244,7 +249,7 @@ function HomePage() {
     window.open("https://omg10.com/4/11202064", "_blank");
   };
 
-  // 🔥 2. Countdown Logic Effect
+  // 🔥 3. Countdown Logic Effect
   useEffect(() => {
     if (!modalOpen) {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -271,7 +276,7 @@ function HomePage() {
     };
   }, [modalOpen, targetId, navigate]);
 
-  // 🔥 3. Tab-Switching Anti-Cheat (Visibility API) - ඉක්මනින් ආපහු ආවොත් ටයිමර් එක 5ට Reset වෙනවා
+  // 🔥 4. Tab-Switching Anti-Cheat (Visibility API) - ඉක්මනින් ආපහු ආවොත් ටයිමර් එක 5ට Reset වෙනවා
   useEffect(() => {
     if (!modalOpen) return;
 
@@ -288,7 +293,7 @@ function HomePage() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [modalOpen]);
 
-  // 🔥 4. Back Button Blocking (පස්සට යන්න හැදුවොත් වළක්වනවා)
+  // 🔥 5. Back Button Blocking (පස්සට යන්න හැදුවොත් වළක්වනවා)
   useEffect(() => {
     if (!modalOpen) return;
 
@@ -339,7 +344,14 @@ function HomePage() {
       )}
       <Navbar showSearch query={query} setQuery={handleQueryChange} />
 
-      <Hero featured={featured} slide={slide} setSlide={setSlide} loading={isLoading} onAction={handleItemClick} />
+      <Hero 
+        featured={featured} 
+        slide={slide} 
+        setSlide={setSlide} 
+        loading={isLoading} 
+        onDownload={handleDownloadClick} 
+        onDetails={handleDetailsClick} 
+      />
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex items-end justify-between mb-4 flex-wrap gap-4">
@@ -422,7 +434,13 @@ function HomePage() {
         ) : filtered.length === 0 ? (
           <EmptyState />
         ) : query ? (
-          <Row title="Search Results" icon={<Search className="w-4 h-4" />} items={filtered} onAction={handleItemClick} />
+          <Row 
+            title="Search Results" 
+            icon={<Search className="w-4 h-4" />} 
+            items={filtered} 
+            onDownload={handleDownloadClick} 
+            onDetails={handleDetailsClick} 
+          />
         ) : (
           <div className="mt-8 space-y-12">
             {type !== "series" && (
@@ -430,7 +448,8 @@ function HomePage() {
                 title={genre ? `${genre} Movies` : "Movies"}
                 icon={<Film className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "movie")}
-                onAction={handleItemClick}
+                onDownload={handleDownloadClick}
+                onDetails={handleDetailsClick}
               />
             )}
             {type !== "movie" && (
@@ -438,7 +457,8 @@ function HomePage() {
                 title={genre ? `${genre} TV Series` : "TV Series"}
                 icon={<Tv className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "series")}
-                onAction={handleItemClick}
+                onDownload={handleDownloadClick}
+                onDetails={handleDetailsClick}
               />
             )}
           </div>
@@ -503,13 +523,15 @@ function Hero({
   slide,
   setSlide,
   loading,
-  onAction,
+  onDownload,
+  onDetails,
 }: {
   featured: GridItem[];
   slide: number;
   setSlide: (i: number | ((s: number) => number)) => void;
   loading: boolean;
-  onAction: (id: string) => void;
+  onDownload: (id: string) => void;
+  onDetails: (id: string) => void;
 }) {
   if (loading) {
     return (
@@ -591,13 +613,13 @@ function Hero({
                   </p>
                   <div className="mt-5 flex gap-3">
                     <button
-                      onClick={() => onAction(String(current.id))}
+                      onClick={() => onDownload(String(current.id))}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
                     </button>
                     <button
-                      onClick={() => onAction(String(current.id))}
+                      onClick={() => onDetails(String(current.id))}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-medium hover:bg-card transition cursor-pointer"
                     >
                       Details
@@ -709,7 +731,19 @@ function FilterTabs({ active, onChange }: { active: Category; onChange: (c: Cate
   );
 }
 
-function Row({ title, icon, items, onAction }: { title: string; icon?: React.ReactNode; items: GridItem[]; onAction: (id: string) => void }) {
+function Row({ 
+  title, 
+  icon, 
+  items, 
+  onDownload, 
+  onDetails 
+}: { 
+  title: string; 
+  icon?: React.ReactNode; 
+  items: GridItem[]; 
+  onDownload: (id: string) => void; 
+  onDetails: (id: string) => void;
+}) {
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   const scrollBy = (dir: 1 | -1) => {
@@ -761,7 +795,7 @@ function Row({ title, icon, items, onAction }: { title: string; icon?: React.Rea
               key={it.key}
               className="snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[18vw] xl:w-[15vw] max-w-[220px]"
             >
-              <SubtitleCard item={it} index={i} onAction={onAction} />
+              <SubtitleCard item={it} index={i} onDownload={onDownload} onDetails={onDetails} />
             </div>
           ))}
         </div>
@@ -796,7 +830,17 @@ function SkeletonRow() {
   );
 }
 
-function SubtitleCard({ item, index, onAction }: { item: GridItem; index: number; onAction: (id: string) => void }) {
+function SubtitleCard({ 
+  item, 
+  index, 
+  onDownload, 
+  onDetails 
+}: { 
+  item: GridItem; 
+  index: number; 
+  onDownload: (id: string) => void; 
+  onDetails: (id: string) => void;
+}) {
   const tv = item.kind === "series";
   const title = itemTitle(item);
   const poster = itemPoster(item);
@@ -808,7 +852,7 @@ function SubtitleCard({ item, index, onAction }: { item: GridItem; index: number
       transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.3) }}
     >
       <button
-        onClick={() => onAction(String(item.id))}
+        onClick={() => onDetails(String(item.id))} // පෝස්ටරය ක්ලික් කළ විට සෘජුවම Details පිටුවට යයි
         className="group block text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
       >
         <div className="relative aspect-[2/3] bg-muted overflow-hidden">
@@ -887,4 +931,4 @@ function Footer() {
       </div>
     </footer>
   );
-}
+      }
