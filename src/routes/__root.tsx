@@ -6,7 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
-  useLocation, // <-- මෙහිදී useLocation එකතු කර ඇත
+  useLocation,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -158,14 +158,14 @@ function MonetagPopunder() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const location = useLocation(); // <-- වත්මන් පිටුව (route) හඳුනා ගැනීමට යොදාගෙන ඇත
+  const location = useLocation();
 
-  // වත්මන් පිටුවේ ලිපිනය '/manage-admin' ලෙස ආරම්භ වේ නම් Monetag පෙන්වීම වළක්වයි
+  // '/manage-admin' පිටුවේ නොමැති විට පමණක් Monetag Popunder පෙන්වීමට අවසර දේ
   const isNotAdmin = !location.pathname.startsWith("/manage-admin");
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isNotAdmin && <MonetagPopunder />} {/* <-- මෙහිදී කොන්දේසියක් සහිතව Monetag load කරයි */}
+      {isNotAdmin && <MonetagPopunder />}
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
