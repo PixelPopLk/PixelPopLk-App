@@ -322,7 +322,7 @@ function Dashboard() {
       const insertedRow = dbData[0];
       if (tgEnabled && tgBotToken && tgChatId) {
         try {
-          const siteUrl = "https://pixelpoplk.com";
+          const siteUrl = "https://pixelpopshows.netlify.app";
           const isSeries = insertedRow.season != null || insertedRow.episode != null;
           
           let caption = `<b>🎬 ${insertedRow.title}</b>\n\n`;
