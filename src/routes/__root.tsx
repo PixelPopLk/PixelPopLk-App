@@ -134,7 +134,9 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// 50/50 Rotation සඳහා URL දෙකම ඇතුළත් කර ඇත
 const MONETAG_POPUNDER_URL = "https://omg10.com/4/11202064";
+const ADSTERRA_POPUNDER_URL = "https://www.effectivecpmnetwork.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 function MonetagPopunder() {
   useEffect(() => {
@@ -142,8 +144,8 @@ function MonetagPopunder() {
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
 
-      // 'no-popunder' පන්තිය (Class) සහිත මූලද්‍රව්‍ය ක්ලික් කළහොත් දැන්වීම් පෙන්වීම මඟහරියි
-      if (target.closest(".no-popunder")) {
+      // 'no-popunder' පන්තිය (Class) සහිත මූලද්‍රව්‍ය ක්ලික් කළහොත් දැන්වීම් පෙන්වීම මඟහරියි (Safe matching)
+      if (target && typeof target.closest === "function" && target.closest(".no-popunder")) {
         return;
       }
 
@@ -151,7 +153,10 @@ function MonetagPopunder() {
       fired = true;
       window.removeEventListener("click", handler, true);
       try {
-        const w = window.open(MONETAG_POPUNDER_URL, "_blank", "noopener,noreferrer");
+        // Monetag සහ Adsterra මාරුවෙන් මාරුවට 50% ක සම්භාවිතාවයකින් තෝරා ගනී
+        const targetUrl = Math.random() < 0.5 ? MONETAG_POPUNDER_URL : ADSTERRA_POPUNDER_URL;
+        
+        const w = window.open(targetUrl, "_blank", "noopener,noreferrer");
         if (w) w.opener = null;
       } catch {
         /* noop */
@@ -177,4 +182,4 @@ function RootComponent() {
       <Outlet />
     </QueryClientProvider>
   );
-}
+      }
