@@ -20,6 +20,11 @@ export function parseTitle(title: string): ParsedTitle {
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
   m = title.match(/^(.*?)[\s._\-]+(\d{1,2})x(\d{1,3})(?:[\s._\-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
+  
+  // 🔥 අලුත් Pattern එක: "Title Episode 1" හෝ "Title Ep 2" වැනි දෑ සාර්ථකව TV Series ලෙස හඳුනාගනී
+  m = title.match(/^(.*?)[\s._\-]+(?:Episode|Epi|Ep)[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
+  if (m) return { showName: cleanShowName(m[1]), episode: { season: 1, episode: +m[2], episodeTitle: m[3]?.trim() } };
+  
   return { showName: title.trim() };
 }
 
@@ -150,4 +155,4 @@ export function genreBadgeClass(g: string) {
   let h = 0;
   for (let i = 0; i < g.length; i++) h = (h * 31 + g.charCodeAt(i)) >>> 0;
   return GENRE_PALETTE[h % GENRE_PALETTE.length];
-}
+      }
