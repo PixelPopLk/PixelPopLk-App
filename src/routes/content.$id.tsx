@@ -10,6 +10,10 @@ import {
   Star,
   Subtitles,
   Tv,
+  MessageSquare,
+  Trash2,
+  Send,
+  Loader2,
 } from "lucide-react";
 
 import { supabase, SUBTITLES_TABLE, SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
@@ -75,14 +79,21 @@ function ContentPage() {
   if (!data) return <Shell><p>Loading…</p></Shell>;
   if (!item) throw notFound();
 
-  return <Shell>{item.kind === "movie" ? <MovieView item={item} /> : <SeriesView item={item} />}</Shell>;
+  return (
+    <Shell>
+      {item.kind === "movie" ? <MovieView item={item} /> : <SeriesView item={item} />}
+      
+      {/* Comments Section */}
+      <CommentsSection subtitleId={id} />
+    </Shell>
+  );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <Navbar showBack backTo="/" backText="Back" />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">{children}</main>
     </div>
   );
 }
@@ -191,7 +202,6 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
     ? s.description.slice(0, 160)
     : `Download Sinhala subtitles for ${s.title} (${year}). High-quality Sinhala sub file synced for official release. Fast & secure on PixelPopLK.`;
   
-  // Admin panel එකෙන් metatags දමා ඇත්නම් ඒවා ප්‍රමුඛව භාවිත කරයි
   const customMeta = (s as any).metatags;
   const keywordText = customMeta 
     ? `${s.title} Sinhala Subtitle, ${customMeta}`
@@ -215,7 +225,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
 
     updateMeta("description", descText);
     updateMeta("keywords", keywordText);
-    updateMeta("robots", "index, follow"); // සෙවුම් යන්ත්‍ර වලට පිටුව හසුකර ගැනීමට අත්‍යවශ්‍යයි
+    updateMeta("robots", "index, follow");
     updateMeta("og:title", titleText, true);
     updateMeta("og:description", descText, true);
     updateMeta("og:type", "video.movie", true);
@@ -303,7 +313,6 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
     ? meta.description.slice(0, 160)
     : `Download Sinhala subtitles for TV Series ${item.showName} (${meta.year}). Latest seasons and episodes available on PixelPopLK.`;
   
-  // TV Series එකක episodes වල ඇති metatags සසඳා කියවා ගැනීම
   const customMeta = useMemo(() => {
     const metas = item.episodes.map(e => (e as any).metatags).filter(Boolean);
     return metas.length > 0 ? metas[0] : null;
@@ -331,7 +340,7 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
 
     updateMeta("description", descText);
     updateMeta("keywords", keywordText);
-    updateMeta("robots", "index, follow"); // TV Series පිටුව ද සෙවුම් වලට එක් කිරීමට අත්‍යවශ්‍යයි
+    updateMeta("robots", "index, follow");
     updateMeta("og:title", titleText, true);
     updateMeta("og:description", descText, true);
     updateMeta("og:type", "video.tv_show", true);
@@ -414,3 +423,165 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
               </span>
             </Link>
           ))}
+        </div>
+      </div>
+    </Hero>
+  );
+}
+
+function CommentsSection({ subtitleId }: { subtitleId: string }) {
+  const [authorName, setAuthorName] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const { data: comments, refetch } = useQuery({
+    queryKey: ["comments", subtitleId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subtitle_comments")
+        .select("*")
+        .eq("subtitle_id", subtitleId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setIsAdmin(true);
+    });
+
+    const savedName = localStorage.getItem("comment_author_name");
+    if (savedName) setAuthorName(savedName);
+  }, []);
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorName.trim() || !commentText.trim()) return;
+
+    const lastSubmit = localStorage.getItem("last_comment_submit_time");
+    const now = Date.now();
+    if (lastSubmit && now - parseInt(lastSubmit, 10) < 15000) {
+      alert("Please wait 15 seconds before posting another comment!");
+      return;
+    }
+
+    setSubmitting(true);
+    const { error } = await supabase.from("subtitle_comments").insert({
+      subtitle_id: subtitleId,
+      author_name: authorName.trim(),
+      comment_text: commentText.trim(),
+    });
+
+    setSubmitting(false);
+
+    if (error) {
+      alert(`Error: ${error.message}`);
+    } else {
+      setCommentText("");
+      localStorage.setItem("comment_author_name", authorName.trim());
+      localStorage.setItem("last_comment_submit_time", String(now));
+      refetch();
+    }
+  };
+
+  const handleDeleteComment = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    const { error } = await supabase.from("subtitle_comments").delete().eq("id", id);
+    if (error) alert(error.message);
+    else refetch();
+  };
+
+  return (
+    <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-6 sm:p-8 space-y-6">
+      <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
+        <MessageSquare className="w-5 h-5 text-primary" />
+        Feedback & Comments <span className="text-xs font-normal text-muted-foreground">({comments?.length ?? 0})</span>
+      </h3>
+
+      <form onSubmit={handleCommentSubmit} className="space-y-4">
+        <div className="grid sm:grid-cols-[200px_1fr] gap-3">
+          <input
+            type="text"
+            required
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder="Your Name *"
+            maxLength={30}
+            className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-sm transition-colors"
+          />
+          <div className="relative">
+            <input
+              type="text"
+              required
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Leave a comment... *"
+              maxLength={300}
+              className="w-full pl-4 pr-12 py-2.5 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-sm transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-primary text-primary-foreground grid place-items-center hover:opacity-90 transition cursor-pointer disabled:opacity-60"
+            >
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-hide pt-2">
+        {comments?.map((comment: any) => {
+          const initials = comment.author_name ? comment.author_name.charAt(0).toUpperCase() : "?";
+          
+          // 🔥 TanStack AST Parser එක පැටලීම වැළැක්වීමට Expression එක මෙසේ වෙනම variable එකකට ගෙන ඇත
+          const formattedDate = new Date(comment.created_at).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+
+          return (
+            <div key={comment.id} className="flex gap-3 items-start p-3.5 rounded-2xl bg-muted/30 border border-border/50 group/comment">
+              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold text-xs grid place-items-center shrink-0">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-bold text-foreground/90">{comment.author_name}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {formattedDate} {/* <-- ආරක්ෂිතව සකස් කළ variable එක මෙහි පෙන්වයි */}
+                  </span>
+                </div>
+                <p className="text-sm text-foreground/80 mt-1 leading-relaxed whitespace-pre-line">{comment.comment_text}</p>
+              </div>
+
+              {isAdmin && (
+                <button
+                  onClick={() => handleDeleteComment(comment.id)}
+                  className="p-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-destructive-foreground transition opacity-0 group-hover/comment:opacity-100 cursor-pointer shrink-0"
+                  title="Delete Comment"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {(!comments || comments.length === 0) && (
+          <p className="text-center text-xs text-muted-foreground py-6">
+            No comments yet. Be the first to leave a feedback!
+          </p>
+        )}
+      </div>
+    </div>
+  );
+              }
