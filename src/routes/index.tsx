@@ -367,7 +367,7 @@ function HomePage() {
 
   const collectionSchema = useMemo(() => {
     if (!filtered || filtered.length === 0) return null;
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://pixelpoplk.com";
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://pixelpopshows.netlify.app";
     return {
       "@context": "https://schema.org",
       "@type": "ItemList",
