@@ -138,9 +138,10 @@ function matchesRating(it: GridItem, rf: RatingFilter): boolean {
   return r >= min;
 }
 
+// 📌 Space තැබීමට හැකි වන පරිදි .trim() ඉවත් කර සකසා ඇත (Space typing fix)
 function sanitizeInput(str: string): string {
   if (!str) return "";
-  return str.replace(/<[^>]*>/g, "").trim();
+  return str.replace(/<[^>]*>/g, "");
 }
 
 function HomePage() {
@@ -207,7 +208,7 @@ function HomePage() {
   }, [featured.length]);
 
   const filtered = useMemo(() => {
-    const qClean = query.trim().toLowerCase();
+    const qClean = query.trim().toLowerCase(); // සැබෑ සෙවුම සිදුවන විට පමණක් trim කරයි
     let result = items.filter(
       (it) =>
         matchesQuery(it, qClean) &&
@@ -244,12 +245,10 @@ function HomePage() {
     }
   };
 
-  // 🔥 1. Poster හෝ details click කළ විට සෘජුවම අදාළ පිටුවට යයි (දැන්වීම් හෝ countdown ක්‍රියාත්මක නොවේ)
   const handleDetailsClick = (id: string) => {
     navigate({ to: "/content/$id", params: { id } });
   };
 
-  // 🔥 2. Download බටන් ක්ලික් කළ විට Monetag සහ Adsterra මාරුවෙන් මාරුවට 50% ක සම්භාවිතාවයකින් ක්‍රියාත්මක වේ
   const handleDownloadClick = (id: string) => {
     completedRef.current = false;
     setTargetId(id);
@@ -263,12 +262,10 @@ function HomePage() {
     window.open(adUrl, "_blank");
   };
 
-  // 🔥 3. Subtitle Request එකක් Supabase වෙත යැවීම (තත්පර 15ක Cooldown Spam Protection සහිතව)
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!requestTitle.trim()) return;
 
-    // Cooldown check
     const lastSubmit = localStorage.getItem("last_request_submit_time");
     const now = Date.now();
     if (lastSubmit && now - parseInt(lastSubmit, 10) < 15000) {
@@ -293,11 +290,10 @@ function HomePage() {
       setRequestTitle("");
       setRequestNotes("");
       localStorage.setItem("last_request_submit_time", String(now));
-      setTimeout(() => setRequestModalOpen(false), 2500); // සාර්ථක වූ විට තත්පර 2.5කින් වසා දමයි
+      setTimeout(() => setRequestModalOpen(false), 2500);
     }
   };
 
-  // 🔥 4. Countdown Logic Effect
   useEffect(() => {
     if (!modalOpen) {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -309,9 +305,9 @@ function HomePage() {
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current);
           completedRef.current = true;
-          setModalOpen(false); // ටයිමර් එක ඉවර වුණාම මෝඩල් එක වහනවා
+          setModalOpen(false);
           if (targetId) {
-            navigate({ to: "/content/$id", params: { id: targetId } }); // Content පිටුවට යනවා
+            navigate({ to: "/content/$id", params: { id: targetId } });
           }
           return 0;
         }
@@ -324,14 +320,13 @@ function HomePage() {
     };
   }, [modalOpen, targetId, navigate]);
 
-  // 🔥 5. Tab-Switching Anti-Cheat (Visibility API) - ඉක්මනින් ආපහු ආවොත් ටයිමර් එක 5ට Reset වෙනවා
   useEffect(() => {
     if (!modalOpen) return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && !completedRef.current) {
         setCountdown((prev) => {
-          if (prev > 0) return 5; // තවම 0 වෙලා නැත්නම් ආපහු 5 ඉඳන් පටන්ගන්නවා
+          if (prev > 0) return 5;
           return prev;
         });
       }
@@ -341,7 +336,6 @@ function HomePage() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [modalOpen]);
 
-  // 🔥 6. Back Button Blocking (පස්සට යන්න හැදුවොත් වළක්වනවා)
   useEffect(() => {
     if (!modalOpen) return;
 
@@ -513,7 +507,7 @@ function HomePage() {
         )}
       </section>
 
-      {/* 🔥 Request Subtitle Banner Section */}
+      {/* Request Subtitle Banner Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10">
         <div className="bg-gradient-to-r from-primary/10 to-cyan-500/10 rounded-3xl border border-border/80 p-8 text-center max-w-4xl mx-auto shadow-card">
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
@@ -731,7 +725,7 @@ function Hero({
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" /> Trending Now
           </span>
-          <span className="text-xs text-muted-foreground">Subtitles</span>
+          <span className="text-xs text-muted-foreground">Sinhala Subtitles</span>
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
@@ -1091,4 +1085,4 @@ function Footer() {
       </div>
     </footer>
   );
-}
+        }
