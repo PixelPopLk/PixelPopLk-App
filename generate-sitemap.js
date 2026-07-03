@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-// Environment Variable එක තිබුණොත් ඒක ගනියි, නැත්නම් string එකේ තියෙන URL එක ගනියි.
+// Netlify හෝ Cloudflare හි ඇති Environment Variables කියවා ගැනීම, නැතහොත් සෘජුවම URL එක භාවිතා කිරීම
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://gilnzvsnkwrnfbwhobow.supabase.co";
 const SUPABASE_ANON_KEY = process.env.sb_publishable_ZWL-aXdaOXfnYKKaTJO58w_FIya45KL || "ඔයාගේ_Supabase_Anon_Key_එක_මෙතැනට_දාන්න";
 
