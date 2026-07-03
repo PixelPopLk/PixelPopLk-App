@@ -27,7 +27,7 @@ async function generateSitemap() {
     }
 
     const subtitles = await res.json();
-    const baseUrl = "https://pixelpopshows.netlify.app"; // ඔයාගේ නිදහස් netlify ඩොමේන් එක
+    const baseUrl = "https://pixelpoplk.pages.dev"; // ඔයාගේ නිදහස් netlify ඩොමේන් එක
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
