@@ -123,21 +123,26 @@ function ContentPage() {
     return null;
   }, [data, id]);
 
-  if (isLoading) return <Shell><div className="h-96 rounded-3xl bg-muted/30 animate-pulse" /></Shell>;
-  if (!data) return <Shell><p>Loading…</p></Shell>;
-  if (!item) throw notFound();
-
+  // 🔥 Early returns සම්පූර්ණයෙන්ම ඉවත් කර, සියල්ල ප්‍රධාන return එක ඇතුළට ගෙන ඇත (Error 310 ස්ථාවරව වළක්වයි)
   return (
     <Shell>
-      {/* 🔥 Unique keys එක් කිරීමෙන් React Hooks පටලවා ගැනීම (Error 310) සම්පූර්ණයෙන්ම වළක්වා ඇත */}
-      {item.kind === "movie" ? (
-        <MovieView key={`movie-${item.id}`} item={item} />
+      {isLoading ? (
+        <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
+      ) : !data ? (
+        <p>Loading…</p>
+      ) : !item ? (
+        <div className="p-10 text-center text-destructive">Content not found</div>
       ) : (
-        <SeriesView key={`series-${item.id}`} item={item} />
+        <>
+          {item.kind === "movie" ? (
+            <MovieView key={`movie-${item.id}`} item={item} />
+          ) : (
+            <SeriesView key={`series-${item.id}`} item={item} />
+          )}
+          
+          <CommentsSection key={`comments-${id}`} subtitleId={id} />
+        </>
       )}
-      
-      {/* Comments Section එකටද unique key එකක් එක් කර ඇත (පිටු මාරු වන විට කමෙන්ට්ස් ක්ෂණිකව රීසෙට් වීමට) */}
-      <CommentsSection key={`comments-${id}`} subtitleId={id} />
     </Shell>
   );
 }
@@ -216,7 +221,7 @@ function Hero({
             </span>
             <GenreBadges genres={genres} />
           </div>
-          <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold leading- tracking-tight">{title}</h1>
+          <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold leading-[1.1] tracking-tight">{title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
             {year && (
               <span className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -528,7 +533,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
     }
 
     setSubmitting(true);
-    const { error } = await supabase.from("subtitle_comments").insert({
+    const { error = null } = await supabase.from("subtitle_comments").insert({
       subtitle_id: subtitleId,
       author_name: authorName.trim(),
       comment_text: commentText.trim(),
