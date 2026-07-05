@@ -1,9 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, Download, PlayCircle, Star, Subtitles, Tv } from "lucide-react";
 
-import { supabase, SUBTITLES_TABLE, SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import {
   buildGridItems,
   formatRating,
@@ -40,12 +40,12 @@ function EpisodePage() {
   const { data, isLoading } = useQuery({
     queryKey: ["subtitles"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: dbData, error } = await supabase
         .from(SUBTITLES_TABLE)
-        .select(SUBTITLE_COLUMNS)
+        .select("*") // <-- සියලුම දත්ත ආරක්ෂිතව කියවා ගනී
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Subtitle[];
+      return (dbData ?? []) as Subtitle[];
     },
   });
 
@@ -61,31 +61,37 @@ function EpisodePage() {
     return null;
   }, [data, id]);
 
-  if (isLoading) {
-    return (
-      <Shell>
-        <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
-      </Shell>
-    );
-  }
-  if (!data) return <Shell><p>Loading…</p></Shell>;
-  if (!found) throw notFound();
+  const series = found?.series;
+  const ep = found?.ep;
 
-  const { series, ep } = found;
-  const genres = splitGenres(ep.genre);
-  const rating = formatRating(ep.rating);
-  const year =
-    ep.year != null && ep.year !== ""
+  // React Hooks සැමවිටම පොදුවේ (Unconditionally) ක්‍රියාත්මක වීම සඳහා දත්ත ආරක්ෂිතව සකසා ගැනීම
+  const genres = useMemo(() => (ep ? splitGenres(ep.genre) : []), [ep]);
+  const rating = useMemo(() => (ep ? formatRating(ep.rating) : null), [ep]);
+  const year = useMemo(() => {
+    if (!ep) return "";
+    return ep.year != null && ep.year !== ""
       ? String(ep.year)
       : new Date(ep.created_at).getFullYear().toString();
-  const poster = ep.image_url || series.poster;
+  }, [ep]);
 
-  const episodeTitle = ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`;
-  const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${episodeTitle} | PixelPopLK`;
-  const descText = `Download Sinhala subtitle for ${series.showName} S${ep.season}E${ep.episode} (${episodeTitle}). High-quality Sinhala sub file synced on PixelPopLK.`;
-  const keywordText = `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle, ${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Subtitle, Sinhala Subitiles TV Series, PixelPopLK, Sinhala Subtitles`;
+  const poster = ep?.image_url || series?.poster || "";
+  const episodeTitle = ep ? (ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`) : "";
+
+  const titleText = series && ep
+    ? `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${episodeTitle} | PixelPopLK`
+    : "Episode — PixelPopLK";
+  
+  const descText = series && ep
+    ? `Download Sinhala subtitle for ${series.showName} S${ep.season}E${ep.episode} (${episodeTitle}). High-quality Sinhala sub file synced on PixelPopLK.`
+    : "";
+  
+  const keywordText = series && ep
+    ? `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle, ${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Subtitle, Sinhala Subitiles TV Series, PixelPopLK, Sinhala Subtitles`
+    : "";
 
   useEffect(() => {
+    if (!series || !ep) return; // දත්ත පූරණය වන තෙක් SEO update වීම නවත්වයි
+
     document.title = titleText;
     const updateMeta = (nameOrProperty: string, content: string, isProperty = false) => {
       const selector = isProperty 
@@ -112,7 +118,7 @@ function EpisodePage() {
     if (poster) updateMeta("twitter:image", poster);
   }, [series, ep, poster, titleText, descText, keywordText]);
 
-  const episodeSchema = {
+  const episodeSchema = series && ep ? {
     "@context": "https://schema.org",
     "@type": "TVEpisode",
     "name": episodeTitle,
@@ -135,102 +141,120 @@ function EpisodePage() {
       "encodingFormat": "application/x-subrip",
       "description": `Download Sinhala Subtitle (.srt) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`
     }
-  };
+  } : null;
 
   return (
     <Shell>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(episodeSchema) }}
-      />
-      <Link
-        to="/content/$id"
-        params={{ id: String(series.id) }}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back to {series.showName}
-      </Link>
+      {isLoading ? (
+        <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
+      ) : !data ? (
+        <p>Loading…</p>
+      ) : !found ? (
+        <div className="p-10 text-center text-destructive">Episode not found</div>
+      ) : (
+        <>
+          {episodeSchema && (
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{ __html: JSON.stringify(episodeSchema) }}
+            />
+          )}
+          
+          <Link
+            to="/content/$id"
+            params={{ id: String(series.id) }}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to {series.showName}
+          </Link>
 
-      <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
-        {poster && (
-          <div className="pointer-events-none absolute inset-0 opacity-30">
-            <img src={poster} alt="" className="w-full h-full object-cover blur-3xl scale-110" />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
-          </div>
-        )}
-        <div className="relative grid md:grid-cols-[320px_1fr] gap-0">
-          <div className="p-6 md:p-8 md:pr-0">
-            <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-border shadow-card bg-muted">
-              {poster && (
-                <img src={poster} alt={ep.title} className="absolute inset-0 w-full h-full object-cover" />
-              )}
-            </div>
-          </div>
-          <div className="p-6 sm:p-8 md:pl-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/15 text-primary text-xs font-semibold uppercase tracking-wide">
-                <Tv className="w-3 h-3" /> Episode
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-card/70 border border-border text-[11px] font-semibold uppercase tracking-wide">
-                S{String(ep.season).padStart(2, "0")} · E{String(ep.episode).padStart(2, "0")}
-              </span>
-              {genres.map((g) => (
-                <span
-                  key={g}
-                  className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide ${genreBadgeClass(g.toLowerCase())}`}
-                >
-                  {g}
-                </span>
-              ))}
-            </div>
-
-            <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-              {series.showName}
-            </p>
-            <h1 className="mt-1 text-3xl sm:text-4xl font-extrabold leading-[1.1] tracking-tight">
-              {episodeTitle}
-            </h1>
-
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                <Calendar className="w-4 h-4 text-primary" />
-                <span className="font-semibold text-foreground">{year}</span>
-              </span>
-              {rating && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-bold text-foreground">{rating}</span>
-                  <span className="text-muted-foreground text-xs">/ 10 IMDb</span>
-                </span>
-              )}
-            </div>
-
-            {ep.description ? (
-              <div className="mt-6">
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
-                  Overview
-                </h3>
-                <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">
-                  {ep.description}
-                </p>
-              </div>
-            ) : (
-              <div className="mt-6 p-4 rounded-xl bg-background/40 border border-border text-sm text-muted-foreground leading-relaxed">
-                High-quality Sinhala subtitle synced for the official release.
+          <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
+            {poster && (
+              <div className="pointer-events-none absolute inset-0 opacity-30">
+                <img src={poster} alt="" className="w-full h-full object-cover blur-3xl scale-110" />
+                <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
               </div>
             )}
+            <div className="relative grid md:grid-cols-[320px_1fr] gap-0">
+              <div className="p-6 md:p-8 md:pr-0">
+                <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-border shadow-card bg-muted">
+                  {poster && (
+                    <img src={poster} alt={ep.title} className="absolute inset-0 w-full h-full object-cover" />
+                  )}
+                </div>
+              </div>
+              <div className="p-6 sm:p-8 md:pl-8">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/15 text-primary text-xs font-semibold uppercase tracking-wide">
+                    <Tv className="w-3 h-3" /> Episode
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-card/70 border border-border text-[11px] font-semibold uppercase tracking-wide">
+                    S{String(ep.season).padStart(2, "0")} · E{String(ep.episode).padStart(2, "0")}
+                  </span>
+                  {genres.map((g) => (
+                    <span
+                      key={g}
+                      className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide ${genreBadgeClass(g.toLowerCase())}`}
+                    >
+                      {g}
+                    </span>
+                  ))}
+                </div>
 
-            <div className="mt-7">
-              <DownloadButton downloadLink={ep.download_link} label="Download Subtitle" />
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                Opens in a new tab. Thank you for supporting PixelPopLK ❤
-              </p>
+                <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+                  {series.showName}
+                </p>
+                <h1 className="mt-1 text-3xl sm:text-4xl font-extrabold leading-[1.1] tracking-tight">
+                  {episodeTitle}
+                </h1>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <span className="font-semibold text-foreground">{year}</span>
+                  </span>
+                  {rating && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-bold text-foreground">{rating}</span>
+                      <span className="text-muted-foreground text-xs">/ 10 IMDb</span>
+                    </span>
+                  )}
+                </div>
+
+                {ep.description ? (
+                  <div className="mt-6">
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
+                      Overview
+                    </h3>
+                    <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">
+                      {ep.description}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-6 p-4 rounded-xl bg-background/40 border border-border text-sm text-muted-foreground leading-relaxed">
+                    High-quality Sinhala subtitle synced for the official release.
+                  </div>
+                )}
+
+                {/* 🔥 ඩවුන්ලෝඩ් බොත්තම් 2ම (Direct සහ Telegram) මෙහි සාර්ථකව සකසා ඇත */}
+                <div className="mt-7 flex flex-col sm:flex-row gap-3">
+                  <DownloadButton downloadLink={ep.download_link} label="Direct Download (.srt)" />
+                  {(ep as any).telegram_link && (
+                    <DownloadButton downloadLink={(ep as any).telegram_link} label="Telegram Download" variant="telegram" />
+                  )}
+                </div>
+                
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Opens in a new tab. Thank you for supporting PixelPopLK ❤
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <OtherEpisodes series={found.series} currentId={String(ep.id)} />
+          <OtherEpisodes series={found.series} currentId={String(ep.id)} />
+        </>
+      )}
     </Shell>
   );
 }
