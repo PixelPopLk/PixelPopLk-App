@@ -2,8 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, Lock, AlertTriangle, CheckCircle, X } from "lucide-react";
 
+// Monetag සහ Adsterra 50/50 සසම්භාවීව මාරු වීම සඳහා URL දෙකම ඇතුළත් කර ඇත
 const MONETAG_URL = "https://omg10.com/4/11202064";
+const ADSTERRA_URL = "https://www.effectivecpmnetwork.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+
 const COUNTDOWN_SECONDS = 5;
+
+// සසම්භාවීව දැන්වීම් URL එකක් ලබා ගන්නා සරල ශ්‍රිතය
+const getRandomAdUrl = () => Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL;
 
 /**
  * Sanitizes and validates a URL to prevent protocol-based XSS attacks (e.g. javascript: URLs)
@@ -39,6 +45,7 @@ export function DownloadCountdownModal({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPageVisibleRef = useRef<boolean>(true);
 
+  // පළමු වතාවට මෝඩල් එක ඕපන් වන විට පමණක් මුල සිට ටයිමරය පටන් ගනී
   const startVerification = () => {
     accumulatedTimeRef.current = 0;
     blurTimeRef.current = null;
@@ -91,7 +98,7 @@ export function DownloadCountdownModal({
           blurTimeRef.current = null;
         }
 
-        // Check if returned too early
+        // පරිශීලකයා නියමිත කාලයට පෙර නැවත පැමිණියහොත් ටයිමරය නතර (Freeze) කර Warning තත්ත්වයට පත් කරයි
         if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
           if (timerRef.current) clearInterval(timerRef.current);
           setStatus("warning");
@@ -138,14 +145,20 @@ export function DownloadCountdownModal({
     };
   }, [status]);
 
-  const handleRetry = () => {
+  // 🔥 Freeze වූ තත්පර ගණනින් නැවත ආරම්භ කිරීම (Resume Logic)
+  const handleResume = () => {
+    // නැවතත් 50% සසම්භාවීව ඇඩ් එකක් අලුත් ටැබ් එකකින් විවෘත කරයි
+    const activeAdUrl = getRandomAdUrl();
     try {
-      const w = window.open(MONETAG_URL, "_blank", "noopener,noreferrer");
+      const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
       if (w) w.opener = null;
     } catch {
       /* noop */
     }
-    startVerification();
+    
+    // දත්ත ඉතිරි තත්පර ගණනින් පටන් ගැනීමට සලස්වයි
+    blurTimeRef.current = null;
+    setStatus("verifying");
   };
 
   const circumference = 2 * Math.PI * 32; // r=32
@@ -192,23 +205,23 @@ export function DownloadCountdownModal({
 
           <div className="p-8 flex flex-col items-center text-center gap-5">
             {status === "warning" ? (
-              /* Warning state when returned too early */
+              /* Warning/Paused state when returned too early */
               <>
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 grid place-items-center">
                   <AlertTriangle className="w-8 h-8 text-amber-400 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Verification Failed</h3>
+                  <h3 className="text-base font-bold text-foreground">Verification Paused</h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     You returned too early! Please stay on the sponsor page for at least{" "}
-                    <span className="text-amber-400 font-semibold">{COUNTDOWN_SECONDS} seconds</span> to unlock the download.
+                    <span className="text-amber-400 font-semibold">{secondsLeft} more seconds</span> to unlock the download.
                   </p>
                 </div>
                 <button
-                  onClick={handleRetry}
+                  onClick={handleResume} // <-- Resume button එක
                   className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
                 >
-                  Try Again
+                  Resume Unlocking
                 </button>
               </>
             ) : status === "completed" ? (
@@ -314,7 +327,7 @@ export function DownloadCountdownModal({
                 </div>
 
                 <button
-                  onClick={handleRetry}
+                  onClick={handleResume}
                   className="text-xs text-primary/80 hover:text-primary underline cursor-pointer"
                 >
                   Sponsor page didn't open? Click here
@@ -333,10 +346,12 @@ export function DownloadButton({
   downloadLink,
   label = "Download Subtitle",
   className,
+  variant = "primary", // Telegram සහ Direct බටන්ස් වෙන්කර හඳුනා ගැනීමට variant එකතු කරන ලදී
 }: {
   downloadLink: string;
   label?: string;
   className?: string;
+  variant?: "primary" | "telegram";
 }) {
   const [showModal, setShowModal] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -365,9 +380,10 @@ export function DownloadButton({
         alert("Invalid or unsafe download link detected.");
       }
     } else {
-      // First click: Open ad and show modal
+      // First click: Open ad randomly from rotator and show modal
+      const activeAdUrl = getRandomAdUrl();
       try {
-        const w = window.open(MONETAG_URL, "_blank", "noopener,noreferrer");
+        const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
         if (w) w.opener = null;
       } catch {
         /* noop */
@@ -395,14 +411,18 @@ export function DownloadButton({
     }
   };
 
+  // Telegram variant එක සඳහා ලස්සන නිල් පැහැති Telegram style gradient එකක් සහ shadow එකක් එක් කර ඇත
+  const buttonClass = className ?? (
+    variant === "telegram"
+      ? "inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm shadow-[0_4px_15px_rgba(6,182,212,0.35)] hover:opacity-95 transition cursor-pointer"
+      : "inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-primary text-primary-foreground font-bold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
+  );
+
   return (
     <>
       <button
         onClick={handleDownloadClick}
-        className={
-          className ??
-          "inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-primary text-primary-foreground font-bold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
-        }
+        className={buttonClass}
       >
         {isUnlocked ? (
           <CheckCircle className="w-4 h-4 text-emerald-400" />
@@ -421,4 +441,4 @@ export function DownloadButton({
       )}
     </>
   );
-}
+    }
