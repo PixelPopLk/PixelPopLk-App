@@ -54,12 +54,18 @@ export function DownloadCountdownModal({
   };
 
   useEffect(() => {
-    // සත්‍යාපනය (verifying) නොවන අවස්ථාවලදී ටයිමරය පමණක් නවත්වයි, Early Return කරන්නේ නැත
     if (status !== "verifying") {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
+    // Set initial visibility state
+    const isVisible = document.visibilityState === "visible";
+    isPageVisibleRef.current = isVisible;
+    if (!isVisible) {
+      blurTimeRef.current = Date.now();
+    } else {
+      blurTimeRef.current = null;
     }
 
     const updateTimer = () => {
@@ -79,20 +85,9 @@ export function DownloadCountdownModal({
       }
     };
 
-    // 'verifying' තත්ත්වයේදී පමණක් ටයිමරය පණගන්වයි
-    if (status === "verifying") {
-      const isVisible = document.visibilityState === "visible";
-      isPageVisibleRef.current = isVisible;
-      if (!isVisible) {
-        blurTimeRef.current = Date.now();
-      } else {
-        blurTimeRef.current = null;
-      }
-      timerRef.current = setInterval(updateTimer, 100);
-    }
+    timerRef.current = setInterval(updateTimer, 100);
 
     const handleVisibilityChange = () => {
-      if (status !== "verifying") return;
       const isVisible = document.visibilityState === "visible";
       const now = Date.now();
 
@@ -103,6 +98,7 @@ export function DownloadCountdownModal({
           blurTimeRef.current = null;
         }
 
+        // පරිශීលකයා නියමිත කාලයට පෙර නැවත පැමිණියහොත් ටයිමරය නතර (Freeze) කර Warning තත්ත්වයට පත් කරයි
         if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
           if (timerRef.current) clearInterval(timerRef.current);
           setStatus("warning");
@@ -114,7 +110,6 @@ export function DownloadCountdownModal({
     };
 
     const handleBlur = () => {
-      if (status !== "verifying") return;
       const now = Date.now();
       if (isPageVisibleRef.current) {
         isPageVisibleRef.current = false;
@@ -123,7 +118,6 @@ export function DownloadCountdownModal({
     };
 
     const handleFocus = () => {
-      if (status !== "verifying") return;
       const now = Date.now();
       if (!isPageVisibleRef.current) {
         isPageVisibleRef.current = true;
@@ -153,6 +147,7 @@ export function DownloadCountdownModal({
 
   // 🔥 Freeze වූ තත්පර ගණනින් නැවත ආරම්භ කිරීම (Resume Logic)
   const handleResume = () => {
+    // නැවතත් 50% සසම්භාවීව ඇඩ් එකක් අලුත් ටැබ් එකකින් විවෘත කරයි
     const activeAdUrl = getRandomAdUrl();
     try {
       const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
@@ -161,6 +156,7 @@ export function DownloadCountdownModal({
       /* noop */
     }
     
+    // දත්ත ඉතිරි තත්පර ගණනින් පටන් ගැනීමට සලස්වයි
     blurTimeRef.current = null;
     setStatus("verifying");
   };
@@ -209,6 +205,7 @@ export function DownloadCountdownModal({
 
           <div className="p-8 flex flex-col items-center text-center gap-5">
             {status === "warning" ? (
+              /* Warning/Paused state when returned too early */
               <>
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 grid place-items-center">
                   <AlertTriangle className="w-8 h-8 text-amber-400 animate-pulse" />
@@ -221,13 +218,14 @@ export function DownloadCountdownModal({
                   </p>
                 </div>
                 <button
-                  onClick={handleResume}
-                  className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
+                  onClick={handleResume} // <-- Resume button එක
+                  className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-95 transition cursor-pointer w-full"
                 >
                   Resume Unlocking
                 </button>
               </>
             ) : status === "completed" ? (
+              /* Completed state */
               <>
                 <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 grid place-items-center">
                   <CheckCircle className="w-8 h-8 text-emerald-400 animate-bounce" />
@@ -264,10 +262,14 @@ export function DownloadCountdownModal({
                 </div>
               </>
             ) : (
+              /* Countdown state */
               <>
+                {/* SVG Countdown Ring */}
                 <div className="relative w-24 h-24 flex items-center justify-center">
                   <svg className="absolute inset-0 -rotate-90" width="96" height="96" viewBox="0 0 96 96">
+                    {/* Track */}
                     <circle cx="48" cy="48" r="32" fill="none" stroke="oklch(1 0 0 / 0.06)" strokeWidth="6" />
+                    {/* Progress */}
                     <circle
                       cx="48"
                       cy="48"
@@ -313,6 +315,7 @@ export function DownloadCountdownModal({
                   </p>
                 </div>
 
+                {/* Progress bar */}
                 <div className="w-full h-1.5 rounded-full bg-muted/40 overflow-hidden">
                   <div
                     className="h-full bg-gradient-primary rounded-full transition-all"
@@ -338,6 +341,7 @@ export function DownloadCountdownModal({
   );
 }
 
+/** Replacement for <a href={downloadLink}> — shows countdown modal instead */
 export function DownloadButton({
   downloadLink,
   label = "Download Subtitle",
@@ -413,22 +417,4 @@ export function DownloadButton({
 
   return (
     <>
-      <button onClick={handleDownloadClick} className={buttonClass}>
-        {isUnlocked ? (
-          <CheckCircle className="w-4 h-4 text-emerald-400" />
-        ) : (
-          <Download className="w-4 h-4" />
-        )}
-        {isUnlocked ? "Download Now" : label}
-      </button>
-
-      {showModal && (
-        <DownloadCountdownModal
-          downloadLink={downloadLink}
-          onClose={() => setShowModal(false)}
-          onUnlockSuccess={handleUnlockSuccess}
-        />
-      )}
-    </>
-  );
-}
+      <button
