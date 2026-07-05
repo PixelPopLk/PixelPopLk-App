@@ -1,441 +1,646 @@
-import React, { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Download, Lock, AlertTriangle, CheckCircle, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Calendar,
+  Download,
+  Film,
+  PlayCircle,
+  Star,
+  Subtitles,
+  Tv,
+  MessageSquare,
+  Trash2,
+  Send,
+  Loader2,
+} from "lucide-react";
 
-// Monetag සහ Adsterra 50/50 සසම්භාවීව මාරු වීම සඳහා URL දෙකම ඇතුළත් කර ඇත
-const MONETAG_URL = "https://omg10.com/4/11202064";
-const ADSTERRA_URL = "https://www.effectivecpmnetwork.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+import { supabase, SUBTITLES_TABLE, SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import {
+  buildGridItems,
+  formatRating,
+  genreBadgeClass,
+  splitGenres,
+  type GridItem,
+} from "@/lib/subtitles";
+import { Navbar } from "@/components/Navbar";
+import { DownloadButton } from "@/components/DownloadCountdown";
 
-const COUNTDOWN_SECONDS = 5;
-
-// සසම්භාවීව දැන්වීම් URL එකක් ලබා ගන්නා සරල ශ්‍රිතය
-const getRandomAdUrl = () => Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL;
-
-/**
- * Sanitizes and validates a URL to prevent protocol-based XSS attacks (e.g. javascript: URLs)
- */
-export function isSafeUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  try {
-    const cleanUrl = url.trim();
-    if (cleanUrl.startsWith("/")) return true;
-    const parsed = new URL(cleanUrl);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "ipfs:";
-  } catch {
-    return false;
-  }
+// ඔයා එවපු රූපයට සමාන, Pure SVG ඇසුරින් නිමවූ නවීනතම PixelPopLK Monogram (P + L) ලෝගෝව
+export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className={`${className} filter drop-shadow-[0_2px_8px_rgba(59,130,246,0.3)]`}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        {/* Futuristic Metallic Silver/Slate Gradient (P අකුර සඳහා) */}
+        <linearGradient id="metal-silver" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="35%" stopColor="#cbd5e1" />
+          <stop offset="70%" stopColor="#64748b" />
+          <stop offset="100%" stopColor="#1e293b" />
+        </linearGradient>
+        {/* Futuristic Metallic Gold/Bronze Gradient (L අකුරෙහි වක්‍රය සඳහා) */}
+        <linearGradient id="metal-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#fef08a" />
+          <stop offset="40%" stopColor="#ca8a04" />
+          <stop offset="80%" stopColor="#854d0e" />
+          <stop offset="100%" stopColor="#422006" />
+        </linearGradient>
+      </defs>
+      
+      {/* outer 'P' backbone with futuristic angles (Silver) */}
+      <path
+        d="M26,18 L60,18 C78,18 78,44 60,44 L38,44 L38,82 L26,82 Z"
+        fill="url(#metal-silver)"
+        stroke="#0f172a"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+      
+      {/* inner 'L' sweep seamlessly fused (Gold) */}
+      <path
+        d="M48,31 C56,31 66,35 66,45 C66,58 52,69 38,69 L64,69"
+        fill="none"
+        stroke="url(#metal-gold)"
+        strokeWidth="9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
-interface DownloadCountdownModalProps {
-  downloadLink: string;
-  onClose: () => void;
-  onUnlockSuccess: () => void;
+export const Route = createFileRoute("/content/$id")({
+  head: () => ({ meta: [{ title: "Subtitle — PixelPopLK" }] }),
+  component: ContentPage,
+  errorComponent: ({ error }) => (
+    <div className="min-h-screen grid place-items-center p-6 text-center">
+      <p className="text-destructive">{error.message}</p>
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="min-h-screen grid place-items-center p-6 text-center">
+      <div>
+        <h1 className="text-2xl font-bold">Content not found</h1>
+        <Link to="/" className="mt-4 inline-block text-primary hover:underline">
+          ← Back home
+        </Link>
+      </div>
+    </div>
+  ),
+});
+
+function ContentPage() {
+  const { id } = Route.useParams();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["subtitles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from(SUBTITLES_TABLE)
+        .select(SUBTITLE_COLUMNS)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Subtitle[];
+    },
+  });
+
+  const item = useMemo<GridItem | null>(() => {
+    if (!data) return null;
+    const items = buildGridItems(data);
+    // direct id match
+    const direct = items.find((it) => String(it.id) === id);
+    if (direct) return direct;
+    // search across series episodes
+    for (const it of items) {
+      if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id)) return it;
+    }
+    return null;
+  }, [data, id]);
+
+  if (isLoading) return <Shell><div className="h-96 rounded-3xl bg-muted/30 animate-pulse" /></Shell>;
+  if (!data) return <Shell><p>Loading…</p></Shell>;
+  if (!item) throw notFound();
+
+  return (
+    <Shell>
+      {/* 🔥 Unique keys එක් කිරීමෙන් React Hooks පටලවා ගැනීම (Error 310) සම්පූර්ණයෙන්ම වළක්වා ඇත */}
+      {item.kind === "movie" ? (
+        <MovieView key={`movie-${item.id}`} item={item} />
+      ) : (
+        <SeriesView key={`series-${item.id}`} item={item} />
+      )}
+      
+      {/* Comments Section එකටද unique key එකක් එක් කර ඇත (පිටු මාරු වන විට කමෙන්ට්ස් ක්ෂණිකව රීසෙට් වීමට) */}
+      <CommentsSection key={`comments-${id}`} subtitleId={id} />
+    </Shell>
+  );
 }
 
-export function DownloadCountdownModal({
-  downloadLink,
-  onClose,
-  onUnlockSuccess,
-}: DownloadCountdownModalProps) {
-  const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
-  const [status, setStatus] = useState<"verifying" | "warning" | "completed">("verifying");
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar showBack backTo="/" backText="Back" />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">{children}</main>
+    </div>
+  );
+}
 
-  const blurTimeRef = useRef<number | null>(null);
-  const accumulatedTimeRef = useRef<number>(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isPageVisibleRef = useRef<boolean>(true);
 
-  // පළමු වතාවට මෝඩල් එක ඕපන් වන විට පමණක් මුල සිට ටයිමරය පටන් ගනී
-  const startVerification = () => {
-    accumulatedTimeRef.current = 0;
-    blurTimeRef.current = null;
-    setSecondsLeft(COUNTDOWN_SECONDS);
-    setStatus("verifying");
-  };
+function GenreBadges({ genres }: { genres: string[] }) {
+  if (genres.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {genres.map((g) => (
+        <span
+          key={g}
+          className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide ${genreBadgeClass(g.toLowerCase())}`}
+        >
+          {g}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function Hero({
+  poster,
+  title,
+  year,
+  rating,
+  genres,
+  kindLabel,
+  KindIcon,
+  description,
+  children,
+}: {
+  poster: string;
+  title: string;
+  year?: string | null;
+  rating?: string | null;
+  genres: string[];
+  kindLabel: string;
+  KindIcon: typeof Film;
+  description?: string | null;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
+      {poster && (
+        <div className="pointer-events-none absolute inset-0 opacity-30">
+          <img src={poster} alt="" className="w-full h-full object-cover blur-3xl scale-110" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
+        </div>
+      )}
+      <div className="relative grid md:grid-cols-[320px_1fr] gap-0">
+        <div className="p-6 md:p-8 md:pr-0">
+          <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-border shadow-card bg-muted">
+            {poster ? (
+              <img src={poster} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 grid place-items-center text-muted-foreground">
+                <Film className="w-16 h-16" />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="p-6 sm:p-8 md:pl-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/15 text-primary text-xs font-semibold uppercase tracking-wide">
+              <KindIcon className="w-3 h-3" /> {kindLabel}
+            </span>
+            <GenreBadges genres={genres} />
+          </div>
+          <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold leading- tracking-tight">{title}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            {year && (
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <Calendar className="w-4 h-4 text-primary" />
+                <span className="font-semibold text-foreground">{year}</span>
+              </span>
+            )}
+            {rating && (
+              <span className="inline-flex items-center gap-1.5">
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-bold text-foreground">{rating}</span>
+                <span className="text-muted-foreground text-xs">/ 10 IMDb</span>
+              </span>
+            )}
+          </div>
+          {description ? (
+            <div className="mt-6">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">Overview</h3>
+              <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">{description}</p>
+            </div>
+          ) : null}
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
+  const s = item.sub;
+  const year = s.year != null && s.year !== "" ? String(s.year) : new Date(s.created_at).getFullYear().toString();
+  const genres = splitGenres(s.genre);
+
+  const titleText = `${s.title} (${year}) Sinhala Subtitle | Download Movie Subtitles | PixelPopLK`;
+  const descText = s.description 
+    ? s.description.slice(0, 160)
+    : `Download Sinhala subtitles for ${s.title} (${year}). High-quality Sinhala sub file synced for official release. Fast & secure on PixelPopLK.`;
+  
+  const customMeta = (s as any).metatags;
+  const keywordText = customMeta 
+    ? `${s.title} Sinhala Subtitle, ${customMeta}`
+    : `${s.title} Sinhala Subtitle, Download ${s.title} Subtitle, PixelPopLK, Sinhala Subtitles, Movie Subtitles`;
 
   useEffect(() => {
-    if (status !== "verifying") {
-      if (timerRef.current) clearInterval(timerRef.current);
+    document.title = titleText;
+    const updateMeta = (nameOrProperty: string, content: string, isProperty = false) => {
+      const selector = isProperty 
+        ? `meta[property="${nameOrProperty}"]` 
+        : `meta[name="${nameOrProperty}"]`;
+      let element = document.querySelector(selector);
+      if (!element) {
+        element = document.createElement("meta");
+        if (isProperty) element.setAttribute("property", nameOrProperty);
+        else element.setAttribute("name", nameOrProperty);
+        document.head.appendChild(element);
+      }
+      element.setAttribute("content", content);
+    };
+
+    updateMeta("description", descText);
+    updateMeta("keywords", keywordText);
+    updateMeta("robots", "index, follow");
+    updateMeta("og:title", titleText, true);
+    updateMeta("og:description", descText, true);
+    updateMeta("og:type", "video.movie", true);
+    if (s.image_url) updateMeta("og:image", s.image_url, true);
+    updateMeta("twitter:title", titleText);
+    updateMeta("twitter:description", descText);
+    if (s.image_url) updateMeta("twitter:image", s.image_url);
+  }, [s, year, titleText, descText, keywordText]);
+
+  const movieSchema = {
+    "@context": "https://schema.org",
+    "@type": "Movie",
+    "name": s.title,
+    "image": s.image_url,
+    "description": s.description || `Download Sinhala Subtitle for ${s.title}`,
+    "datePublished": s.year || year,
+    "workFeaturedBy": {
+      "@type": "DataDownload",
+      "name": `${s.title} Sinhala Subtitle`,
+      "contentUrl": s.download_link,
+      "encodingFormat": "application/x-subrip",
+      "description": `Download Sinhala Subtitle (.srt) for ${s.title}`
+    }
+  };
+
+  return (
+    <Hero
+      poster={s.image_url}
+      title={s.title}
+      year={year}
+      rating={formatRating(s.rating)}
+      genres={genres}
+      kindLabel="Movie"
+      KindIcon={Film}
+      description={s.description}
+    >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
+      />
+      
+      {/* Direct ඩවුන්ලෝඩ් සහ Telegram ඩවුන්ලෝඩ් බොත්තම් 2ම මෙහි සකසා ඇත */}
+      <div className="mt-7 flex flex-col sm:flex-row gap-3">
+        <DownloadButton downloadLink={s.download_link} label="Direct Download (.srt)" />
+        {(s as any).telegram_link && (
+          <DownloadButton downloadLink={(s as any).telegram_link} label="Telegram Download" variant="telegram" />
+        )}
+      </div>
+      
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        Opens in a new tab. Thank you for supporting PixelPopLK ❤
+      </p>
+    </Hero>
+  );
+}
+
+function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
+  const meta = useMemo(() => {
+    const withDesc = item.episodes.find((e) => e.description) ?? item.episodes[0];
+    const withRating = item.episodes.find((e) => e.rating != null && e.rating !== "") ?? item.episodes[0];
+    const withYear = item.episodes.find((e) => e.year != null && e.year !== "") ?? item.episodes[0];
+    return {
+      description: withDesc?.description ?? null,
+      rating: formatRating(withRating?.rating),
+      year:
+        withYear?.year != null && withYear.year !== ""
+          ? String(withYear.year)
+          : new Date(item.latestDate).getFullYear().toString(),
+    };
+  }, [item]);
+
+  const genres = useMemo(() => {
+    const set = new Set<string>();
+    item.episodes.forEach((e) => splitGenres(e.genre).forEach((g) => set.add(g)));
+    return Array.from(set);
+  }, [item]);
+
+  const seasons = useMemo(() => {
+    const set = new Set(item.episodes.map((e) => e.season));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [item]);
+
+  const [season, setSeason] = useState<number>(seasons[0] ?? 1);
+  const seasonEpisodes = useMemo(
+    () => item.episodes.filter((e) => e.season === season).sort((a, b) => a.episode - b.episode),
+    [item, season],
+  );
+
+  const titleText = `${item.showName} Sinhala Subtitles | TV Series Download | PixelPopLK`;
+  const descText = meta.description 
+    ? meta.description.slice(0, 160)
+    : `Download Sinhala subtitles for TV Series ${item.showName} (${meta.year}). Latest seasons and episodes available on PixelPopLK.`;
+  
+  const customMeta = useMemo(() => {
+    const metas = item.episodes.map(e => (e as any).metatags).filter(Boolean);
+    return metas.length > 0 ? metas[0] : null;
+  }, [item]);
+
+  const keywordText = customMeta
+    ? `${item.showName} Sinhala Subtitles, ${customMeta}`
+    : `${item.showName} Sinhala Subtitles, Sinhala Subitiles TV Series, ${item.showName} Sinhala Subitiles TV Series, PixelPopLK`;
+
+  useEffect(() => {
+    document.title = titleText;
+    const updateMeta = (nameOrProperty: string, content: string, isProperty = false) => {
+      const selector = isProperty 
+        ? `meta[property="${nameOrProperty}"]` 
+        : `meta[name="${nameOrProperty}"]`;
+      let element = document.querySelector(selector);
+      if (!element) {
+        element = document.createElement("meta");
+        if (isProperty) element.setAttribute("property", nameOrProperty);
+        else element.setAttribute("name", nameOrProperty);
+        document.head.appendChild(element);
+      }
+      element.setAttribute("content", content);
+    };
+
+    updateMeta("description", descText);
+    updateMeta("keywords", keywordText);
+    updateMeta("robots", "index, follow");
+    updateMeta("og:title", titleText, true);
+    updateMeta("og:description", descText, true);
+    updateMeta("og:type", "video.tv_show", true);
+    if (item.poster) updateMeta("og:image", item.poster, true);
+    updateMeta("twitter:title", titleText);
+    updateMeta("twitter:description", descText);
+    if (item.poster) updateMeta("twitter:image", item.poster);
+  }, [item, titleText, descText, keywordText]);
+
+  const seriesSchema = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    "name": item.showName,
+    "image": item.poster,
+    "description": meta.description || `Download Sinhala Subtitles for TV Series ${item.showName}`,
+    "numberOfEpisodes": item.episodes.length,
+    "numberOfSeasons": seasons.length
+  };
+
+  return (
+    <Hero
+      poster={item.poster}
+      title={item.showName}
+      year={meta.year}
+      rating={meta.rating}
+      genres={genres}
+      kindLabel="TV Series"
+      KindIcon={Tv}
+      description={meta.description}
+    >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(seriesSchema) }}
+      />
+      <p className="mt-4 text-xs text-muted-foreground">
+        {item.episodes.length} episode{item.episodes.length === 1 ? "" : "s"} across {seasons.length} season
+        {seasons.length === 1 ? "" : "s"}
+      </p>
+
+      <div className="mt-6">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-2">
+          {seasons.map((s) => {
+            const active = s === season;
+            return (
+              <button
+                key={s}
+                onClick={() => setSeason(s)}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition ${
+                  active
+                    ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
+                    : "bg-card/60 text-muted-foreground border-border hover:text-foreground hover:border-primary/40"
+                }`}
+              >
+                Season {String(s).padStart(2, "0")}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {seasonEpisodes.map((ep) => (
+            <Link
+              key={String(ep.id)}
+              to="/episode/$id"
+              params={{ id: String(ep.id) }}
+              className="flex items-center gap-3 p-3 rounded-xl bg-background/60 border border-border hover:border-primary/40 transition group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-primary/15 text-primary grid place-items-center shrink-0">
+                <PlayCircle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold truncate group-hover:text-primary transition">
+                  Episode {String(ep.episode).padStart(2, "0")}
+                  {ep.epTitle ? <span className="text-muted-foreground font-normal"> — {ep.epTitle}</span> : null}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">{ep.title}</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-card border border-border text-xs font-semibold text-foreground/80 group-hover:border-primary/50 group-hover:text-primary transition shrink-0">
+                Open
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </Hero>
+  );
+}
+
+function CommentsSection({ subtitleId }: { subtitleId: string }) {
+  const [authorName, setAuthorName] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const { data: comments, refetch } = useQuery({
+    queryKey: ["comments", subtitleId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subtitle_comments")
+        .select("*")
+        .eq("subtitle_id", subtitleId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setIsAdmin(true);
+    });
+
+    const savedName = localStorage.getItem("comment_author_name");
+    if (savedName) setAuthorName(savedName);
+  }, []);
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorName.trim() || !commentText.trim()) return;
+
+    const lastSubmit = localStorage.getItem("last_comment_submit_time");
+    const now = Date.now();
+    if (lastSubmit && now - parseInt(lastSubmit, 10) < 15000) {
+      alert("Please wait 15 seconds before posting another comment!");
       return;
     }
 
-    // Set initial visibility state
-    const isVisible = document.visibilityState === "visible";
-    isPageVisibleRef.current = isVisible;
-    if (!isVisible) {
-      blurTimeRef.current = Date.now();
+    setSubmitting(true);
+    const { error } = await supabase.from("subtitle_comments").insert({
+      subtitle_id: subtitleId,
+      author_name: authorName.trim(),
+      comment_text: commentText.trim(),
+    });
+
+    setSubmitting(false);
+
+    if (error) {
+      alert(`Error: ${error.message}`);
     } else {
-      blurTimeRef.current = null;
+      setCommentText("");
+      localStorage.setItem("comment_author_name", authorName.trim());
+      localStorage.setItem("last_comment_submit_time", String(now));
+      refetch();
     }
-
-    const updateTimer = () => {
-      const now = Date.now();
-      let currentSessionTime = 0;
-      if (blurTimeRef.current !== null) {
-        currentSessionTime = now - blurTimeRef.current;
-      }
-      const totalMs = accumulatedTimeRef.current + currentSessionTime;
-      const remainingSeconds = Math.max(0, COUNTDOWN_SECONDS - Math.floor(totalMs / 1000));
-      setSecondsLeft(remainingSeconds);
-
-      if (totalMs >= COUNTDOWN_SECONDS * 1000) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setStatus("completed");
-        onUnlockSuccess();
-      }
-    };
-
-    timerRef.current = setInterval(updateTimer, 100);
-
-    const handleVisibilityChange = () => {
-      const isVisible = document.visibilityState === "visible";
-      const now = Date.now();
-
-      if (isVisible) {
-        isPageVisibleRef.current = true;
-        if (blurTimeRef.current !== null) {
-          accumulatedTimeRef.current += now - blurTimeRef.current;
-          blurTimeRef.current = null;
-        }
-
-        // පරිශීලකයා නියමිත කාලයට පෙර නැවත පැමිණියහොත් ටයිමරය නතර (Freeze) කර Warning තත්ත්වයට පත් කරයි
-        if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setStatus("warning");
-        }
-      } else {
-        isPageVisibleRef.current = false;
-        blurTimeRef.current = now;
-      }
-    };
-
-    const handleBlur = () => {
-      const now = Date.now();
-      if (isPageVisibleRef.current) {
-        isPageVisibleRef.current = false;
-        blurTimeRef.current = now;
-      }
-    };
-
-    const handleFocus = () => {
-      const now = Date.now();
-      if (!isPageVisibleRef.current) {
-        isPageVisibleRef.current = true;
-        if (blurTimeRef.current !== null) {
-          accumulatedTimeRef.current += now - blurTimeRef.current;
-          blurTimeRef.current = null;
-        }
-
-        if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setStatus("warning");
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [status]);
-
-  // 🔥 Freeze වූ තත්පර ගණනින් නැවත ආරම්භ කිරීම (Resume Logic)
-  const handleResume = () => {
-    // නැවතත් 50% සසම්භාවීව ඇඩ් එකක් අලුත් ටැබ් එකකින් විවෘත කරයි
-    const activeAdUrl = getRandomAdUrl();
-    try {
-      const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
-      if (w) w.opener = null;
-    } catch {
-      /* noop */
-    }
-    
-    // දත්ත ඉතිරි තත්පර ගණනින් පටන් ගැනීමට සලස්වයි
-    blurTimeRef.current = null;
-    setStatus("verifying");
   };
 
-  const circumference = 2 * Math.PI * 32; // r=32
-  const dashOffset = circumference * (secondsLeft / COUNTDOWN_SECONDS);
-
-  const safeDownloadLink = isSafeUrl(downloadLink) ? downloadLink : "#";
+  const handleDeleteComment = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    const { error } = await supabase.from("subtitle_comments").delete().eq("id", id);
+    if (error) alert(error.message);
+    else refetch();
+  };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key="modal-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
-        <motion.div
-          key="modal-card"
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
-          className="relative w-full max-w-sm rounded-3xl border border-border shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] overflow-hidden"
-          style={{
-            background: "linear-gradient(160deg, oklch(0.20 0.01 20 / 0.98), oklch(0.14 0.008 20 / 0.98))",
-          }}
-        >
-          {/* Top glow strip */}
-          <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-primary opacity-80" />
+    <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-6 sm:p-8 space-y-6">
+      <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
+        <MessageSquare className="w-5 h-5 text-primary" />
+        Feedback & Comments <span className="text-xs font-normal text-muted-foreground">({comments?.length ?? 0})</span>
+      </h3>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute top-4 right-4 w-7 h-7 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition cursor-pointer text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-
-          <div className="p-8 flex flex-col items-center text-center gap-5">
-            {status === "warning" ? (
-              /* Warning/Paused state when returned too early */
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 grid place-items-center">
-                  <AlertTriangle className="w-8 h-8 text-amber-400 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-foreground">Verification Paused</h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    You returned too early! Please stay on the sponsor page for at least{" "}
-                    <span className="text-amber-400 font-semibold">{secondsLeft} more seconds</span> to unlock the download.
-                  </p>
-                </div>
-                <button
-                  onClick={handleResume} // <-- Resume button එක
-                  className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
-                >
-                  Resume Unlocking
-                </button>
-              </>
-            ) : status === "completed" ? (
-              /* Completed state */
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 grid place-items-center">
-                  <CheckCircle className="w-8 h-8 text-emerald-400 animate-bounce" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-foreground">Download Unlocked!</h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    Your secure download link has been unlocked.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 w-full">
-                  <a
-                    href={safeDownloadLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      if (safeDownloadLink === "#") {
-                        e.preventDefault();
-                        alert("Invalid or unsafe download link detected.");
-                      } else {
-                        onClose();
-                      }
-                    }}
-                    className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold text-center transition cursor-pointer w-full"
-                  >
-                    Start Download
-                  </a>
-                  <button
-                    onClick={onClose}
-                    className="px-6 py-2 rounded-full bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition cursor-pointer w-full"
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            ) : (
-              /* Countdown state */
-              <>
-                {/* SVG Countdown Ring */}
-                <div className="relative w-24 h-24 flex items-center justify-center">
-                  <svg className="absolute inset-0 -rotate-90" width="96" height="96" viewBox="0 0 96 96">
-                    {/* Track */}
-                    <circle cx="48" cy="48" r="32" fill="none" stroke="oklch(1 0 0 / 0.06)" strokeWidth="6" />
-                    {/* Progress */}
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r="32"
-                      fill="none"
-                      stroke="url(#ring-gradient)"
-                      strokeWidth="6"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={dashOffset}
-                      style={{ transition: "stroke-dashoffset 0.1s linear" }}
-                    />
-                    <defs>
-                      <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="oklch(0.62 0.24 25)" />
-                        <stop offset="100%" stopColor="oklch(0.55 0.25 18)" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="flex flex-col items-center">
-                    <span className="text-3xl font-extrabold tabular-nums text-gradient leading-none">
-                      {secondsLeft}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wide">sec</span>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Lock className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-xs font-bold uppercase tracking-widest text-primary">
-                      Verifying Ad View
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-foreground">
-                    Unlocking download link...
-                  </h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-                    Please stay on the sponsor page for{" "}
-                    <span className="text-foreground font-semibold">
-                      {secondsLeft} second{secondsLeft !== 1 ? "s" : ""}
-                    </span>.
-                  </p>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-primary rounded-full transition-all"
-                    style={{
-                      width: `${((COUNTDOWN_SECONDS - secondsLeft) / COUNTDOWN_SECONDS) * 100}%`,
-                      transition: "width 0.1s linear",
-                    }}
-                  />
-                </div>
-
-                <button
-                  onClick={handleResume}
-                  className="text-xs text-primary/80 hover:text-primary underline cursor-pointer"
-                >
-                  Sponsor page didn't open? Click here
-                </button>
-              </>
-            )}
+      <form onSubmit={handleCommentSubmit} className="space-y-4">
+        <div className="grid sm:grid-cols-[200px_1fr] gap-3">
+          <input
+            type="text"
+            required
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder="Your Name *"
+            maxLength={30}
+            className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-sm transition-colors"
+          />
+          <div className="relative">
+            <input
+              type="text"
+              required
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Leave a comment... *"
+              maxLength={300}
+              className="w-full pl-4 pr-12 py-2.5 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-sm transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-primary text-primary-foreground grid place-items-center hover:opacity-90 transition cursor-pointer disabled:opacity-60"
+            >
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
+        </div>
+      </form>
 
-/** Replacement for <a href={downloadLink}> — shows countdown modal instead */
-export function DownloadButton({
-  downloadLink,
-  label = "Download Subtitle",
-  className,
-  variant = "primary",
-}: {
-  downloadLink: string;
-  label?: string;
-  className?: string;
-  variant?: "primary" | "telegram";
-}) {
-  const [showModal, setShowModal] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(false);
+      <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-hide pt-2">
+        {comments?.map((comment: any) => {
+          const initials = comment.author_name ? comment.author_name.charAt(0).toUpperCase() : "?";
+          
+          // 🔥 TanStack AST Parser එක පැටලීම වැළැක්වීමට Expression එක මෙසේ වෙනම variable එකකට ගෙන ඇත
+          const formattedDate = new Date(comment.created_at).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
 
-  useEffect(() => {
-    try {
-      const key = `unlocked_${btoa(downloadLink)}`;
-      if (sessionStorage.getItem(key) === "true") {
-        setIsUnlocked(true);
-      }
-    } catch {
-      /* noop */
-    }
-  }, [downloadLink]);
+          return (
+            <div key={comment.id} className="flex gap-3 items-start p-3.5 rounded-2xl bg-muted/30 border border-border/50 group/comment">
+              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold text-xs grid place-items-center shrink-0">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-bold text-foreground/90">{comment.author_name}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {formattedDate} {/* <-- ආරක්ෂිතව සකස් කළ variable එක මෙහි පෙන්වයි */}
+                  </span>
+                </div>
+                <p className="text-sm text-foreground/80 mt-1 leading-relaxed whitespace-pre-line">{comment.comment_text}</p>
+              </div>
 
-  const handleDownloadClick = () => {
-    if (isUnlocked) {
-      if (isSafeUrl(downloadLink)) {
-        try {
-          const w = window.open(downloadLink, "_blank", "noopener,noreferrer");
-          if (w) w.opener = null;
-        } catch {
-          /* noop */
-        }
-      } else {
-        alert("Invalid or unsafe download link detected.");
-      }
-    } else {
-      const activeAdUrl = getRandomAdUrl();
-      try {
-        const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
-        if (w) w.opener = null;
-      } catch {
-        /* noop */
-      }
-      setShowModal(true);
-    }
-  };
-
-  const handleUnlockSuccess = () => {
-    try {
-      const key = `unlocked_${btoa(downloadLink)}`;
-      sessionStorage.setItem(key, "true");
-    } catch {
-      /* noop */
-    }
-    setIsUnlocked(true);
-    if (isSafeUrl(downloadLink)) {
-      try {
-        const w = window.open(downloadLink, "_blank", "noopener,noreferrer");
-        if (w) w.opener = null;
-      } catch {
-        /* noop */
-      }
-    }
-  };
-
-  const buttonClass = className ?? (
-    variant === "telegram"
-      ? "inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm shadow-[0_4px_15px_rgba(6,182,212,0.35)] hover:opacity-95 transition cursor-pointer"
-      : "inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-primary text-primary-foreground font-bold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
-  );
-
-  return (
-    <>
-      <button
-        onClick={handleDownloadClick}
-        className={buttonClass}
-      >
-        {isUnlocked ? (
-          <CheckCircle className="w-4 h-4 text-emerald-400" />
-        ) : (
-          <Download className="w-4 h-4" />
+              {isAdmin && (
+                <button
+                  onClick={() => handleDeleteComment(comment.id)}
+                  className="p-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-destructive-foreground transition opacity-0 group-hover/comment:opacity-100 cursor-pointer shrink-0"
+                  title="Delete Comment"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {(!comments || comments.length === 0) && (
+          <p className="text-center text-xs text-muted-foreground py-6">
+            No comments yet. Be the first to leave a feedback!
+          </p>
         )}
-        {isUnlocked ? "Download Now" : label}
-      </button>
-
-      {showModal && (
-        <DownloadCountdownModal
-          downloadLink={downloadLink}
-          onClose={() => setShowModal(false)}
-          onUnlockSuccess={handleUnlockSuccess}
-        />
-      )}
-    </>
+      </div>
+    </div>
   );
 }
