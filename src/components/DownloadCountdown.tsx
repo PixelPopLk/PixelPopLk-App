@@ -98,7 +98,7 @@ export function DownloadCountdownModal({
           blurTimeRef.current = null;
         }
 
-        // පරිශීលකයා නියමිත කාලයට පෙර නැවත පැමිණියහොත් ටයිමරය නතර (Freeze) කර Warning තත්ත්වයට පත් කරයි
+        // පරිශීලකයා නියමිත කාලයට පෙර නැවත පැමිණියහොත් ටයිමරය නතර (Freeze) කර Warning තත්ත්වයට පත් කරයි
         if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
           if (timerRef.current) clearInterval(timerRef.current);
           setStatus("warning");
@@ -219,7 +219,7 @@ export function DownloadCountdownModal({
                 </div>
                 <button
                   onClick={handleResume} // <-- Resume button එක
-                  className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-95 transition cursor-pointer w-full"
+                  className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
                 >
                   Resume Unlocking
                 </button>
@@ -418,3 +418,24 @@ export function DownloadButton({
   return (
     <>
       <button
+        onClick={handleDownloadClick}
+        className={buttonClass}
+      >
+        {isUnlocked ? (
+          <CheckCircle className="w-4 h-4 text-emerald-400" />
+        ) : (
+          <Download className="w-4 h-4" />
+        )}
+        {isUnlocked ? "Download Now" : label}
+      </button>
+
+      {showModal && (
+        <DownloadCountdownModal
+          downloadLink={downloadLink}
+          onClose={() => setShowModal(false)}
+          onUnlockSuccess={handleUnlockSuccess}
+        />
+      )}
+    </>
+  );
+}
