@@ -5,44 +5,56 @@ import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 import { TelegramIcon, FacebookIcon } from "./SocialIcons";
 
-// 🔥 ඔයා එවපු රූපයට සමාන, Pure SVG ඇසුරින් නිමවූ නවීනතම PixelPopLK Monogram (P + L) ලෝගෝව
+// 🔥 ඔයාගේ FB Page Logo එකට උපරිමයෙන්ම සමාන වන සේ Pure SVG ඇසුරින් නිමවූ නවීනතම PixelPopLK Monogram (P + L) ලෝගෝව
 export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 100 100"
-      className={`${className} filter drop-shadow-[0_2px_8px_rgba(59,130,246,0.35)]`}
+      className={`${className} filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.55)]`}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        {/* Futuristic Metallic Silver/Slate Gradient (P අකුර සඳහා) */}
+        {/* Realistic Metallic Chrome Silver (P අකුර සඳහා) */}
         <linearGradient id="metal-silver" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="35%" stopColor="#cbd5e1" />
-          <stop offset="70%" stopColor="#64748b" />
+          <stop offset="0%" stopColor="#f8fafc" />
+          <stop offset="25%" stopColor="#e2e8f0" />
+          <stop offset="50%" stopColor="#64748b" />
+          <stop offset="75%" stopColor="#cbd5e1" />
           <stop offset="100%" stopColor="#1e293b" />
         </linearGradient>
-        {/* Futuristic Metallic Gold/Bronze Gradient (L අකුරෙහි වක්‍රය සඳහා) */}
+
+        {/* Realistic Metallic Gold (L අකුරෙහි වක්‍රය සඳහා) */}
         <linearGradient id="metal-gold" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#fef08a" />
-          <stop offset="40%" stopColor="#ca8a04" />
-          <stop offset="80%" stopColor="#854d0e" />
+          <stop offset="30%" stopColor="#ca8a04" />
+          <stop offset="60%" stopColor="#fef9c3" />
+          <stop offset="85%" stopColor="#854d0e" />
           <stop offset="100%" stopColor="#422006" />
         </linearGradient>
       </defs>
-      
-      {/* outer 'P' backbone with futuristic angles (Silver) */}
+
+      {/* Left Slanted Stem of 'P' (Silver) */}
       <path
-        d="M26,18 L60,18 C78,18 78,44 60,44 L38,44 L38,82 L26,82 Z"
+        d="M24,78 L37,22 L47,22 L34,78 Z"
         fill="url(#metal-silver)"
-        stroke="#0f172a"
-        strokeWidth="2.5"
+        stroke="#020617"
+        strokeWidth="1.2"
+      />
+
+      {/* Outer 'P' Loop with an open stencil gap (Silver) */}
+      <path
+        d="M37,22 L64,22 C76,22 76,46 64,46 L43,46"
+        fill="none"
+        stroke="url(#metal-silver)"
+        strokeWidth="9.5"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
-      
-      {/* inner 'L' sweep seamlessly fused (Gold) */}
+
+      {/* Inner Sweeping 'L' (Gold) - Perfectly nested and elegant */}
       <path
-        d="M48,31 C56,31 66,35 66,45 C66,58 52,69 38,69 L64,69"
+        d="M48,34 C56,34 65,37 65,46 C65,58 54,68 38,68 L66,68"
         fill="none"
         stroke="url(#metal-gold)"
         strokeWidth="9"
