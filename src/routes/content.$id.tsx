@@ -55,7 +55,7 @@ function ContentPage() {
     queryFn: async () => {
       const { data: dbData, error } = await supabase
         .from(SUBTITLES_TABLE)
-        .select("*") // <-- මෙහිදී සියලුම Columns සක්‍රියව ලබාගනී (Telegram link දෝෂය සම්පූර්ණයෙන්ම විසඳයි)
+        .select("*") // select("*") මඟින් telegram_link දත්තයන්ද සාර්ථකව කියවා ගනී
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (dbData ?? []) as Subtitle[];
@@ -188,6 +188,8 @@ function Hero({
               </span>
             )}
           </div>
+          
+          {/* TV Series පිටුවේ විස්තරය පෙන්වන්නේ Season 1 Episode 1 එකෙන් එන Description එක පමණි */}
           {description ? (
             <div className="mt-6">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">Overview</h3>
@@ -292,12 +294,13 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
 }
 
 function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
+  // TV Series පිටුවේ පෙන්වන්නේ Season 1 Episode 1 එකෙහි විස්තරය (Description) පමණි (එපිසෝඩ් වල විස්තර මඟහරියි)
   const meta = useMemo(() => {
-    const withDesc = item.episodes.find((e) => e.description) ?? item.episodes[0];
+    const s1e1 = item.episodes.find((e) => e.season === 1 && e.episode === 1) || item.episodes[0];
     const withRating = item.episodes.find((e) => e.rating != null && e.rating !== "") ?? item.episodes[0];
     const withYear = item.episodes.find((e) => e.year != null && e.year !== "") ?? item.episodes[0];
     return {
-      description: withDesc?.description ?? null,
+      description: s1e1?.description ?? null, // S01E01 හි විස්තරය පමණක් තෝරා ගනී
       rating: formatRating(withRating?.rating),
       year:
         withYear?.year != null && withYear.year !== ""
@@ -306,9 +309,10 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
     };
   }, [item]);
 
+  // genres double වීම් (duplicates) front-end එකෙහිද සම්පූර්ණයෙන්ම වළක්වාලයි
   const genres = useMemo(() => {
     const set = new Set<string>();
-    item.episodes.forEach((e) => splitGenres(e.genre).forEach((g) => set.add(g)));
+    item.episodes.forEach((e) => splitGenres(e.genre).forEach((g) => set.add(g.toUpperCase())));
     return Array.from(set);
   }, [item]);
 
@@ -433,7 +437,8 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate">{ep.title}</p>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-card border border-border text-xs font-semibold text-foreground/80 group-hover:border-primary/50 group-hover:text-primary transition shrink-0">
+              {/* 🔥 අතිශය ආකර්ෂණීය කොළ පැහැති Emerald Gradient සහ Glow shadow එකක් සහිත Open බටන් එක */}
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] group-hover:shadow-[0_0_20px_rgba(16,185,129,0.55)] group-hover:scale-105 transition-all duration-300 shrink-0">
                 Open
               </span>
             </Link>
