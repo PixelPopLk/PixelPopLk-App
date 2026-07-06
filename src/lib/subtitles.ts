@@ -118,9 +118,18 @@ export function splitGenres(raw: string | null | undefined): string[] {
   return raw.split(/[,/|]/).map((g) => g.trim()).filter(Boolean);
 }
 
+// 🔥 Genres ඩබල් වීම් (Duplicates) 100% ක්ම වළක්වාලන පරිදි සකසන ලද ශ්‍රිතය (Case-Insensitive Deduplication)
 export function itemGenres(it: GridItem): string[] {
   const raw = it.kind === "movie" ? [it.sub.genre] : it.episodes.map((e) => e.genre);
-  return raw.flatMap((g) => splitGenres(g)).map((g) => g.toLowerCase());
+  const allGenres = raw.flatMap((g) => splitGenres(g)).map((g) => g.trim());
+  
+  const uniqueSet = new Set<string>();
+  allGenres.forEach(g => {
+    if (g) {
+      uniqueSet.add(g.toUpperCase()); // සියල්ලම සමානව Uppercase ලෙස සේව් කර ගනී
+    }
+  });
+  return Array.from(uniqueSet);
 }
 
 export function formatDate(iso: string) {
@@ -155,4 +164,4 @@ export function genreBadgeClass(g: string) {
   let h = 0;
   for (let i = 0; i < g.length; i++) h = (h * 31 + g.charCodeAt(i)) >>> 0;
   return GENRE_PALETTE[h % GENRE_PALETTE.length];
-      }
+}
