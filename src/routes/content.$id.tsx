@@ -131,6 +131,7 @@ function ContentPage() {
   );
 }
 
+// Shell ශ්‍රිතය (Function) මෙහිදී එක් වරක් පමණක් සේෆ් වන ලෙස ප්‍රකාශ කර ඇත
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
@@ -139,7 +140,6 @@ function Shell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 
 function GenreBadges({ genres }: { genres: string[] }) {
   if (genres.length === 0) return null;
@@ -489,7 +489,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
       const { data, error } = await supabase
         .from("subtitle_comments")
         .select("*")
-        .eq("subtitle_id", Number(subtitleId) as any) // <-- TypeScript සේෆ් වන සේ සකසා ඇත
+        .eq("subtitle_id", Number(subtitleId) as any)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -518,7 +518,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
 
     setSubmitting(true);
     const { error = null } = await supabase.from("subtitle_comments").insert({
-      subtitle_id: Number(subtitleId) as any, // <-- TypeScript සේෆ් වන සේ සකසා ඇත
+      subtitle_id: Number(subtitleId) as any,
       author_name: authorName.trim(),
       comment_text: commentText.trim(),
     });
@@ -629,15 +629,6 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
           </p>
         )}
       </div>
-    </div>
-  );
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar showBack backTo="/" backText="Back" />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">{children}</main>
     </div>
   );
 }
