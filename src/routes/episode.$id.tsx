@@ -37,15 +37,29 @@ export const Route = createFileRoute("/episode/$id")({
 function EpisodePage() {
   const { id } = Route.useParams();
 
+  // දත්ත ලබා ගැනීම සීමා කරන ලද (Optimized) React Query එක
   const { data, isLoading } = useQuery({
-    queryKey: ["subtitles"],
+    queryKey: ["subtitles", id],
     queryFn: async () => {
-      const { data: dbData, error } = await supabase
+      // 1. මුලින්ම අදාළ Episode ID එකට අදාළ දත්තය පමණක් ලබා ගනී
+      const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
-        .select("*") // <-- සියලුම දත්ත ආරක්ෂිතව කියවා ගනී
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (firstError) throw firstError;
+      if (!targetItem) return [] as Subtitle[];
+
+      // 2. එය අයත් වන TV Series එකේ අනෙකුත් සියලුම episodes පමණක් ලබා ගනී ("More from this season" සඳහා)
+      const { data: allEpisodes, error: secondError } = await supabase
+        .from(SUBTITLES_TABLE)
+        .select("*")
+        .eq("title", targetItem.title)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (dbData ?? []) as Subtitle[];
+
+      if (secondError) throw secondError;
+      return (allEpisodes ?? []) as Subtitle[];
     },
   });
 
@@ -237,7 +251,6 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🔥 ඩවුන්ලෝඩ් බොත්තම් 2ම (Direct සහ Telegram) මෙහි සාර්ථකව සකසා ඇත */}
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
                   <DownloadButton downloadLink={ep.download_link} label="Direct Download (.srt)" />
                   {(ep as any).telegram_link && (
