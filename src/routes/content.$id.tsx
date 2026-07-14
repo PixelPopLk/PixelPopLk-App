@@ -22,6 +22,7 @@ import {
   formatRating,
   genreBadgeClass,
   splitGenres,
+  parseTitle, // <-- parseTitle ශ්‍රිතය මෙතැනට එකතු කරන ලදී
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
@@ -50,7 +51,6 @@ export const Route = createFileRoute("/content/$id")({
 function ContentPage() {
   const { id } = Route.useParams();
 
-  // දත්ත ලබා ගැනීම සීමා කරන ලද (Optimized) React Query එක
   const { data, isLoading } = useQuery({
     queryKey: ["subtitles", id],
     queryFn: async () => {
@@ -64,12 +64,13 @@ function ContentPage() {
       if (firstError) throw firstError;
       if (!targetItem) return [] as Subtitle[];
 
-      // 2. එය TV Series එකක් නම්, එම Series එකට අදාළ සියලුම episodes පමණක් ලබා ගනී (මුළු table එකම download නොකරයි)
-      if (targetItem.kind === "series") {
+      // 2. එය TV Series එකක් නම්, එහි 'showName' එක වෙන් කරගෙන එම නමින් පටන් ගන්නා සියලුම Episodes පමණක් ලබා ගනී
+      const parsed = parseTitle(targetItem.title ?? "");
+      if (targetItem.kind === "series" || parsed.episode) {
         const { data: allEpisodes, error: secondError } = await supabase
           .from(SUBTITLES_TABLE)
           .select("*")
-          .eq("title", targetItem.title)
+          .ilike("title", `${parsed.showName}%`) // <-- SQL LIKE Query එකක් මඟින් සියලුම Episodes ලබා ගනී
           .order("created_at", { ascending: false });
 
         if (secondError) throw secondError;
