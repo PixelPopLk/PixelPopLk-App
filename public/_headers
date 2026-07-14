@@ -1,0 +1,29 @@
+# 1. Main Root එකේ තියෙන JS සහ CSS ෆයිල්ස්
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+# 2. Framework එකෙන් සාමාන්‍යයෙන් හදන Assets ෆෝල්ඩර් එක ඇතුළේ තියෙන හැමදේම (JS, CSS, Images)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 3. පින්තූර වර්ග (Images & Icons)
+/*.png
+  Cache-Control: public, max-age=31536000, immutable
+/*.jpg
+  Cache-Control: public, max-age=31536000, immutable
+/*.jpeg
+  Cache-Control: public, max-age=31536000, immutable
+/*.svg
+  Cache-Control: public, max-age=31536000, immutable
+/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+/*.ico
+  Cache-Control: public, max-age=31536000, immutable
+
+# 4. වෙබ් ෆොන්ට්ස් (Fonts)
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff
+  Cache-Control: public, max-age=31536000, immutable
