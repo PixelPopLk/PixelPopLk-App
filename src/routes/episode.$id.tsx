@@ -123,6 +123,7 @@ function EpisodePage() {
 
     updateMeta("description", descText);
     updateMeta("keywords", keywordText);
+    updateMeta("robots", "index, follow");
     updateMeta("og:title", titleText, true);
     updateMeta("og:description", descText, true);
     updateMeta("og:type", "video.episode", true);
