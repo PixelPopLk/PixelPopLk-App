@@ -22,7 +22,7 @@ import {
   formatRating,
   genreBadgeClass,
   splitGenres,
-  parseTitle, // <-- parseTitle ශ්‍රිතය මෙතැනට එකතු කරන ලදී
+  parseTitle,
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
@@ -64,13 +64,27 @@ function ContentPage() {
       if (firstError) throw firstError;
       if (!targetItem) return [] as Subtitle[];
 
-      // 2. එය TV Series එකක් නම්, එහි 'showName' එක වෙන් කරගෙන එම නමින් පටන් ගන්නා සියලුම Episodes පමණක් ලබා ගනී
-      const parsed = parseTitle(targetItem.title ?? "");
-      if (targetItem.kind === "series" || parsed.episode) {
+      // Database columns සහ title එක පරීක්ෂා කර එය TV Series එකක්දැයි හඳුනාගනී
+      const isSeries = (() => {
+        const sNum = targetItem.season != null && targetItem.season !== "" ? Number(targetItem.season) : null;
+        const eNum = targetItem.episode != null && targetItem.episode !== "" ? Number(targetItem.episode) : null;
+        if (sNum != null && eNum != null) return true;
+        
+        const g = (targetItem.genre ?? "").toLowerCase();
+        const genresList = g.split(/[,/|]/).map((x) => x.trim());
+        if (genresList.includes("movie")) return false;
+        
+        const parsed = parseTitle(targetItem.title ?? "");
+        return parsed.episode != null;
+      })();
+
+      // 2. එය TV Series එකක් නම්, එහි 'showName' එක වෙන් කරගෙන එම නමින් පටන් ගන්නා සියලුම Episodes ලබා ගනී
+      if (isSeries) {
+        const parsed = parseTitle(targetItem.title ?? "");
         const { data: allEpisodes, error: secondError } = await supabase
           .from(SUBTITLES_TABLE)
           .select("*")
-          .ilike("title", `${parsed.showName}%`) // <-- SQL LIKE Query එකක් මඟින් සියලුම Episodes ලබා ගනී
+          .ilike("title", `${parsed.showName}%`)
           .order("created_at", { ascending: false });
 
         if (secondError) throw secondError;
@@ -616,6 +630,15 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar showBack backTo="/" backText="Back" />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">{children}</main>
     </div>
   );
 }
