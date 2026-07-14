@@ -64,10 +64,10 @@ function ContentPage() {
       if (firstError) throw firstError;
       if (!targetItem) return [] as Subtitle[];
 
-      // Database columns සහ title එක පරීක්ෂා කර එය TV Series එකක්දැයි හඳුනාගනී
+      // TypeScript error එක සම්පූර්ණයෙන්ම සකසන ලද Series හඳුනාගැනීමේ කොටස
       const isSeries = (() => {
-        const sNum = targetItem.season != null && targetItem.season !== "" ? Number(targetItem.season) : null;
-        const eNum = targetItem.episode != null && targetItem.episode !== "" ? Number(targetItem.episode) : null;
+        const sNum = targetItem.season;
+        const eNum = targetItem.episode;
         if (sNum != null && eNum != null) return true;
         
         const g = (targetItem.genre ?? "").toLowerCase();
