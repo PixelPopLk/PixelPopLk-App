@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
   formatRating,
   genreBadgeClass,
   splitGenres,
+  parseTitle,
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
@@ -51,14 +52,46 @@ function ContentPage() {
   const { id } = Route.useParams();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["subtitles"],
+    queryKey: ["subtitles", id],
     queryFn: async () => {
-      const { data: dbData, error } = await supabase
+      // 1. අදාළ ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී (TypeScript error එක වළක්වා ඇත)
+      const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
-        .select("*") // select("*") මඟින් telegram_link දත්තයන්ද සාර්ථකව කියවා ගනී
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (dbData ?? []) as Subtitle[];
+        .select("*")
+        .eq("id", Number(id) as any)
+        .maybeSingle();
+
+      if (firstError) throw firstError;
+      if (!targetItem) return [] as Subtitle[];
+
+      const isSeries = (() => {
+        const sNum = targetItem.season;
+        const eNum = targetItem.episode;
+        if (sNum != null && eNum != null) return true;
+        
+        const g = (targetItem.genre ?? "").toLowerCase();
+        const genresList = g.split(/[,/|]/).map((x) => x.trim());
+        if (genresList.includes("movie")) return false;
+        
+        const parsed = parseTitle(targetItem.title ?? "");
+        return parsed.episode != null;
+      })();
+
+      // 2. එය TV Series එකක් නම්, එහි 'showName' එක වෙන් කරගෙන එම නමින් පටන් ගන්නා සියලුම Episodes ලබා ගනී
+      if (isSeries) {
+        const parsed = parseTitle(targetItem.title ?? "");
+        const { data: allEpisodes, error: secondError } = await supabase
+          .from(SUBTITLES_TABLE)
+          .select("*")
+          .ilike("title", `${parsed.showName}%`)
+          .order("created_at", { ascending: false });
+
+        if (secondError) throw secondError;
+        return (allEpisodes ?? []) as Subtitle[];
+      }
+
+      // 3. එය Movie එකක් නම්, එම තනි දත්තය පමණක් array එකක් ලෙස ලබා දෙයි
+      return [targetItem] as Subtitle[];
     },
   });
 
@@ -98,6 +131,7 @@ function ContentPage() {
   );
 }
 
+// Shell ශ්‍රිතය (Function) මෙහිදී එක් වරක් පමණක් සේෆ් වන ලෙස ප්‍රකාශ කර ඇත
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
@@ -106,7 +140,6 @@ function Shell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 
 function GenreBadges({ genres }: { genres: string[] }) {
   if (genres.length === 0) return null;
@@ -189,7 +222,6 @@ function Hero({
             )}
           </div>
           
-          {/* TV Series පිටුවේ විස්තරය පෙන්වන්නේ Season 1 Episode 1 එකෙන් එන Description එක පමණි */}
           {description ? (
             <div className="mt-6">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">Overview</h3>
@@ -278,7 +310,6 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
       
-      {/* Direct ඩවුන්ලෝඩ් සහ Telegram ඩවුන්ලෝඩ් බොත්තම් 2ම මෙහි සකසා ඇත */}
       <div className="mt-7 flex flex-col sm:flex-row gap-3">
         <DownloadButton downloadLink={s.download_link} label="Direct Download (.srt)" />
         {(s as any).telegram_link && (
@@ -294,13 +325,12 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
 }
 
 function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
-  // TV Series පිටුවේ පෙන්වන්නේ Season 1 Episode 1 එකෙහි විස්තරය (Description) පමණි (එපිසෝඩ් වල විස්තර මඟහරියි)
   const meta = useMemo(() => {
     const s1e1 = item.episodes.find((e) => e.season === 1 && e.episode === 1) || item.episodes[0];
     const withRating = item.episodes.find((e) => e.rating != null && e.rating !== "") ?? item.episodes[0];
     const withYear = item.episodes.find((e) => e.year != null && e.year !== "") ?? item.episodes[0];
     return {
-      description: s1e1?.description ?? null, // S01E01 හි විස්තරය පමණක් තෝරා ගනී
+      description: s1e1?.description ?? null,
       rating: formatRating(withRating?.rating),
       year:
         withYear?.year != null && withYear.year !== ""
@@ -309,7 +339,6 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
     };
   }, [item]);
 
-  // genres double වීම් (duplicates) front-end එකෙහිද සම්පූර්ණයෙන්ම වළක්වාලයි
   const genres = useMemo(() => {
     const set = new Set<string>();
     item.episodes.forEach((e) => splitGenres(e.genre).forEach((g) => set.add(g.toUpperCase())));
@@ -437,7 +466,6 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate">{ep.title}</p>
               </div>
-              {/* 🔥 අතිශය ආකර්ෂණීය කොළ පැහැති Emerald Gradient සහ Glow shadow එකක් සහිත Open බටන් එක */}
               <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] group-hover:shadow-[0_0_20px_rgba(16,185,129,0.55)] group-hover:scale-105 transition-all duration-300 shrink-0">
                 Open
               </span>
@@ -461,7 +489,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
       const { data, error } = await supabase
         .from("subtitle_comments")
         .select("*")
-        .eq("subtitle_id", subtitleId)
+        .eq("subtitle_id", Number(subtitleId) as any)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -490,7 +518,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
 
     setSubmitting(true);
     const { error = null } = await supabase.from("subtitle_comments").insert({
-      subtitle_id: subtitleId,
+      subtitle_id: Number(subtitleId) as any,
       author_name: authorName.trim(),
       comment_text: commentText.trim(),
     });
@@ -561,7 +589,6 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
         {comments?.map((comment: any) => {
           const initials = comment.author_name ? comment.author_name.charAt(0).toUpperCase() : "?";
           
-          // 🔥 TanStack AST Parser එක පැටලීම වැළැක්වීමට Expression එක මෙසේ වෙනම variable එකකට ගෙන ඇත
           const formattedDate = new Date(comment.created_at).toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
@@ -578,7 +605,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs font-bold text-foreground/90">{comment.author_name}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {formattedDate} {/* <-- ආරක්ෂිතව සකස් කළ variable එක මෙහි පෙන්වයි */}
+                    {formattedDate}
                   </span>
                 </div>
                 <p className="text-sm text-foreground/80 mt-1 leading-relaxed whitespace-pre-line">{comment.comment_text}</p>

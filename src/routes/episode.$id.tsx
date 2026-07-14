@@ -9,6 +9,7 @@ import {
   formatRating,
   genreBadgeClass,
   splitGenres,
+  parseTitle, // <-- parseTitle ශ්‍රිතය මෙතැනට එකතු කරන ලදී
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
@@ -38,14 +39,28 @@ function EpisodePage() {
   const { id } = Route.useParams();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["subtitles"],
+    queryKey: ["subtitles", id],
     queryFn: async () => {
-      const { data: dbData, error } = await supabase
+      // 1. අදාළ Episode ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී (TypeScript error එක වළක්වා ඇත)
+      const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
-        .select("*") // <-- සියලුම දත්ත ආරක්ෂිතව කියවා ගනී
+        .select("*")
+        .eq("id", Number(id) as any)
+        .maybeSingle();
+
+      if (firstError) throw firstError;
+      if (!targetItem) return [] as Subtitle[];
+
+      // 2. එය අයත් වන TV Series එකේ 'showName' එක වෙන් කරගෙන, එම නමින් පටන් ගන්නා සියලුම episodes පමණක් ලබා ගනී ("More from this season" සඳහා)
+      const parsed = parseTitle(targetItem.title ?? "");
+      const { data: allEpisodes, error: secondError } = await supabase
+        .from(SUBTITLES_TABLE)
+        .select("*")
+        .ilike("title", `${parsed.showName}%`) // <-- SQL LIKE Query එකක් මඟින් සියලුම Episodes ලබා ගනී
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (dbData ?? []) as Subtitle[];
+
+      if (secondError) throw secondError;
+      return (allEpisodes ?? []) as Subtitle[];
     },
   });
 
@@ -64,7 +79,6 @@ function EpisodePage() {
   const series = found?.series;
   const ep = found?.ep;
 
-  // React Hooks සැමවිටම පොදුවේ (Unconditionally) ක්‍රියාත්මක වීම සඳහා දත්ත ආරක්ෂිතව සකසා ගැනීම
   const genres = useMemo(() => (ep ? splitGenres(ep.genre) : []), [ep]);
   const rating = useMemo(() => (ep ? formatRating(ep.rating) : null), [ep]);
   const year = useMemo(() => {
@@ -90,7 +104,7 @@ function EpisodePage() {
     : "";
 
   useEffect(() => {
-    if (!series || !ep) return; // දත්ත පූරණය වන තෙක් SEO update වීම නවත්වයි
+    if (!series || !ep) return;
 
     document.title = titleText;
     const updateMeta = (nameOrProperty: string, content: string, isProperty = false) => {
@@ -109,6 +123,7 @@ function EpisodePage() {
 
     updateMeta("description", descText);
     updateMeta("keywords", keywordText);
+    updateMeta("robots", "index, follow");
     updateMeta("og:title", titleText, true);
     updateMeta("og:description", descText, true);
     updateMeta("og:type", "video.episode", true);
@@ -237,7 +252,6 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🔥 ඩවුන්ලෝඩ් බොත්තම් 2ම (Direct සහ Telegram) මෙහි සාර්ථකව සකසා ඇත */}
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
                   <DownloadButton downloadLink={ep.download_link} label="Direct Download (.srt)" />
                   {(ep as any).telegram_link && (
