@@ -53,7 +53,7 @@ async function generateSitemap() {
     xml += `</urlset>`;
 
     // 📂 './public' ෆෝල්ඩරය සෑදී නොමැති නම් එය ස්වයංක්‍රීයවම සාදයි (ENOENT Error එක වළක්වයි)
-    const outDir = './public';
+    const outDir = './.output/public';
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true });
     }
