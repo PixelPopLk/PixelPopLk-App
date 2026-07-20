@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import AdBanner from "@/components/AdBanner";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -29,7 +30,7 @@ import { Navbar } from "@/components/Navbar";
 import { DownloadButton } from "@/components/DownloadCountdown";
 
 export const Route = createFileRoute("/content/$id")({
-  head: () => ({ meta: [{ title: "Subtitle — PixelPopLk" }] }),
+  head: () => ({ meta: [{ title: "Subtitle — PixelPopLK" }] }),
   component: ContentPage,
   errorComponent: ({ error }) => (
     <div className="min-h-screen grid place-items-center p-6 text-center">
@@ -54,7 +55,6 @@ function ContentPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["subtitles", id],
     queryFn: async () => {
-      // 1. අදාළ ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී
       const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
         .select("*")
@@ -77,7 +77,6 @@ function ContentPage() {
         return parsed.episode != null;
       })();
 
-      // 2. එය TV Series එකක් නම්, එහි 'showName' එක වෙන් කරගෙන එම නමින් පටන් ගන්නා සියලුම Episodes ලබා ගනී
       if (isSeries) {
         const parsed = parseTitle(targetItem.title ?? "");
         const { data: allEpisodes, error: secondError } = await supabase
@@ -90,7 +89,6 @@ function ContentPage() {
         return (allEpisodes ?? []) as Subtitle[];
       }
 
-      // 3. එය Movie එකක් නම්, එම තනි දත්තය පමණක් array එකක් ලෙස ලබා දෙයි
       return [targetItem] as Subtitle[];
     },
   });
@@ -98,10 +96,8 @@ function ContentPage() {
   const item = useMemo<GridItem | null>(() => {
     if (!data) return null;
     const items = buildGridItems(data);
-    // direct id match
     const direct = items.find((it) => String(it.id) === id);
     if (direct) return direct;
-    // search across series episodes
     for (const it of items) {
       if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id)) return it;
     }
@@ -109,7 +105,7 @@ function ContentPage() {
   }, [data, id]);
 
   return (
-    <LayoutShell>
+    <Shell>
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
@@ -127,12 +123,11 @@ function ContentPage() {
           <CommentsSection key={`comments-${id}`} subtitleId={id} />
         </>
       )}
-    </LayoutShell>
+    </Shell>
   );
 }
 
-// Shell component එක වෙනුවට ගැටුම් වළක්වා ගැනීමට LayoutShell ලෙස වෙනස් කර ඇත
-function LayoutShell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <Navbar showBack backTo="/" backText="Back" />
@@ -228,6 +223,10 @@ function Hero({
               <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">{description}</p>
             </div>
           ) : null}
+
+          {/* 🟢 Movies සහ Series දෙකේම Overview එකට යටින් ad එක මෙතනින් load වේ */}
+          <AdBanner />
+
           {children}
         </div>
       </div>
