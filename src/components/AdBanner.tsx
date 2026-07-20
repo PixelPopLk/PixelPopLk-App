@@ -1,91 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-interface AdBannerProps {
-  zoneKey: string;
-  width: number;
-  height: number;
-}
-
-export default function AdBanner({ zoneKey, width, height }: AdBannerProps) {
+export default function AdBanner() {
   const bannerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
 
-  // 📱 මොබයිල් screen වලදී ad එක auto-scale කර සයිට් එක කැඩීම වැළැක්වීම
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const handleResize = () => {
-      const padding = 32; // mobile screen padding
-      const availableWidth = window.innerWidth - padding;
-
-      if (availableWidth < width) {
-        setScale(availableWidth / width);
-      } else {
-        setScale(1);
-      }
-    };
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [width]);
-
-  // 🚀 Ads දෙකම ගැටලුවකින් තොරව load කිරීම (Dynamic DOM injection)
   useEffect(() => {
     if (typeof window === "undefined" || !bannerRef.current) return;
     if (bannerRef.current.hasChildNodes()) return;
 
-    // Global config එක overwrite වීම වැළැක්වීම සඳහා inline script එකක් සෑදීම
-    const confScript = document.createElement("script");
-    confScript.type = "text/javascript";
-    confScript.innerHTML = `
-      atOptions = {
-        'key' : '${zoneKey}',
-        'format' : 'iframe',
-        'height' : ${height},
-        'width' : ${width},
-        'params' : {}
-      };
-    `;
+    (window as any).atOptions = {
+      key: "9dd5c8b0fb237459ed96d9d5952c404d",
+      format: "iframe",
+      height: 250,
+      width: 300,
+      params: {},
+    };
 
-    // Ad invoke කරන ප්‍රධාන script එක
-    const invokeScript = document.createElement("script");
-    invokeScript.type = "text/javascript";
-    invokeScript.src = `//acorntar.com/${zoneKey}/invoke.js`;
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = "//acorntar.com/9dd5c8b0fb237459ed96d9d5952c404d/invoke.js";
 
-    // container එක ඇතුළට පිළිවෙලින් ඇතුළත් කිරීම
-    bannerRef.current.appendChild(confScript);
-    bannerRef.current.appendChild(invokeScript);
+    bannerRef.current.appendChild(script);
 
     return () => {
       if (bannerRef.current) {
         bannerRef.current.innerHTML = "";
       }
     };
-  }, [zoneKey, width, height]);
-
-  // Scale වීම නිසා ඇතිවන හිස්තැන (blank space) මඟහැරීමට height එක ගණනය කිරීම
-  const scaledHeight = height * scale;
+  }, []);
 
   return (
-    <div 
-      className="flex justify-center my-4 w-full overflow-hidden" 
-      style={{ height: `${scaledHeight}px` }}
-    >
+    <div className="flex justify-center my-4 w-full">
       <div 
-        style={{ 
-          width: `${width}px`, 
-          height: `${height}px`,
-          transform: `scale(${scale})`,
-          transformOrigin: "center top"
-        }}
-        className="shrink-0"
-      >
-        <div 
-          ref={bannerRef} 
-          className="overflow-hidden bg-muted/10 rounded-lg w-full h-full"
-        />
-      </div>
+        ref={bannerRef} 
+        style={{ width: "300px", height: "250px" }} 
+        className="overflow-hidden bg-muted/10 rounded-lg flex items-center justify-center"
+      />
     </div>
   );
 }
