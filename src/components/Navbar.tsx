@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Menu, Search, X, ArrowLeft } from "lucide-react";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
@@ -62,8 +62,8 @@ export function Navbar({
   const [isOpen, setIsOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
 
+  // Search box එකෙන් එලිය ක්ලික් කරාම Popup එක close වීම
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -74,6 +74,7 @@ export function Navbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Filter Search Results
   const filteredResults = searchResults.filter((item) =>
     item.title.toLowerCase().includes(query.toLowerCase().trim())
   );
@@ -101,7 +102,7 @@ export function Navbar({
           </Link>
         </div>
 
-        {/* Center: Search Bar with Auto Dropdown */}
+        {/* Center: Search Bar with Auto Dropdown Popup */}
         {showSearch && setQuery && (
           <div ref={searchRef} className="flex-1 max-w-xl mx-auto relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -134,12 +135,11 @@ export function Navbar({
               <div className="absolute top-full left-0 right-0 mt-2 bg-background/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl z-50 overflow-hidden max-h-96 overflow-y-auto p-2 divide-y divide-border/40">
                 {filteredResults.length > 0 ? (
                   filteredResults.map((item) => (
-                    <div
+                    <Link
                       key={item.id}
-                      onClick={() => {
-                        setShowPopup(false);
-                        navigate({ to: "/content/$id", params: { id: item.id } });
-                      }}
+                      to="/content/$id"
+                      params={{ id: String(item.id) }}
+                      onMouseDown={() => setShowPopup(false)}
                       className="flex items-center gap-3 p-2.5 hover:bg-muted/70 rounded-xl cursor-pointer transition group"
                     >
                       {item.posterUrl ? (
@@ -170,7 +170,7 @@ export function Navbar({
                           </span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   ))
                 ) : (
                   <div className="p-4 text-center text-sm text-muted-foreground">
