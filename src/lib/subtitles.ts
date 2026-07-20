@@ -14,21 +14,25 @@ export function cleanShowName(raw: string) {
 
 export function parseTitle(title: string): ParsedTitle {
   if (!title) return { showName: "" };
+
   let m = title.match(/^(.*?)[\s._\-]*[Ss](\d{1,2})[\s._\-]*[Ee](\d{1,3})(?:[\s._\-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
+
   m = title.match(/^(.*?)[\s._\-]+Season[\s._\-]?(\d{1,2})[\s._\-]+Episode[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
+
   m = title.match(/^(.*?)[\s._\-]+(\d{1,2})x(\d{1,3})(?:[\s._\-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
-  
-  // 🔥 අලුත් Pattern එක: "Title Episode 1" හෝ "Title Ep 2" වැනි දෑ සාර්ථකව TV Series ලෙස හඳුනාගනී
+
+  // 🔥 "Title Episode 1" හෝ "Title Ep 2" වැනි දෑ සාර්ථකව TV Series ලෙස හඳුනාගනී
   m = title.match(/^(.*?)[\s._\-]+(?:Episode|Epi|Ep)[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: 1, episode: +m[2], episodeTitle: m[3]?.trim() } };
-  
+
   return { showName: title.trim() };
 }
 
 export type SeriesEpisode = Subtitle & { season: number; episode: number; epTitle?: string };
+
 export type GridItem =
   | { kind: "movie"; key: string; id: Subtitle["id"]; sub: Subtitle }
   | {
@@ -52,8 +56,10 @@ function isSeriesRow(s: Subtitle): EpisodeInfo | null {
   const sNum = num(s.season);
   const eNum = num(s.episode);
   if (sNum != null && eNum != null) return { season: sNum, episode: eNum };
+
   const g = (s.genre ?? "").toLowerCase();
   if (g.split(/[,/|]/).map((x) => x.trim()).includes("movie")) return null;
+
   const p = parseTitle(s.title ?? "");
   return p.episode ?? null;
 }
@@ -106,9 +112,11 @@ export function buildGridItems(subs: Subtitle[]): GridItem[] {
 export function itemTitle(it: GridItem) {
   return it.kind === "movie" ? it.sub.title : it.showName;
 }
+
 export function itemPoster(it: GridItem) {
   return it.kind === "movie" ? it.sub.image_url : it.poster;
 }
+
 export function itemDate(it: GridItem) {
   return it.kind === "movie" ? it.sub.created_at : it.latestDate;
 }
@@ -118,15 +126,35 @@ export function splitGenres(raw: string | null | undefined): string[] {
   return raw.split(/[,/|]/).map((g) => g.trim()).filter(Boolean);
 }
 
-// 🔥 Genres ඩබල් වීම් (Duplicates) 100% ක්ම වළක්වාලන පරිදි සකසන ලද ශ්‍රිතය (Case-Insensitive Deduplication)
+// 🔥 Simple/Mixed Case එන ඕනෑම Genre එකක් Capitalize කිරීමට (e.g. action -> Action, sci-fi -> Sci-Fi)
+export function formatGenre(genre: string): string {
+  if (!genre) return "";
+
+  const g = genre.trim().toLowerCase();
+
+  // විශේෂ අවස්ථා
+  if (g === "sci-fi" || g === "scifi" || g === "sci fi") return "Sci-Fi";
+  if (g === "tv series" || g === "tv-series") return "TV Series";
+
+  // සාමාන්‍ය වචන වල මුල් අකුර Capital කිරීම
+  return g
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join("-")
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// 🔥 Duplicates වළක්වා ගනිමින් සියලුම Genres Title Case (Action, Adventure, Sci-Fi) ලෙස Format කරයි
 export function itemGenres(it: GridItem): string[] {
   const raw = it.kind === "movie" ? [it.sub.genre] : it.episodes.map((e) => e.genre);
   const allGenres = raw.flatMap((g) => splitGenres(g)).map((g) => g.trim());
-  
+
   const uniqueSet = new Set<string>();
-  allGenres.forEach(g => {
+  allGenres.forEach((g) => {
     if (g) {
-      uniqueSet.add(g.toUpperCase()); // සියල්ලම සමානව Uppercase ලෙස සේව් කර ගනී
+      uniqueSet.add(formatGenre(g));
     }
   });
   return Array.from(uniqueSet);
@@ -160,6 +188,7 @@ const GENRE_PALETTE = [
   "bg-pink-500/15 text-pink-300 border-pink-500/30",
   "bg-lime-500/15 text-lime-300 border-lime-500/30",
 ];
+
 export function genreBadgeClass(g: string) {
   let h = 0;
   for (let i = 0; i < g.length; i++) h = (h * 31 + g.charCodeAt(i)) >>> 0;
