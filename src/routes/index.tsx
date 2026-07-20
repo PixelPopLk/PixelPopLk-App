@@ -79,12 +79,17 @@ function matchesFilter(it: GridItem, type: "all" | "movie" | "series", genre?: s
   if (genre) {
     const genres = itemGenres(it);
     const target = genre.toLowerCase();
-    return genres.some(
-      (g) =>
-        g === target ||
-        g.includes(target) ||
-        (target === "sci-fi" && (g === "scifi" || g === "sci fi" || g === "science fiction")),
-    );
+    
+    return genres.some((g) => {
+      // 💡 Database එකෙන් එන Genre එකත් lowercase කරගන්නවා
+      const lowerG = String(g).toLowerCase(); 
+
+      return (
+        lowerG === target ||
+        lowerG.includes(target) ||
+        (target === "sci-fi" && (lowerG === "scifi" || lowerG === "sci fi" || lowerG === "science fiction"))
+      );
+    });
   }
   return true;
 }
