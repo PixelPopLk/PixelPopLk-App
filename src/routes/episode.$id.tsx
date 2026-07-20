@@ -282,6 +282,20 @@ function EpisodePage() {
                 
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Opens in a new tab. Thank you for supporting PixelPopLK ❤
+                                  <div className="mt-7 flex flex-col sm:flex-row gap-3">
+                  <DownloadButton downloadLink={ep.download_link} label="Direct Download (.srt)" />
+                  {(ep as any).telegram_link && (
+                    <DownloadButton downloadLink={(ep as any).telegram_link} label="Telegram Download" variant="telegram" />
+                  )}
+                </div>
+                
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Opens in a new tab. Thank you for supporting PixelPopLK ❤
+                </p>
+
+                {/* 🟢 2. Download Buttons වලට යටින් දෙවැනි Ad එක */}
+                <AdBanner />
+
                 </p>
               </div>
             </div>
