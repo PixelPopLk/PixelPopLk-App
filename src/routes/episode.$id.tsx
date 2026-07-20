@@ -252,10 +252,8 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🟢 1. පළමු Ad එක (300x250) */}
-                <div className="mt-4">
-                  <AdBanner zoneKey="9dd5c8b0fb237459ed96d9d5952c404d" width={300} height={250} />
-                </div>
+                {/* 🟢 1. Overview/Description එකට යටින්ම පෙන්වන පළමු Ad එක */}
+                <AdBanner />
 
                 {/* Download Buttons Section */}
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
@@ -268,11 +266,6 @@ function EpisodePage() {
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Opens in a new tab. Thank you for supporting PixelPopLK ❤
                 </p>
-
-                {/* 🟢 2. දෙවැනි Ad එක (728x90) */}
-                <div className="mt-4">
-                  <AdBanner zoneKey="c40246f137a89efa5b84b57e5fd1045c" width={728} height={90} />
-                </div>
 
               </div>
             </div>
