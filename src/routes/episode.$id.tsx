@@ -9,11 +9,11 @@ import {
   formatRating,
   genreBadgeClass,
   splitGenres,
-  parseTitle, // <-- parseTitle ශ්‍රිතය මෙතැනට එකතු කරන ලදී
+  parseTitle, 
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
-import AdBanner from "@/components/AdBanner"; // <-- මේ පේලිය එකතු කරන්න
+import AdBanner from "@/components/AdBanner"; 
 import { DownloadButton } from "@/components/DownloadCountdown";
 
 export const Route = createFileRoute("/episode/$id")({
@@ -42,7 +42,6 @@ function EpisodePage() {
   const { data, isLoading } = useQuery({
     queryKey: ["subtitles", id],
     queryFn: async () => {
-      // 1. අදාළ Episode ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී (TypeScript error එක වළක්වා ඇත)
       const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
         .select("*")
@@ -52,12 +51,11 @@ function EpisodePage() {
       if (firstError) throw firstError;
       if (!targetItem) return [] as Subtitle[];
 
-      // 2. එය අයත් වන TV Series එකේ 'showName' එක වෙන් කරගෙන, එම නමින් පටන් ගන්නා සියලුම episodes පමණක් ලබා ගනී ("More from this season" සඳහා)
       const parsed = parseTitle(targetItem.title ?? "");
       const { data: allEpisodes, error: secondError } = await supabase
         .from(SUBTITLES_TABLE)
         .select("*")
-        .ilike("title", `${parsed.showName}%`) // <-- SQL LIKE Query එකක් මඟින් සියලුම Episodes ලබා ගනී
+        .ilike("title", `${parsed.showName}%`) 
         .order("created_at", { ascending: false });
 
       if (secondError) throw secondError;
@@ -238,11 +236,8 @@ function EpisodePage() {
                   )}
                 </div>
 
+                {/* Overview Section */}
                 {ep.description ? (
-                  <div className="mt-6">
-                    <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
-                      Overview
-                                      {ep.description ? (
                   <div className="mt-6">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                       Overview
@@ -252,7 +247,9 @@ function EpisodePage() {
                     </p>
 
                     {/* 🟢 1. කියවන Text එකට යටින්ම පළමු Ad එක */}
-                    <AdBanner />
+                    <div className="mt-4">
+                      <AdBanner />
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-6 p-4 rounded-xl bg-background/40 border border-border text-sm text-muted-foreground leading-relaxed">
@@ -260,27 +257,8 @@ function EpisodePage() {
                   </div>
                 )}
 
-                    </h3>
-                    <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">
-                      {ep.description}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-6 p-4 rounded-xl bg-background/40 border border-border text-sm text-muted-foreground leading-relaxed">
-                    High-quality Sinhala subtitle synced for the official release.
-                  </div>
-                )}
-
+                {/* Download Buttons Section */}
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
-                  <DownloadButton downloadLink={ep.download_link} label="Direct Download (.srt)" />
-                  {(ep as any).telegram_link && (
-                    <DownloadButton downloadLink={(ep as any).telegram_link} label="Telegram Download" variant="telegram" />
-                  )}
-                </div>
-                
-                <p className="mt-3 text-[11px] text-muted-foreground">
-                  Opens in a new tab. Thank you for supporting PixelPopLK ❤
-                                  <div className="mt-7 flex flex-col sm:flex-row gap-3">
                   <DownloadButton downloadLink={ep.download_link} label="Direct Download (.srt)" />
                   {(ep as any).telegram_link && (
                     <DownloadButton downloadLink={(ep as any).telegram_link} label="Telegram Download" variant="telegram" />
@@ -292,9 +270,10 @@ function EpisodePage() {
                 </p>
 
                 {/* 🟢 2. Download Buttons වලට යටින් දෙවැනි Ad එක */}
-                <AdBanner />
+                <div className="mt-4">
+                  <AdBanner />
+                </div>
 
-                </p>
               </div>
             </div>
           </div>
