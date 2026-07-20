@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import AdBanner from "@/components/AdBanner";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
