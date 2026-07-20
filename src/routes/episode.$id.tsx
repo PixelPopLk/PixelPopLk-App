@@ -15,7 +15,6 @@ import {
 import { Navbar } from "@/components/Navbar";
 import AdBanner from "@/components/AdBanner"; // <-- මේ පේලිය එකතු කරන්න
 import { DownloadButton } from "@/components/DownloadCountdown";
-import { DownloadButton } from "@/components/DownloadCountdown";
 
 export const Route = createFileRoute("/episode/$id")({
   head: () => ({ meta: [{ title: "Episode — PixelPopLK" }] }),
