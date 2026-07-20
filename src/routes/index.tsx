@@ -389,7 +389,18 @@ function HomePage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
         />
       )}
-      <Navbar showSearch query={query} setQuery={handleQueryChange} />
+      <Navbar
+  showSearch
+  query={query}
+  setQuery={handleQueryChange}
+  searchResults={items.map((it) => ({
+    id: it.id,
+    title: itemTitle(it),
+    type: it.kind === "movie" ? "Movie" : "TV Series",
+    posterUrl: itemPoster(it),
+    year: getItemYear(it) ? String(getItemYear(it)) : undefined,
+  }))}
+/>
 
       <Hero 
         featured={featured} 
