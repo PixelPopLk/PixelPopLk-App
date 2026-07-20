@@ -29,7 +29,7 @@ import { Navbar } from "@/components/Navbar";
 import { DownloadButton } from "@/components/DownloadCountdown";
 
 export const Route = createFileRoute("/content/$id")({
-  head: () => ({ meta: [{ title: "Subtitle — PixelPopLK" }] }),
+  head: () => ({ meta: [{ title: "Subtitle — PixelPopLk" }] }),
   component: ContentPage,
   errorComponent: ({ error }) => (
     <div className="min-h-screen grid place-items-center p-6 text-center">
@@ -54,7 +54,7 @@ function ContentPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["subtitles", id],
     queryFn: async () => {
-      // 1. අදාළ ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී (TypeScript error එක වළක්වා ඇත)
+      // 1. අදාළ ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී
       const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
         .select("*")
@@ -109,7 +109,7 @@ function ContentPage() {
   }, [data, id]);
 
   return (
-    <Shell>
+    <LayoutShell>
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
@@ -127,12 +127,12 @@ function ContentPage() {
           <CommentsSection key={`comments-${id}`} subtitleId={id} />
         </>
       )}
-    </Shell>
+    </LayoutShell>
   );
 }
 
-// Shell ශ්‍රිතය (Function) මෙහිදී එක් වරක් පමණක් සේෆ් වන ලෙස ප්‍රකාශ කර ඇත
-function Shell({ children }: { children: React.ReactNode }) {
+// Shell component එක වෙනුවට ගැටුම් වළක්වා ගැනීමට LayoutShell ලෙස වෙනස් කර ඇත
+function LayoutShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <Navbar showBack backTo="/" backText="Back" />
