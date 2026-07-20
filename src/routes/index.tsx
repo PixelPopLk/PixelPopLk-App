@@ -389,7 +389,18 @@ function HomePage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
         />
       )}
-      <Navbar showSearch query={query} setQuery={handleQueryChange} />
+      <Navbar
+  showSearch
+  query={query}
+  setQuery={handleQueryChange}
+  searchResults={items.map((it) => ({
+    id: it.id,
+    title: itemTitle(it),
+    type: it.kind === "movie" ? "Movie" : "TV Series",
+    posterUrl: itemPoster(it),
+    year: getItemYear(it) ? String(getItemYear(it)) : undefined,
+  }))}
+/>
 
       <Hero 
         featured={featured} 
@@ -943,20 +954,13 @@ function Row({
         <div className="pointer-events-none absolute inset-y-0 left-0 w-8 sm:w-12 bg-gradient-to-r from-background to-transparent z-10" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 sm:w-12 bg-gradient-to-l from-background to-transparent z-10" />
 
-        <div
-          ref={scrollerRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-px-4 sm:scroll-px-6 lg:scroll-px-8 px-4 sm:px-6 lg:px-8 py-1"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {items.map((it, i) => (
-            <div
-              key={it.key}
-              className="snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[18vw] xl:w-[15vw] max-w-[220px]"
-            >
-              <SubtitleCard item={it} index={i} onDownload={onDownload} onDetails={onDetails} />
-            </div>
-          ))}
-        </div>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 px-4 sm:px-6 lg:px-8 py-1">
+  {items.map((it, i) => (
+    <div key={it.key}>
+      <SubtitleCard item={it} index={i} onDownload={onDownload} onDetails={onDetails} />
+    </div>
+  ))}
+</div>
       </div>
     </div>
   );
