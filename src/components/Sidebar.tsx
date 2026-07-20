@@ -21,18 +21,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate();
 
   const handleCategoryClick = (type: "movie" | "series", genre: string) => {
-    const adKey = `ad-triggered-${type}-${genre}`.toLowerCase();
-    const alreadyTriggered = sessionStorage.getItem(adKey);
-    if (!alreadyTriggered) {
-      sessionStorage.setItem(adKey, "true");
-      try {
-        const w = window.open("https://omg10.com/4/11202064", "_blank", "noopener,noreferrer");
-        if (w) w.opener = null;
-      } catch (err) {
-        console.error("Popup blocked:", err);
-      }
-    }
-
+    // ඇඩ් ඕපන් වෙන කොටස සම්පූර්ණයෙන්ම අයින් කර ඇත
     navigate({
       to: "/",
       search: {
