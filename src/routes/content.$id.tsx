@@ -55,7 +55,6 @@ function ContentPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["subtitles", id],
     queryFn: async () => {
-      // 1. අදාළ ID එක Number එකක් ලෙස සකසා දත්තය ලබා ගනී (TypeScript error එක වළක්වා ඇත)
       const { data: targetItem, error: firstError } = await supabase
         .from(SUBTITLES_TABLE)
         .select("*")
@@ -78,7 +77,6 @@ function ContentPage() {
         return parsed.episode != null;
       })();
 
-      // 2. එය TV Series එකක් නම්, එහි 'showName' එක වෙන් කරගෙන එම නමින් පටන් ගන්නා සියලුම Episodes ලබා ගනී
       if (isSeries) {
         const parsed = parseTitle(targetItem.title ?? "");
         const { data: allEpisodes, error: secondError } = await supabase
@@ -91,7 +89,6 @@ function ContentPage() {
         return (allEpisodes ?? []) as Subtitle[];
       }
 
-      // 3. එය Movie එකක් නම්, එම තනි දත්තය පමණක් array එකක් ලෙස ලබා දෙයි
       return [targetItem] as Subtitle[];
     },
   });
@@ -99,10 +96,8 @@ function ContentPage() {
   const item = useMemo<GridItem | null>(() => {
     if (!data) return null;
     const items = buildGridItems(data);
-    // direct id match
     const direct = items.find((it) => String(it.id) === id);
     if (direct) return direct;
-    // search across series episodes
     for (const it of items) {
       if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id)) return it;
     }
@@ -132,7 +127,6 @@ function ContentPage() {
   );
 }
 
-// Shell ශ්‍රිතය (Function) මෙහිදී එක් වරක් පමණක් සේෆ් වන ලෙස ප්‍රකාශ කර ඇත
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
@@ -229,6 +223,10 @@ function Hero({
               <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">{description}</p>
             </div>
           ) : null}
+
+          {/* 🟢 Movies සහ Series දෙකේම Overview එකට යටින් ad එක මෙතනින් load වේ */}
+          <AdBanner />
+
           {children}
         </div>
       </div>
