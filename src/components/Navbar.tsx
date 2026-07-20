@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, Search, X, ArrowLeft } from "lucide-react";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 import { TelegramIcon, FacebookIcon } from "./SocialIcons";
 
-// 🔥 ඔයාගේ FB Page Logo එකට උපරිමයෙන්ම සමාන වන සේ Pure SVG ඇසුරින් නිමවූ නවීනතම PixelPopLK Monogram (P + L) ලෝගෝව
 export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
   return (
     <svg
@@ -15,7 +14,6 @@ export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        {/* Realistic Metallic Chrome Silver (P අකුර සඳහා) */}
         <linearGradient id="metal-silver" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#f8fafc" />
           <stop offset="25%" stopColor="#e2e8f0" />
@@ -24,7 +22,6 @@ export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
           <stop offset="100%" stopColor="#1e293b" />
         </linearGradient>
 
-        {/* Realistic Metallic Gold (L අකුරෙහි වක්‍රය සඳහා) */}
         <linearGradient id="metal-gold" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#fef08a" />
           <stop offset="30%" stopColor="#ca8a04" />
@@ -34,7 +31,6 @@ export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
         </linearGradient>
       </defs>
 
-      {/* Left Slanted Stem of 'P' (Silver) */}
       <path
         d="M24,78 L37,22 L47,22 L34,78 Z"
         fill="url(#metal-silver)"
@@ -42,7 +38,6 @@ export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
         strokeWidth="1.2"
       />
 
-      {/* Outer 'P' Loop with an open stencil gap (Silver) */}
       <path
         d="M37,22 L64,22 C76,22 76,46 64,46 L43,46"
         fill="none"
@@ -52,7 +47,6 @@ export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
         strokeLinejoin="round"
       />
 
-      {/* Inner Sweeping 'L' (Gold) - Perfectly nested and elegant */}
       <path
         d="M48,34 C56,34 65,37 65,46 C65,58 54,68 38,68 L66,68"
         fill="none"
@@ -83,6 +77,19 @@ export function Navbar({
   backText = "Back",
 }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Search box එකෙන් එලිය ක්ලික් කල විට popup එක hide වීම
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowPopup(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border">
@@ -102,7 +109,6 @@ export function Navbar({
           </Sheet>
 
           <Link to="/" className="flex items-center gap-2">
-            {/* පැරණි Subtitles icon එක වෙනුවට අලුත්ම Monogram SVG LogoIcon එක සෘජුවම එකතු කර ඇත */}
             <LogoIcon className="w-9 h-9" />
             <span className="font-extrabold text-lg sm:text-xl tracking-tight hidden xs:inline-block">
               Pixel<span className="text-gradient">Pop</span>LK
@@ -110,25 +116,49 @@ export function Navbar({
           </Link>
         </div>
 
-        {/* Center: Search Bar (Conditional) */}
+        {/* Center: Search Bar with Auto Popup */}
         {showSearch && setQuery && (
-          <div className="flex-1 max-w-xl mx-auto relative">
+          <div ref={searchRef} className="flex-1 max-w-xl mx-auto relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShowPopup(true);
+              }}
+              onFocus={() => setShowPopup(true)}
               placeholder="Search movies, series, episodes…"
               className="w-full pl-10 pr-10 py-2 rounded-full bg-muted/60 border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm transition"
             />
             {query && (
               <button
                 aria-label="Clear"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setShowPopup(false);
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
+            )}
+
+            {/* 🔥 Search Bar එකට කෙලින්ම යටින් එන Auto Popup Dropdown එක */}
+            {showPopup && query.trim() !== "" && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-background/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto p-2">
+                <div 
+                  onClick={() => setShowPopup(false)}
+                  className="p-3 hover:bg-muted/60 rounded-xl cursor-pointer flex justify-between items-center transition"
+                >
+                  <span className="text-sm font-medium text-foreground">
+                    Search for "<span className="text-primary">{query}</span>"
+                  </span>
+                  <span className="text-xs bg-primary/20 text-primary font-semibold px-2.5 py-1 rounded-lg">
+                    Press Enter
+                  </span>
+                </div>
+              </div>
             )}
           </div>
         )}
