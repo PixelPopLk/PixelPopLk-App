@@ -12,7 +12,6 @@ export interface SearchItem {
   year?: string;
   posterUrl?: string;
   description?: string;
-  slug?: string;
 }
 
 export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
@@ -130,7 +129,7 @@ export function Navbar({
               </button>
             )}
 
-            {/* Auto Popup Dropdown */}
+            {/* 🔥 Auto Popup Dropdown */}
             {showPopup && query.trim() !== "" && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-background/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl z-50 overflow-hidden max-h-96 overflow-y-auto p-2 divide-y divide-border/40">
                 {filteredResults.length > 0 ? (
@@ -139,9 +138,7 @@ export function Navbar({
                       key={item.id}
                       onClick={() => {
                         setShowPopup(false);
-                        if (item.slug) {
-                          navigate({ to: `/movie/${item.slug}` as any });
-                        }
+                        navigate({ to: "/content/$id", params: { id: item.id } });
                       }}
                       className="flex items-center gap-3 p-2.5 hover:bg-muted/70 rounded-xl cursor-pointer transition group"
                     >
@@ -171,12 +168,6 @@ export function Navbar({
                           <span className="text-xs text-muted-foreground font-medium block mt-0.5">
                             {item.year}
                           </span>
-                        )}
-
-                        {item.description && (
-                          <p className="text-xs text-muted-foreground/80 line-clamp-2 mt-1 leading-relaxed">
-                            {item.description}
-                          </p>
                         )}
                       </div>
                     </div>
