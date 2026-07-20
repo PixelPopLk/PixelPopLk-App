@@ -244,6 +244,24 @@ function EpisodePage() {
                   <div className="mt-6">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                       Overview
+                                      {ep.description ? (
+                  <div className="mt-6">
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
+                      Overview
+                    </h3>
+                    <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">
+                      {ep.description}
+                    </p>
+
+                    {/* 🟢 1. කියවන Text එකට යටින්ම පළමු Ad එක */}
+                    <AdBanner />
+                  </div>
+                ) : (
+                  <div className="mt-6 p-4 rounded-xl bg-background/40 border border-border text-sm text-muted-foreground leading-relaxed">
+                    High-quality Sinhala subtitle synced for the official release.
+                  </div>
+                )}
+
                     </h3>
                     <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line">
                       {ep.description}
