@@ -138,50 +138,14 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-// 50/50 Rotation සඳහා URL දෙකම ඇතුළත් කර ඇත
-const MONETAG_POPUNDER_URL = "https://omg10.com/4/11202064";
-const ADSTERRA_POPUNDER_URL = "https://omg10.com/4/11172288";
-
-function MonetagPopunder() {
-  useEffect(() => {
-    let fired = false;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-
-      // 'no-popunder' පන්තිය (Class) සහිත මූලද්‍රව්‍ය ක්ලික් කළහොත් දැන්වීම් පෙන්වීම මඟහරියි (Safe matching)
-      if (target && typeof target.closest === "function" && target.closest(".no-popunder")) {
-        return;
-      }
-
-      if (fired) return;
-      fired = true;
-      window.removeEventListener("click", handler, true);
-      try {
-        // Monetag සහ Adsterra මාරුවෙන් මාරුවට 50% ක සම්භාවිතාවයකින් තෝරා ගනී
-        const targetUrl = Math.random() < 0.5 ? MONETAG_POPUNDER_URL : ADSTERRA_POPUNDER_URL;
-        
-        const w = window.open(targetUrl, "_blank", "noopener,noreferrer");
-        if (w) w.opener = null;
-      } catch {
-        /* noop */
-      }
-    };
-    window.addEventListener("click", handler, true);
-    return () => window.removeEventListener("click", handler, true);
-  }, []);
-  return null;
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const location = useLocation();
 
-  // '/manage-admin' පිටුවේ නොමැති විට පමණක් Monetag Popunder පෙන්වීමට අවසර දේ
-  const isNotAdmin = !location.pathname.startsWith("/manage-admin");
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isNotAdmin && <MonetagPopunder />}
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
