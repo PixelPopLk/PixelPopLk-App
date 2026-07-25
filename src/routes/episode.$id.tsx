@@ -252,7 +252,7 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🟢 1. Overview/Description එකට යටින්ම පෙන්වන පළමු Ad එක */}
+                {/* 🟢 1. Overview/Description එකට යටින්ම පෙන්වන පළමු Ads එක */}
                 <AdBanner />
 
                 {/* Download Buttons Section */}
