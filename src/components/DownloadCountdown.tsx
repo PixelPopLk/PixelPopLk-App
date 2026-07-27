@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Download, Lock, AlertTriangle, CheckCircle, X } from "lucide-react";
 
 // Monetag සහ Adsterra 50/50 සසම්භාවීව මාරු වීම සඳහා URL දෙකම ඇතුළත් කර ඇත
-const MONETAG_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+const MONETAG_URL = "https://omg10.com/4/11202064";
 const ADSTERRA_URL = "https://www.effectivecpmnetwork.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const COUNTDOWN_SECONDS = 5;
