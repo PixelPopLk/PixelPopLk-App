@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AgeGate } from "../components/AgeGate"; // AgeGate.tsx ගොනුව import කිරීම
 
 function NotFoundComponent() {
   return (
@@ -122,7 +123,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
         
-        {/* 🔥 Google Search Console Verification Meta Tag */}
+        {/* Google Search Console Verification Meta Tag */}
         <meta name="google-site-verification" content="VoErL02EHeHtDv46aBcjIEm5DpUTnJRhPF89ewoK-M4" />
         
         <script
@@ -138,16 +139,17 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const location = useLocation();
 
-
   return (
     <QueryClientProvider client={queryClient}>
+      {/* 18+ Age Gate overlay එක */}
+      <AgeGate />
+
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
   );
-      }
+                                    }
