@@ -32,7 +32,6 @@ export function DownloadCountdownModal({
   onClose,
   onUnlockSuccess,
 }: DownloadCountdownModalProps) {
-  // States: "idle" (ක්ලික් කිරීමට පෙර) | "verifying" (කාලය ගණනය වන විට) | "warning" | "completed"
   const [status, setStatus] = useState<"idle" | "verifying" | "warning" | "completed">("idle");
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
 
@@ -139,17 +138,15 @@ export function DownloadCountdownModal({
     };
   }, [status, onUnlockSuccess]);
 
-  // Ad එක click කර countdown එක පටන් ගන්නා අවස්ථාව
   const handleStartVerification = () => {
     const activeAdUrl = getRandomAdUrl();
     try {
-      // NOTE: "noreferrer" ඉවත් කර "noopener" පමණක් දමා ඇත (High CPM සඳහා)
       const w = window.open(activeAdUrl, "_blank", "noopener");
       if (w) w.opener = null;
     } catch {
       /* noop */
     }
-    blurTimeRef.current = Date.now(); // ක්ලික් කරපු ගමන් ad tab එකට යන නිසා වහාම blur වෙයි
+    blurTimeRef.current = Date.now();
     setStatus("verifying");
   };
 
@@ -200,44 +197,63 @@ export function DownloadCountdownModal({
                   <Lock className="w-8 h-8 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Unlock Your Download</h3>
+                  <h3 className="text-base font-bold text-foreground leading-snug">
+                    Unlock Your Download <br />
+                    <span className="text-[11px] font-normal text-muted-foreground block mt-1">ඩවුන්ලෝඩ් ලින්ක් එක ලබා ගැනීමට</span>
+                  </h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Please visit our sponsor link for just <span className="text-primary font-semibold">5 seconds</span> to unlock your file.
+                    <span className="block text-[11px] mt-1 text-muted-foreground/75">කරුණාකර පහත බටන් එක ක්ලික් කර තත්පර 5ක් එහි රැඳී සිටින්න.</span>
                   </p>
                 </div>
                 
-                {/* Visual Step Guide (පියවර පැහැදිලිව පෙන්වීම) */}
+                {/* Visual Step Guide */}
                 <div className="w-full text-left bg-muted/20 p-4 rounded-2xl border border-muted/40 text-xs text-muted-foreground space-y-2">
-                  <div className="flex gap-2"><span className="font-bold text-primary">1.</span> Click "Unlock Download" below.</div>
-                  <div className="flex gap-2"><span className="font-bold text-primary">2.</span> Stay on sponsor page for 5 seconds.</div>
-                  <div className="flex gap-2"><span className="font-bold text-primary">3.</span> Return here to start downloading.</div>
+                  <div className="flex flex-col">
+                    <span><span className="font-bold text-primary">1.</span> Click "Unlock Download" below.</span>
+                    <span className="text-[11px] text-muted-foreground/60 ml-4">පහත බටන් එක ක්ලික් කරන්න.</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span><span className="font-bold text-primary">2.</span> Stay on sponsor page for 5 seconds.</span>
+                    <span className="text-[11px] text-muted-foreground/60 ml-4">තත්පර 5ක් එම වෙබ් අඩවියේ රැඳී සිටින්න.</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span><span className="font-bold text-primary">3.</span> Return here to start downloading.</span>
+                    <span className="text-[11px] text-muted-foreground/60 ml-4">නැවත මෙම පිටුවට පැමිණ ඩවුන්ලෝඩ් කරන්න.</span>
+                  </div>
                 </div>
 
                 <button
                   onClick={handleStartVerification}
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
                 >
-                  Unlock Download <ExternalLink className="w-4 h-4" />
+                  Unlock Download | සක්‍රීය කරන්න <ExternalLink className="w-4 h-4" />
                 </button>
               </>
             ) : status === "warning" ? (
-              /* WARNING STATE */
+              /* WARNING STATE: වේලාව මදි වූ විට එන message එක */
               <>
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 grid place-items-center">
                   <AlertTriangle className="w-8 h-8 text-amber-400 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Verification Paused</h3>
+                  <h3 className="text-base font-bold text-foreground">
+                    Verification Paused <br />
+                    <span className="text-[11px] font-normal text-amber-400/80 block mt-1">තහවුරු කිරීම නැවතී ඇත!</span>
+                  </h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     You returned too early! Please stay on the sponsor page for at least{" "}
                     <span className="text-amber-400 font-semibold">{secondsLeft} more seconds</span> to unlock.
+                    <span className="block text-[11px] mt-1.5 text-muted-foreground/80">
+                      ඔබ නියමිත කාලයට පෙර ආපසු පැමිණ ඇත! කරුණාකර තව තත්පර {secondsLeft}ක් අනුග්‍රාහක පිටුවේ රැඳී සිටින්න.
+                    </span>
                   </p>
                 </div>
                 <button
                   onClick={handleStartVerification}
                   className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
                 >
-                  Resume Unlocking
+                  Resume Unlocking | නැවත උත්සාහ කරන්න
                 </button>
               </>
             ) : status === "completed" ? (
@@ -247,16 +263,20 @@ export function DownloadCountdownModal({
                   <CheckCircle className="w-8 h-8 text-emerald-400 animate-bounce" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Download Unlocked!</h3>
+                  <h3 className="text-base font-bold text-foreground">
+                    Download Unlocked! <br />
+                    <span className="text-[11px] font-normal text-emerald-400/80 block mt-1">ඩවුන්ලෝඩ් කිරීමට සූදානම්!</span>
+                  </h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Your secure download link has been unlocked.
+                    <span className="block text-[11px] mt-1 text-muted-foreground/80">ඔබගේ ආරක්ෂිත ඩවුන්ලෝඩ් ලින්ක් එක සාර්ථකව සක්‍රීය කර ඇත.</span>
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 w-full">
                   <a
                     href={safeDownloadLink}
                     target="_blank"
-                    rel="noopener" // noreferrer ඉවත් කර ඇත
+                    rel="noopener"
                     onClick={(e) => {
                       if (safeDownloadLink === "#") {
                         e.preventDefault();
@@ -267,13 +287,13 @@ export function DownloadCountdownModal({
                     }}
                     className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold text-center transition cursor-pointer w-full"
                   >
-                    Start Download
+                    Start Download | ඩවුන්ලෝඩ් කරන්න
                   </a>
                   <button
                     onClick={onClose}
                     className="px-6 py-2 rounded-full bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition cursor-pointer w-full"
                   >
-                    Close
+                    Close | වසන්න
                   </button>
                 </div>
               </>
@@ -318,13 +338,17 @@ export function DownloadCountdownModal({
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-foreground">
-                    Verifying ad view...
+                    Verifying ad view... <br />
+                    <span className="text-[11px] font-normal text-muted-foreground block mt-1">දැන්වීම පරීක්ෂා කරමින් පවතී...</span>
                   </h3>
                   <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
                     Please stay on the sponsor page for{" "}
                     <span className="text-foreground font-semibold">
                       {secondsLeft} second{secondsLeft !== 1 ? "s" : ""}
                     </span>.
+                    <span className="block text-[11px] mt-1 text-muted-foreground/80">
+                      කරුණාකර තව තත්පර {secondsLeft}ක් අනුග්‍රාහක පිටුවේ රැඳී සිටින්න.
+                    </span>
                   </p>
                 </div>
 
@@ -342,7 +366,7 @@ export function DownloadCountdownModal({
                   onClick={handleStartVerification}
                   className="text-xs text-primary/80 hover:text-primary underline cursor-pointer"
                 >
-                  Sponsor page closed? Click to reopening
+                  Sponsor page closed? Click to reopen | නැවත විවෘත කරන්න
                 </button>
               </>
             )}
@@ -382,7 +406,7 @@ export function DownloadButton({
     if (isUnlocked) {
       if (isSafeUrl(downloadLink)) {
         try {
-          const w = window.open(downloadLink, "_blank", "noopener"); // noreferrer ඉවත් කර ඇත
+          const w = window.open(downloadLink, "_blank", "noopener");
           if (w) w.opener = null;
         } catch {
           /* noop */
@@ -391,7 +415,6 @@ export function DownloadButton({
         alert("Invalid or unsafe download link detected.");
       }
     } else {
-      // මෙතැනදී කෙලින්ම Modal එක පමණක් පෙන්වයි (No auto ads here)
       setShowModal(true);
     }
   };
@@ -420,7 +443,7 @@ export function DownloadButton({
         ) : (
           <Download className="w-4 h-4" />
         )}
-        {isUnlocked ? "Download Now" : label}
+        {isUnlocked ? "Download Now | දැන් ඩවුන්ලෝඩ් කරන්න" : label}
       </button>
 
       {showModal && (
