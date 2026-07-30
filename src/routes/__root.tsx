@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AgeGate } from "../components/AgeGate";
 import {
   Outlet,
   Link,
@@ -147,6 +148,20 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  const location = useLocation();
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* 18+ Age Gate එක මෙතැනින් ඇතුළත් කරන්න */}
+      <AgeGate />
+
+      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <Outlet />
+    </QueryClientProvider>
+  );
+      }
       <Outlet />
     </QueryClientProvider>
   );
