@@ -1,19 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Download, Lock, AlertTriangle, CheckCircle, X } from "lucide-react";
+import { Download, Lock, AlertTriangle, CheckCircle, X, ExternalLink } from "lucide-react";
 
-// Monetag සහ Adsterra 50/50 සසම්භාවීව මාරු වීම සඳහා URL දෙකම ඇතුළත් කර ඇත
 const MONETAG_URL = "https://omg10.com/4/11202064";
 const ADSTERRA_URL = "https://www.effectivecpmnetwork.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const COUNTDOWN_SECONDS = 5;
 
-// සසම්භාවීව දැන්වීම් URL එකක් ලබා ගන්නා සරල ශ්‍රිතය
 const getRandomAdUrl = () => Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL;
 
-/**
- * Sanitizes and validates a URL to prevent protocol-based XSS attacks (e.g. javascript: URLs)
- */
 export function isSafeUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
@@ -37,21 +32,14 @@ export function DownloadCountdownModal({
   onClose,
   onUnlockSuccess,
 }: DownloadCountdownModalProps) {
+  // States: "idle" (ක්ලික් කිරීමට පෙර) | "verifying" (කාලය ගණනය වන විට) | "warning" | "completed"
+  const [status, setStatus] = useState<"idle" | "verifying" | "warning" | "completed">("idle");
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
-  const [status, setStatus] = useState<"verifying" | "warning" | "completed">("verifying");
 
   const blurTimeRef = useRef<number | null>(null);
   const accumulatedTimeRef = useRef<number>(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<any>(null);
   const isPageVisibleRef = useRef<boolean>(true);
-
-  // පළමු වතාවට මෝඩල් එක ඕපන් වන විට පමණක් මුල සිට ටයිමරය පටන් ගනී
-  const startVerification = () => {
-    accumulatedTimeRef.current = 0;
-    blurTimeRef.current = null;
-    setSecondsLeft(COUNTDOWN_SECONDS);
-    setStatus("verifying");
-  };
 
   useEffect(() => {
     if (status !== "verifying") {
@@ -59,7 +47,6 @@ export function DownloadCountdownModal({
       return;
     }
 
-    // Set initial visibility state
     const isVisible = document.visibilityState === "visible";
     isPageVisibleRef.current = isVisible;
     if (!isVisible) {
@@ -98,10 +85,13 @@ export function DownloadCountdownModal({
           blurTimeRef.current = null;
         }
 
-        // පරිශීලකයා නියමිත කාලයට පෙර නැවත පැමිණියහොත් ටයිමරය නතර (Freeze) කර Warning තත්ත්වයට පත් කරයි
+        if (timerRef.current) clearInterval(timerRef.current);
+
         if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
-          if (timerRef.current) clearInterval(timerRef.current);
           setStatus("warning");
+        } else {
+          setStatus("completed");
+          onUnlockSuccess();
         }
       } else {
         isPageVisibleRef.current = false;
@@ -126,9 +116,13 @@ export function DownloadCountdownModal({
           blurTimeRef.current = null;
         }
 
+        if (timerRef.current) clearInterval(timerRef.current);
+
         if (accumulatedTimeRef.current < COUNTDOWN_SECONDS * 1000) {
-          if (timerRef.current) clearInterval(timerRef.current);
           setStatus("warning");
+        } else {
+          setStatus("completed");
+          onUnlockSuccess();
         }
       }
     };
@@ -143,27 +137,24 @@ export function DownloadCountdownModal({
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [status]);
+  }, [status, onUnlockSuccess]);
 
-  // 🔥 Freeze වූ තත්පර ගණනින් නැවත ආරම්භ කිරීම (Resume Logic)
-  const handleResume = () => {
-    // නැවතත් 50% සසම්භාවීව ඇඩ් එකක් අලුත් ටැබ් එකකින් විවෘත කරයි
+  // Ad එක click කර countdown එක පටන් ගන්නා අවස්ථාව
+  const handleStartVerification = () => {
     const activeAdUrl = getRandomAdUrl();
     try {
-      const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
+      // NOTE: "noreferrer" ඉවත් කර "noopener" පමණක් දමා ඇත (High CPM සඳහා)
+      const w = window.open(activeAdUrl, "_blank", "noopener");
       if (w) w.opener = null;
     } catch {
       /* noop */
     }
-    
-    // දත්ත ඉතිරි තත්පර ගණනින් පටන් ගැනීමට සලස්වයි
-    blurTimeRef.current = null;
+    blurTimeRef.current = Date.now(); // ක්ලික් කරපු ගමන් ad tab එකට යන නිසා වහාම blur වෙයි
     setStatus("verifying");
   };
 
-  const circumference = 2 * Math.PI * 32; // r=32
+  const circumference = 2 * Math.PI * 32;
   const dashOffset = circumference * (secondsLeft / COUNTDOWN_SECONDS);
-
   const safeDownloadLink = isSafeUrl(downloadLink) ? downloadLink : "#";
 
   return (
@@ -191,10 +182,8 @@ export function DownloadCountdownModal({
             background: "linear-gradient(160deg, oklch(0.20 0.01 20 / 0.98), oklch(0.14 0.008 20 / 0.98))",
           }}
         >
-          {/* Top glow strip */}
           <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-primary opacity-80" />
 
-          {/* Close button */}
           <button
             onClick={onClose}
             aria-label="Close"
@@ -204,8 +193,35 @@ export function DownloadCountdownModal({
           </button>
 
           <div className="p-8 flex flex-col items-center text-center gap-5">
-            {status === "warning" ? (
-              /* Warning/Paused state when returned too early */
+            {status === "idle" ? (
+              /* IDLE STATE: User ad එක click කිරීමට පෙර */
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 grid place-items-center">
+                  <Lock className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Unlock Your Download</h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                    Please visit our sponsor link for just <span className="text-primary font-semibold">5 seconds</span> to unlock your file.
+                  </p>
+                </div>
+                
+                {/* Visual Step Guide (පියවර පැහැදිලිව පෙන්වීම) */}
+                <div className="w-full text-left bg-muted/20 p-4 rounded-2xl border border-muted/40 text-xs text-muted-foreground space-y-2">
+                  <div className="flex gap-2"><span className="font-bold text-primary">1.</span> Click "Unlock Download" below.</div>
+                  <div className="flex gap-2"><span className="font-bold text-primary">2.</span> Stay on sponsor page for 5 seconds.</div>
+                  <div className="flex gap-2"><span className="font-bold text-primary">3.</span> Return here to start downloading.</div>
+                </div>
+
+                <button
+                  onClick={handleStartVerification}
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
+                >
+                  Unlock Download <ExternalLink className="w-4 h-4" />
+                </button>
+              </>
+            ) : status === "warning" ? (
+              /* WARNING STATE */
               <>
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 grid place-items-center">
                   <AlertTriangle className="w-8 h-8 text-amber-400 animate-pulse" />
@@ -214,18 +230,18 @@ export function DownloadCountdownModal({
                   <h3 className="text-base font-bold text-foreground">Verification Paused</h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     You returned too early! Please stay on the sponsor page for at least{" "}
-                    <span className="text-amber-400 font-semibold">{secondsLeft} more seconds</span> to unlock the download.
+                    <span className="text-amber-400 font-semibold">{secondsLeft} more seconds</span> to unlock.
                   </p>
                 </div>
                 <button
-                  onClick={handleResume} // <-- Resume button එක
+                  onClick={handleStartVerification}
                   className="px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground text-sm font-bold shadow-glow hover:opacity-90 transition cursor-pointer w-full"
                 >
                   Resume Unlocking
                 </button>
               </>
             ) : status === "completed" ? (
-              /* Completed state */
+              /* COMPLETED STATE */
               <>
                 <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 grid place-items-center">
                   <CheckCircle className="w-8 h-8 text-emerald-400 animate-bounce" />
@@ -240,7 +256,7 @@ export function DownloadCountdownModal({
                   <a
                     href={safeDownloadLink}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener" // noreferrer ඉවත් කර ඇත
                     onClick={(e) => {
                       if (safeDownloadLink === "#") {
                         e.preventDefault();
@@ -262,14 +278,11 @@ export function DownloadCountdownModal({
                 </div>
               </>
             ) : (
-              /* Countdown state */
+              /* VERIFYING (COUNTDOWN) STATE */
               <>
-                {/* SVG Countdown Ring */}
                 <div className="relative w-24 h-24 flex items-center justify-center">
                   <svg className="absolute inset-0 -rotate-90" width="96" height="96" viewBox="0 0 96 96">
-                    {/* Track */}
                     <circle cx="48" cy="48" r="32" fill="none" stroke="oklch(1 0 0 / 0.06)" strokeWidth="6" />
-                    {/* Progress */}
                     <circle
                       cx="48"
                       cy="48"
@@ -301,11 +314,11 @@ export function DownloadCountdownModal({
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Lock className="w-3.5 h-3.5 text-primary" />
                     <span className="text-xs font-bold uppercase tracking-widest text-primary">
-                      Verifying Ad View
+                      Verifying Sponsor Visit
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-foreground">
-                    Unlocking download link...
+                    Verifying ad view...
                   </h3>
                   <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
                     Please stay on the sponsor page for{" "}
@@ -315,7 +328,6 @@ export function DownloadCountdownModal({
                   </p>
                 </div>
 
-                {/* Progress bar */}
                 <div className="w-full h-1.5 rounded-full bg-muted/40 overflow-hidden">
                   <div
                     className="h-full bg-gradient-primary rounded-full transition-all"
@@ -327,10 +339,10 @@ export function DownloadCountdownModal({
                 </div>
 
                 <button
-                  onClick={handleResume}
+                  onClick={handleStartVerification}
                   className="text-xs text-primary/80 hover:text-primary underline cursor-pointer"
                 >
-                  Sponsor page didn't open? Click here
+                  Sponsor page closed? Click to reopening
                 </button>
               </>
             )}
@@ -341,7 +353,6 @@ export function DownloadCountdownModal({
   );
 }
 
-/** Replacement for <a href={downloadLink}> — shows countdown modal instead */
 export function DownloadButton({
   downloadLink,
   label = "Download Subtitle",
@@ -358,7 +369,7 @@ export function DownloadButton({
 
   useEffect(() => {
     try {
-      const key = `unlocked_${btoa(downloadLink)}`;
+      const key = `unlocked_${encodeURIComponent(downloadLink)}`;
       if (sessionStorage.getItem(key) === "true") {
         setIsUnlocked(true);
       }
@@ -371,7 +382,7 @@ export function DownloadButton({
     if (isUnlocked) {
       if (isSafeUrl(downloadLink)) {
         try {
-          const w = window.open(downloadLink, "_blank", "noopener,noreferrer");
+          const w = window.open(downloadLink, "_blank", "noopener"); // noreferrer ඉවත් කර ඇත
           if (w) w.opener = null;
         } catch {
           /* noop */
@@ -380,33 +391,19 @@ export function DownloadButton({
         alert("Invalid or unsafe download link detected.");
       }
     } else {
-      const activeAdUrl = getRandomAdUrl();
-      try {
-        const w = window.open(activeAdUrl, "_blank", "noopener,noreferrer");
-        if (w) w.opener = null;
-      } catch {
-        /* noop */
-      }
+      // මෙතැනදී කෙලින්ම Modal එක පමණක් පෙන්වයි (No auto ads here)
       setShowModal(true);
     }
   };
 
   const handleUnlockSuccess = () => {
     try {
-      const key = `unlocked_${btoa(downloadLink)}`;
+      const key = `unlocked_${encodeURIComponent(downloadLink)}`;
       sessionStorage.setItem(key, "true");
     } catch {
       /* noop */
     }
     setIsUnlocked(true);
-    if (isSafeUrl(downloadLink)) {
-      try {
-        const w = window.open(downloadLink, "_blank", "noopener,noreferrer");
-        if (w) w.opener = null;
-      } catch {
-        /* noop */
-      }
-    }
   };
 
   const buttonClass = className ?? (
@@ -417,10 +414,7 @@ export function DownloadButton({
 
   return (
     <>
-      <button
-        onClick={handleDownloadClick}
-        className={buttonClass}
-      >
+      <button onClick={handleDownloadClick} className={buttonClass}>
         {isUnlocked ? (
           <CheckCircle className="w-4 h-4 text-emerald-400" />
         ) : (
