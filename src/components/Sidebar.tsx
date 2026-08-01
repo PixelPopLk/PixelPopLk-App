@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Film, Tv, Home, Subtitles } from "lucide-react";
+// Languages icon එක මෙතනට එකතු කර ඇත
+import { Film, Tv, Home, Subtitles, Languages } from "lucide-react";
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Accordion,
@@ -109,6 +110,18 @@ export function Sidebar({ onClose }: SidebarProps) {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+
+          {/* Translate Option එක මෙතනට එකතු කර ඇත */}
+          <a
+            href="https://ais-pre-ezmra3hcelmmewl23jj6wg-128742997540.asia-east1.run.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-200"
+          >
+            <Languages className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">TRANSLATE</span>
+          </a>
         </nav>
       </div>
 
