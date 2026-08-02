@@ -224,8 +224,8 @@ function Hero({
             </div>
           ) : null}
 
-          {/* 🟢 Movies සහ Series දෙකේම Overview එකට යටින් ad එක මෙතනින් load වේ */}
-          <AdBanner />
+          {/* 🟢 Overview එකට යටින් Ad එක */}
+          <AdBanner type="300x250" />
 
           {children}
         </div>
@@ -471,6 +471,9 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
             </Link>
           ))}
         </div>
+
+        {/* 🟢 අන්තිම Episode එකට යටින් Ad එක */}
+        <AdBanner type="160x300" />
       </div>
     </Hero>
   );
