@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface AdBannerProps {
   keyId?: string;
   width?: number;
   height?: number;
   type?: "300x250" | "160x300";
+  delay?: number; // Animation එක ඉවර වෙනකම් පොඩි Delay එකක් තැබීමට
 }
 
 export default function AdBanner({
@@ -12,8 +13,10 @@ export default function AdBanner({
   width,
   height,
   type = "300x250",
+  delay = 300, // Popup එක Lag නොවී Instant Open වෙන්න 300ms Delay එකක්
 }: AdBannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
 
   // Ad configurations
   const adConfig = {
@@ -33,13 +36,21 @@ export default function AdBanner({
   const selectedWidth = width || adConfig[type]?.width || 300;
   const selectedHeight = height || adConfig[type]?.height || 250;
 
+  // 1. Popup එකේ Animation එක ඉවර වෙනකම් පොඩ්ඩක් ඉවසීම (Lag එක නැති කිරීමට)
   useEffect(() => {
-    if (!containerRef.current) return;
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, delay);
 
-    // පැරණි Ad එක clear කිරීම
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  // 2. Ready වූ පසු Ad එක Load කිරීම
+  useEffect(() => {
+    if (!isReady || !containerRef.current) return;
+
     containerRef.current.innerHTML = "";
 
-    // Variable ගැටුම් (Conflicts) වැළැක්වීම සඳහා Isolated Iframe එකක් සෑදීම
     const iframe = document.createElement("iframe");
     iframe.width = `${selectedWidth}`;
     iframe.height = `${selectedHeight}`;
@@ -85,15 +96,19 @@ export default function AdBanner({
     iframeDoc.open();
     iframeDoc.write(htmlContent);
     iframeDoc.close();
-  }, [selectedKey, selectedWidth, selectedHeight]);
+  }, [isReady, selectedKey, selectedWidth, selectedHeight]);
 
   return (
     <div className="flex justify-center my-4 w-full">
       <div
         ref={containerRef}
         style={{ width: `${selectedWidth}px`, height: `${selectedHeight}px` }}
-        className="overflow-hidden bg-muted/10 rounded-lg flex items-center justify-center"
-      />
+        className="overflow-hidden bg-muted/10 rounded-lg flex items-center justify-center min-h-[250px]"
+      >
+        {!isReady && (
+          <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        )}
+      </div>
     </div>
   );
-      }
+}
