@@ -184,7 +184,7 @@ export function DownloadCountdownModal({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-4 right-4 w-7 h-7 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition cursor-pointer text-muted-foreground hover:text-foreground"
+            className="absolute top-4 right-4 w-7 h-7 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition cursor-pointer text-muted-foreground hover:text-foreground z-10"
           >
             <X className="w-3.5 h-3.5" />
           </button>
