@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, Lock, AlertTriangle, CheckCircle, X, ExternalLink } from "lucide-react";
-import AdBanner from "@/components/AdBanner";
 
 const MONETAG_URL = "https://omg10.com/4/11202064";
 const ADSTERRA_URL = "https://www.effectivecpmnetwork.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
@@ -190,42 +189,39 @@ export function DownloadCountdownModal({
             <X className="w-3.5 h-3.5" />
           </button>
 
-          <div className="p-5 sm:p-8 flex flex-col items-center text-center gap-4">
+          <div className="p-8 flex flex-col items-center text-center gap-5">
             {status === "idle" ? (
               /* IDLE STATE: User ad එක click කිරීමට පෙර */
               <>
-                <div className="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 grid place-items-center">
-                  <Lock className="w-7 h-7 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 grid place-items-center">
+                  <Lock className="w-8 h-8 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-foreground leading-snug">
                     Unlock Your Download <br />
                     <span className="text-[11px] font-normal text-muted-foreground block mt-1">ඩවුන්ලෝඩ් ලින්ක් එක ලබා ගැනීමට</span>
                   </h3>
-                  <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Please visit our sponsor link for just <span className="text-primary font-semibold">5 seconds</span> to unlock your file.
-                    <span className="block text-[11px] mt-0.5 text-muted-foreground/75">කරුණාකර පහත බටන් එක ක්ලික් කර තත්පර 5ක් එහි රැඳී සිටින්න.</span>
+                    <span className="block text-[11px] mt-1 text-muted-foreground/75">කරුණාකර පහත බටන් එක ක්ලික් කර තත්පර 5ක් එහි රැඳී සිටින්න.</span>
                   </p>
                 </div>
                 
                 {/* Visual Step Guide */}
-                <div className="w-full text-left bg-muted/20 p-3.5 rounded-2xl border border-muted/40 text-xs text-muted-foreground space-y-1.5">
+                <div className="w-full text-left bg-muted/20 p-4 rounded-2xl border border-muted/40 text-xs text-muted-foreground space-y-2">
                   <div className="flex flex-col">
                     <span><span className="font-bold text-primary">1.</span> Click "Unlock Download" below.</span>
-                    <span className="text-[10px] text-muted-foreground/60 ml-4">පහත බටන් එක ක්ලික් කරන්න.</span>
+                    <span className="text-[11px] text-muted-foreground/60 ml-4">පහත බටන් එක ක්ලික් කරන්න.</span>
                   </div>
                   <div className="flex flex-col">
                     <span><span className="font-bold text-primary">2.</span> Stay on sponsor page for 5 seconds.</span>
-                    <span className="text-[10px] text-muted-foreground/60 ml-4">තත්පර 5ක් එම වෙබ් අඩවියේ රැඳී සිටින්න.</span>
+                    <span className="text-[11px] text-muted-foreground/60 ml-4">තත්පර 5ක් එම වෙබ් අඩවියේ රැඳී සිටින්න.</span>
                   </div>
                   <div className="flex flex-col">
                     <span><span className="font-bold text-primary">3.</span> Return here to start downloading.</span>
-                    <span className="text-[10px] text-muted-foreground/60 ml-4">නැවත මෙම පිටුවට පැමිණ ඩවුන්ලෝඩ් කරන්න.</span>
+                    <span className="text-[11px] text-muted-foreground/60 ml-4">නැවත මෙම පිටුවට පැමිණ ඩවුන්ලෝඩ් කරන්න.</span>
                   </div>
                 </div>
-
-                {/* 🟢 Sponsor Modal එක ඇතුලේ පෙන්වන 300x250 Ad එක */}
-                <AdBanner type="300x250" />
 
                 <button
                   onClick={handleStartVerification}
