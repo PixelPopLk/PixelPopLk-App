@@ -252,8 +252,8 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🟢 1. Overview/Description එකට යටින්ම පෙන්වන පළමු Ads එක */}
-                <AdBanner />
+                {/* 🟢 1. Overview/Description එකට යටින්ම පෙන්වන පළමු Ads එක (300x250) */}
+                <AdBanner type="300x250" />
 
                 {/* Download Buttons Section */}
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
@@ -266,6 +266,9 @@ function EpisodePage() {
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Opens in a new tab. Thank you for supporting PixelPopLK ❤
                 </p>
+
+                {/* 🟢 2. Download Buttons සහ "Thank you for supporting PixelPopLK" කොටසට යටින් දෙවැනි Ad එක (160x300) */}
+                <AdBanner type="160x300" />
 
               </div>
             </div>
@@ -325,7 +328,6 @@ function OtherEpisodes({
   );
 }
 
-// Shell component එක වෙනුවට ගැටුම් වළක්වා ගැනීමට EpisodeShell ලෙස වෙනස් කර ඇත
 function EpisodeShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
