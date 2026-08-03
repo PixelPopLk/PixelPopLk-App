@@ -111,20 +111,6 @@ export function Sidebar({ onClose }: SidebarProps) {
             </AccordionItem>
           </Accordion>
 
-          {/* Translate Option එක මෙතනට එකතු කර ඇත */}
-          <a
-            href="https://ais-pre-ezmra3hcelmmewl23jj6wg-128742997540.asia-east1.run.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onClose}
-            className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-200"
-          >
-            <Languages className="w-4 h-4 text-primary" />
-            <span className="font-semibold text-sm">TRANSLATE</span>
-          </a>
-        </nav>
-      </div>
-
       {/* Social Media Buttons at the bottom for Mobile */}
       <div className="flex flex-col gap-3 pt-6 border-t border-border/40">
         <a
