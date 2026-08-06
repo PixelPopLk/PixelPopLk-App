@@ -41,7 +41,7 @@ async function generateSitemap() {
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
 
-    // 2. සියලුම උපසිරැසි පිටු (Movie/Series) සහ Episode පිටු සිතියමට එකතු කිරීම
+    // 2. සියලුම උපසිරැසි පිටු (Movie/Series) සිතියමට එකතු කිරීම
     subtitles.forEach((sub) => {
       // Safe Date Formatting
       let date = new Date().toISOString().split('T')[0];
@@ -59,14 +59,6 @@ async function generateSitemap() {
       xml += `    <lastmod>${date}</lastmod>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
       xml += `    <priority>0.8</priority>\n`;
-      xml += `  </url>\n`;
-
-      // 📺 Episode Download Page (/episode/id)
-      xml += `  <url>\n`;
-      xml += `    <loc>${BASE_URL}/episode/${sub.id}</loc>\n`;
-      xml += `    <lastmod>${date}</lastmod>\n`;
-      xml += `    <changefreq>weekly</changefreq>\n`;
-      xml += `    <priority>0.7</priority>\n`;
       xml += `  </url>\n`;
     });
 
