@@ -29,6 +29,9 @@ import {
 import { Navbar } from "@/components/Navbar";
 import { DownloadButton } from "@/components/DownloadCountdown";
 
+// 🟢 Canonical links සෑදීම සඳහා Base URL එක මෙතැනින් ලබා දෙනවා
+const BASE_URL = "https://pixelpoplk.pages.dev";
+
 export const Route = createFileRoute("/content/$id")({
   head: () => ({ meta: [{ title: "Subtitle — PixelPopLK" }] }),
   component: ContentPage,
@@ -77,21 +80,21 @@ function ContentPage() {
         return parsed.episode != null;
       })();
 
-      if (isSeries) {
-        const parsed = parseTitle(targetItem.title ?? "");
-        const { data: allEpisodes, error: secondError } = await supabase
-          .from(SUBTITLES_TABLE)
-          .select("*")
-          .ilike("title", `${parsed.showName}%`)
-          .order("created_at", { ascending: false });
+          if (isSeries) {
+            const parsed = parseTitle(targetItem.title ?? "");
+            const { data: allEpisodes, error: secondError } = await supabase
+              .from(SUBTITLES_TABLE)
+              .select("*")
+              .ilike("title", `${parsed.showName}%`)
+              .order("created_at", { ascending: false });
 
-        if (secondError) throw secondError;
-        return (allEpisodes ?? []) as Subtitle[];
-      }
+            if (secondError) throw secondError;
+            return (allEpisodes ?? []) as Subtitle[];
+          }
 
-      return [targetItem] as Subtitle[];
-    },
-  });
+          return [targetItem] as Subtitle[];
+        },
+      });
 
   const item = useMemo<GridItem | null>(() => {
     if (!data) return null;
@@ -265,9 +268,24 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       element.setAttribute("content", content);
     };
 
+    // 🟢 Canonical Tag එක update කරන කේතය
+    const updateCanonical = (href: string) => {
+      let element = document.querySelector('link[rel="canonical"]');
+      if (!element) {
+        element = document.createElement("link");
+        element.setAttribute("rel", "canonical");
+        document.head.appendChild(element);
+      }
+      element.setAttribute("href", href);
+    };
+
     updateMeta("description", descText);
     updateMeta("keywords", keywordText);
     updateMeta("robots", "index, follow");
+    
+    // 🟢 Canonical Tag එක ඇතුළත් කිරීම
+    updateCanonical(`${BASE_URL}/content/${s.id}`);
+
     updateMeta("og:title", titleText, true);
     updateMeta("og:description", descText, true);
     updateMeta("og:type", "video.movie", true);
@@ -385,9 +403,24 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
       element.setAttribute("content", content);
     };
 
+    // 🟢 Canonical Tag එක හදන සහ update කරන කේතය
+    const updateCanonical = (href: string) => {
+      let element = document.querySelector('link[rel="canonical"]');
+      if (!element) {
+        element = document.createElement("link");
+        element.setAttribute("rel", "canonical");
+        document.head.appendChild(element);
+      }
+      element.setAttribute("href", href);
+    };
+
     updateMeta("description", descText);
     updateMeta("keywords", keywordText);
     updateMeta("robots", "index, follow");
+    
+    // 🟢 Canonical Tag එක ඇතුළත් කිරීම
+    updateCanonical(`${BASE_URL}/content/${item.id}`);
+
     updateMeta("og:title", titleText, true);
     updateMeta("og:description", descText, true);
     updateMeta("og:type", "video.tv_show", true);
@@ -633,4 +666,4 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
       </div>
     </div>
   );
-}
+                  }
