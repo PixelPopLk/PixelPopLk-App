@@ -242,6 +242,20 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
   const year = s.year != null && s.year !== "" ? String(s.year) : new Date(s.created_at).getFullYear().toString();
   const genres = splitGenres(s.genre);
 
+  // 🟢 Download Count එක වැඩි කරන අලුත් Function එක
+  const handleTrackDownload = async () => {
+    try {
+      const currentCount = (s as any).download_count || 0;
+      await supabase
+        .from(SUBTITLES_TABLE)
+        .update({ download_count: currentCount + 1 } as any)
+        .eq("id", s.id);
+      console.log("Download count updated!");
+    } catch (error) {
+      console.error("Error updating download count:", error);
+    }
+  };
+
   const titleText = `${s.title} (${year}) Sinhala Subtitle | Download Movie Subtitles | PixelPopLK`;
   const descText = s.description 
     ? s.description.slice(0, 160)
@@ -327,10 +341,16 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
       
+      {/* 🟢 මෙතන තමයි වෙනස් කලේ - onClick එක div එකට දැම්මා */}
       <div className="mt-7 flex flex-col sm:flex-row gap-3 min-w-0">
-        <DownloadButton downloadLink={s.download_link} label="Direct Download (.srt)" />
+        <div onClick={handleTrackDownload} className="w-full sm:w-auto cursor-pointer">
+          <DownloadButton downloadLink={s.download_link} label="Direct Download (.srt)" />
+        </div>
+        
         {(s as any).telegram_link && (
-          <DownloadButton downloadLink={(s as any).telegram_link} label="Telegram Download" variant="telegram" />
+          <div onClick={handleTrackDownload} className="w-full sm:w-auto cursor-pointer">
+            <DownloadButton downloadLink={(s as any).telegram_link} label="Telegram Download" variant="telegram" />
+          </div>
         )}
       </div>
       
@@ -666,4 +686,4 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
       </div>
     </div>
   );
-                  }
+}
