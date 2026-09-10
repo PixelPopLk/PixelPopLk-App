@@ -6,7 +6,7 @@ const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924ad
 const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
-const SILENT_RELOCK_MS = 10000; // Download කර තත්පර 10න් ආපසු Lock වේ
+const SILENT_RELOCK_MS = 10000;
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
@@ -31,7 +31,7 @@ export function isSafeUrl(url: string | null | undefined): boolean {
   }
 }
 
-// 🚀 Fast Native Download Function
+// 🚀 Fast Native Download Function (Duplicate Query Params නැතිව)
 function triggerFastNativeDownload(rawUrl: string, title?: string) {
   try {
     const fullUrl = rawUrl.trim();
@@ -50,13 +50,14 @@ function triggerFastNativeDownload(rawUrl: string, title?: string) {
 
     const fileName = `${safeTitle} Sinhala Sub - PixelPopLK.${extension}`;
 
-    if (urlObj.hostname.endsWith(".supabase.co") || urlObj.hostname === "supabase.co") {
+    // Supabase storage URL එකක් නම් පමණක් ?download=fileName attach කිරීම
+    if (urlObj.hostname.endsWith("supabase.co")) {
       urlObj.searchParams.set("download", fileName);
     }
 
-    const downloadUrlWithDisposition = urlObj.toString();
+    const downloadUrl = urlObj.toString();
     const a = document.createElement("a");
-    a.href = downloadUrlWithDisposition;
+    a.href = downloadUrl;
     a.setAttribute("download", fileName);
     a.setAttribute("target", "_self");
     document.body.appendChild(a);
@@ -75,7 +76,7 @@ interface DownloadButtonProps {
   variant?: "primary" | "direct" | "telegram";
 }
 
-type ButtonState = "locked" | "verifying" | "paused" | "fetching" | "ready" | "downloading";
+type ButtonState = "locked" | "verifying" | "paused" | "ready" | "downloading";
 
 export function DownloadButton({
   subtitleId,
@@ -87,26 +88,38 @@ export function DownloadButton({
   const normalizedVariant = variant === "telegram" ? "telegram" : "direct";
   const subId = subtitleId || "default";
 
-  // 🟢 Direct සහ Telegram දෙකට වෙන වෙනම Storage keys (දෙක එකිනෙක unlock නොවේ)
-  const sessionKey = `pxl_ad_time_${subId}_${normalizedVariant}`;
+  // 🟢 Storage Keys - Direct සහ Telegram වෙන වෙනම පාලනය වේ
+  const timeStorageKey = `pxl_timer_${subId}_${normalizedVariant}`;
+  const lockExpiryKey = `pxl_relock_${subId}_${normalizedVariant}`;
 
   const [state, setState] = useState<ButtonState>("locked");
-  const [accumulatedMs, setAccumulatedMs] = useState<number>(0);
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
-  const [resolvedLink, setResolvedLink] = useState<string>("");
+  const [downloadLink, setDownloadLink] = useState<string>("");
 
-  const leftAtRef = useRef<number | null>(null);
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Link එක Fetch කිරීම
+  // 🟢 Database එකෙන් Link එක ලබාගැනීම (RPC + Direct Table Fallback)
   const fetchLink = useCallback(async (): Promise<string | null> => {
     if (!subtitleId) return null;
     try {
+      // 1. මුලින් RPC එකෙන් උත්සාහ කිරීම
       const { data, error } = await supabase.rpc("get_single_download_link", {
         target_id: Number(subtitleId),
       });
       if (!error && data) {
-        return normalizedVariant === "telegram" ? data.telegram_link : data.download_link;
+        const link = normalizedVariant === "telegram" ? data.telegram_link : data.download_link;
+        if (link) return link;
+      }
+
+      // 2. RPC එක fail වුණොත් කෙලින්ම Table එකෙන් Fetch කරන Fallback එක
+      const { data: directData } = await supabase
+        .from("subtitles")
+        .select("download_link, telegram_link")
+        .eq("id", Number(subtitleId))
+        .maybeSingle();
+
+      if (directData) {
+        return normalizedVariant === "telegram" ? directData.telegram_link : directData.download_link;
       }
     } catch {
       /* noop */
@@ -114,96 +127,107 @@ export function DownloadButton({
     return null;
   }, [subtitleId, normalizedVariant]);
 
-  // Lock තත්ත්වයට Reset කිරීම
+  // Lock තත්ත්වයට පත් කිරීම
   const resetToLocked = useCallback(() => {
     setState("locked");
-    setAccumulatedMs(0);
     setRemainingSec(REQUIRED_AD_SECONDS);
-    setResolvedLink("");
-    leftAtRef.current = null;
+    setDownloadLink("");
     try {
-      sessionStorage.removeItem(sessionKey);
+      localStorage.removeItem(timeStorageKey);
+      localStorage.removeItem(lockExpiryKey);
     } catch {
       /* noop */
     }
-  }, [sessionKey]);
+  }, [timeStorageKey, lockExpiryKey]);
 
-  // Download වූ පසු තත්පර 10කින් Auto Lock කිරීම
+  // Download වූ පසු තත්පර 10කින් Auto-Lock කිරීම
   const scheduleSilentRelock = useCallback(() => {
+    const expireAt = Date.now() + SILENT_RELOCK_MS;
+    try {
+      localStorage.setItem(lockExpiryKey, String(expireAt));
+    } catch {
+      /* noop */
+    }
+
     if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
     reLockTimerRef.current = setTimeout(() => {
       resetToLocked();
     }, SILENT_RELOCK_MS);
-  }, [resetToLocked]);
+  }, [lockExpiryKey, resetToLocked]);
 
-  // 🟢 User නැවත Tab එකට පැමිණි විට තත්පර 5 සම්පූර්ණදැයි පරීක්ෂා කිරීම (Pause / Resume Logic)
-  const handleUserReturned = useCallback(async () => {
-    if (state !== "verifying" || leftAtRef.current === null) return;
-
-    const now = Date.now();
-    const timeSpentAway = now - leftAtRef.current;
-    leftAtRef.current = null;
-
-    const totalTimeMs = accumulatedMs + timeSpentAway;
-    setAccumulatedMs(totalTimeMs);
-
+  // 🟢 සැබෑ ඔරලෝසු වේලාව අනුව තත්පර 5 සම්පූර්ණදැයි බලන ප්‍රධාන Function එක
+  const verifyAdTime = useCallback(async () => {
     try {
-      sessionStorage.setItem(sessionKey, String(totalTimeMs));
+      // 1. දැනටමත් 10-sec re-lock එකක් ක්‍රියාත්මකදැයි බැලීම
+      const expireAtStr = localStorage.getItem(lockExpiryKey);
+      if (expireAtStr) {
+        const expireAt = parseInt(expireAtStr, 10);
+        if (Date.now() >= expireAt) {
+          resetToLocked();
+          return;
+        }
+      }
+
+      // 2. Ad එක ආරම්භ කළ Timestamp එක බැලීම
+      const startTimeStr = localStorage.getItem(timeStorageKey);
+      if (!startTimeStr) return;
+
+      const startTime = parseInt(startTimeStr, 10);
+      const elapsedMs = Date.now() - startTime;
+
+      // 🚀 තත්පර 5 හෝ ඊට වැඩි කාලයක් ගතවී ඇත්නම් ➔ අනිවාර්යයෙන්ම කොළ පාට (READY) වේ!
+      if (elapsedMs >= REQUIRED_AD_SECONDS * 1000) {
+        setState("ready");
+
+        // Link එක background එකෙන් ready කරගැනීම
+        const link = await fetchLink();
+        if (link && isSafeUrl(link)) {
+          setDownloadLink(link);
+        }
+      } else {
+        // තත්පර 5ට කලින් ආවොත් ➔ PAUSED (ඉතිරි තත්පර ගණන පෙන්වයි)
+        const leftSec = Math.max(1, Math.ceil((REQUIRED_AD_SECONDS * 1000 - elapsedMs) / 1000));
+        setRemainingSec(leftSec);
+        setState("paused");
+      }
     } catch {
       /* noop */
     }
+  }, [timeStorageKey, lockExpiryKey, fetchLink, resetToLocked]);
 
-    // තත්පර 5 සම්පූර්ණ වී ඇත්නම් ➔ READY (Unlock)
-    if (totalTimeMs >= REQUIRED_AD_SECONDS * 1000) {
-      setState("fetching");
-      const link = await fetchLink();
-      if (link && isSafeUrl(link)) {
-        setResolvedLink(link);
-        setState("ready");
-      } else {
-        alert("Download link එක ලබාගැනීමේ දෝෂයක් ඇත. කරුණාකර නැවත උත්සාහ කරන්න.");
-        resetToLocked();
-      }
-    } else {
-      // 🛑 තත්පර 5ට කලින් පැමිණියේ නම් ➔ PAUSE කර ඉතිරි තත්පර ගණන පෙන්වීම
-      const remainingMs = REQUIRED_AD_SECONDS * 1000 - totalTimeMs;
-      const remSec = Math.max(1, Math.ceil(remainingMs / 1000));
-      setRemainingSec(remSec);
-      setState("paused");
-    }
-  }, [state, accumulatedMs, sessionKey, fetchLink, resetToLocked]);
-
-  // Visibility Change / Focus Listener
+  // Page Load වෙද්දී සහ User නැවත Tab එකට එද්දී පරීක්ෂා කිරීම
   useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        handleUserReturned();
-      }
+    verifyAdTime();
+
+    const handleActive = () => {
+      verifyAdTime();
     };
 
-    const onWindowFocus = () => {
-      handleUserReturned();
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", handleActive);
+    window.addEventListener("focus", handleActive);
+    window.addEventListener("pageshow", handleActive); // Mobile Back button සඳහා
 
     return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", handleActive);
+      window.removeEventListener("focus", handleActive);
+      window.removeEventListener("pageshow", handleActive);
       if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
     };
-  }, [handleUserReturned]);
+  }, [verifyAdTime]);
 
-  // Button Click Handler
+  // Button Click Logic
   const handleButtonClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 1. LOCKED හෝ PAUSED අවස්ථාවේදී: Ad එක Open කර Timer එක ආරම්භ කිරීම
-    if (state === "locked" || state === "paused") {
-      const activeAdUrl = getRandomAdUrl();
-      leftAtRef.current = Date.now();
+    // 1. LOCKED අවස්ථාවේදී: අලුතින් Ad එක Open කර Timestamp එක Save කිරීම
+    if (state === "locked") {
+      try {
+        localStorage.setItem(timeStorageKey, String(Date.now()));
+      } catch {
+        /* noop */
+      }
 
+      const activeAdUrl = getRandomAdUrl();
       try {
         const w = window.open(activeAdUrl, "_blank", "noopener");
         if (w) w.opener = null;
@@ -215,46 +239,61 @@ export function DownloadButton({
       return;
     }
 
-    // 2. VERIFYING අවස්ථාවේදී Click කළහොත් (Ad එක නැවත විවෘත කිරීම)
-    if (state === "verifying") {
-      const activeAdUrl = getRandomAdUrl();
-      leftAtRef.current = Date.now();
+    // 2. PAUSED අවස්ථාවේදී: ඉතිරි කාලය සම්පූර්ණ කිරීමට නැවත Ad එක Open කිරීම
+    if (state === "paused" || state === "verifying") {
+      // ඉතිරි කාලයට සරිලන සේ start time එක adjust කිරීම
+      const adjustedStartTime = Date.now() - (REQUIRED_AD_SECONDS - remainingSec) * 1000;
       try {
-        window.open(activeAdUrl, "_blank", "noopener");
+        localStorage.setItem(timeStorageKey, String(adjustedStartTime));
       } catch {
         /* noop */
       }
+
+      const activeAdUrl = getRandomAdUrl();
+      try {
+        const w = window.open(activeAdUrl, "_blank", "noopener");
+        if (w) w.opener = null;
+      } catch {
+        /* noop */
+      }
+
+      setState("verifying");
       return;
     }
 
-    // 3. READY (Unlocked) අවස්ථාවේදී: ක්ෂණික Fast Download කිරීම
+    // 3. READY (කොළ පාට) අවස්ථාවේදී: ක්ෂණික Direct Download
     if (state === "ready") {
-      if (!resolvedLink || !isSafeUrl(resolvedLink)) {
-        alert("Download link එක අවලංගුයි. කරුණාකර නැවත උත්සාහ කරන්න.");
-        resetToLocked();
-        return;
+      let finalUrl = downloadLink;
+
+      if (!finalUrl) {
+        setState("downloading");
+        finalUrl = await fetchLink() || "";
       }
 
-      setState("downloading");
+      if (finalUrl && isSafeUrl(finalUrl)) {
+        setState("downloading");
 
-      if (normalizedVariant === "telegram") {
-        window.open(resolvedLink.trim(), "_blank", "noopener");
+        if (normalizedVariant === "telegram") {
+          window.open(finalUrl.trim(), "_blank", "noopener");
+        } else {
+          triggerFastNativeDownload(finalUrl, title);
+        }
+
+        logDownload(subtitleId, normalizedVariant);
+
+        // Download වූ සැණින් තත්පර 10ක Re-lock එක ආරම්භ කිරීම
+        scheduleSilentRelock();
+
+        setTimeout(() => {
+          setState("ready");
+        }, 1500);
       } else {
-        triggerFastNativeDownload(resolvedLink, title);
+        alert("Download link එක ලබාගැනීමේ දෝෂයක් ඇත. කරුණාකර නැවත උත්සාහ කරන්න.");
+        resetToLocked();
       }
-
-      logDownload(subtitleId, normalizedVariant);
-
-      // Download වූ සැණින් නිහඬව තත්පර 10ක Re-lock timer එක ක්‍රියාත්මක කිරීම
-      scheduleSilentRelock();
-
-      setTimeout(() => {
-        setState("ready");
-      }, 1500);
     }
   };
 
-  // Button Styles State අනුව වෙනස් වීම
   const getButtonContent = () => {
     switch (state) {
       case "locked":
@@ -269,7 +308,7 @@ export function DownloadButton({
         return (
           <>
             <ExternalLink className="w-4 h-4 animate-bounce" />
-            <span>Ad Opened... Return after 5s</span>
+            <span>Ad Opened... Stay 5s & Return</span>
           </>
         );
 
@@ -278,14 +317,6 @@ export function DownloadButton({
           <>
             <AlertTriangle className="w-4 h-4 text-amber-300 animate-pulse" />
             <span>{`⚠️ Paused! (${remainingSec}s left) - Click to Resume`}</span>
-          </>
-        );
-
-      case "fetching":
-        return (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>Preparing link...</span>
           </>
         );
 
@@ -303,7 +334,7 @@ export function DownloadButton({
         return (
           <>
             <CheckCircle2 className="w-4 h-4 text-white animate-pulse" />
-            <span>Downloading File...</span>
+            <span>Starting Download...</span>
           </>
         );
     }
@@ -324,12 +355,9 @@ export function DownloadButton({
       case "paused":
         return `${base} bg-gradient-to-r from-amber-600 to-orange-600 text-white border border-amber-400/40 shadow-[0_4px_15px_rgba(245,158,11,0.35)]`;
 
-      case "fetching":
-        return `${base} bg-muted text-foreground cursor-wait`;
-
       case "ready":
       case "downloading":
-        return `${base} bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_4px_20px_rgba(16,185,129,0.45)] animate-shimmer`;
+        return `${base} bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_4px_20px_rgba(16,185,129,0.45)]`;
     }
   };
 
@@ -338,7 +366,6 @@ export function DownloadButton({
       type="button"
       data-no-ad="true"
       data-download="true"
-      disabled={state === "fetching" || state === "downloading"}
       onClick={handleButtonClick}
       className={className ? `${className} ${getButtonClass()}` : getButtonClass()}
     >
