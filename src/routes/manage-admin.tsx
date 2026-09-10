@@ -6,8 +6,9 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  LineChart,
-  Line,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -33,6 +34,9 @@ import {
   TrendingUp,
   Download,
   Flame,
+  Clock,
+  PieChart as PieIcon,
+  Activity,
 } from "lucide-react";
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import { splitGenres, genreBadgeClass, buildGridItems } from "@/lib/subtitles";
@@ -50,48 +54,25 @@ export const Route = createFileRoute("/manage-admin")({
   notFoundComponent: () => <div className="p-10 text-center">Not found</div>,
 });
 
-// බ්‍රවුසරයේ localStorage එකෙන් සක්‍රිය Supabase Session එකක් තිබේදැයි සෘජුවම කියවා ගන්නා ශ්‍රිතය (Synchronous login recovery)
-const getStoredSession = () => {
-  try {
-    if (typeof window !== "undefined") {
-      const keys = Object.keys(localStorage);
-      const authKey = keys.find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
-      if (authKey) {
-        const data = localStorage.getItem(authKey);
-        if (data) return JSON.parse(data);
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse stored session", e);
-  }
-  return null;
-};
-
 function AdminPage() {
-  const [session, setSession] = useState<any>(() => getStoredSession());
-  const [loading, setLoading] = useState(() => !getStoredSession());
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    // පසුබිමෙන් Supabase Session එක තහවුරු කර ගැනීම
-    supabase.auth.getSession().then(({ data: { session: asyncSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (mounted) {
-        if (asyncSession) {
-          setSession(asyncSession);
-        }
+        setSession(currentSession);
         setLoading(false);
       }
     });
 
-    // Login/Logout වෙනස්වීම් නිරීක්ෂණය කිරීම
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       if (mounted) {
-        if (currentSession) {
-          setSession(currentSession);
-        } else if (event === "SIGNED_OUT") {
-          setSession(null);
-        }
+        setSession(currentSession);
         setLoading(false);
       }
     });
@@ -239,26 +220,37 @@ const EMPTY: FormState = {
   metatags: "",
 };
 
-const extractTmdbId = (input: string): { id: string; type: "movie" | "tv" | null } => {
+// 🟢 Smart ID Extraction (TMDB link, TMDB ID, හෝ IMDb tt... ID)
+const extractMediaId = (input: string): { id: string; type: "movie" | "tv" | null; isImdb: boolean } => {
   const clean = input.trim();
+  if (clean.startsWith("tt")) {
+    return { id: clean, type: null, isImdb: true };
+  }
+  const imdbMatch = clean.match(/imdb\.com\/title\/(tt\d+)/);
+  if (imdbMatch) {
+    return { id: imdbMatch[1], type: null, isImdb: true };
+  }
   if (/^\d+$/.test(clean)) {
-    return { id: clean, type: null };
+    return { id: clean, type: null, isImdb: false };
   }
-  const match = clean.match(/themoviedb\.org\/(movie|tv)\/(\d+)/);
-  if (match) {
-    return { id: match[2], type: match[1] as "movie" | "tv" };
+  const tmdbMatch = clean.match(/themoviedb\.org\/(movie|tv)\/(\d+)/);
+  if (tmdbMatch) {
+    return { id: tmdbMatch[2], type: tmdbMatch[1] as "movie" | "tv", isImdb: false };
   }
-  return { id: clean, type: null };
+  return { id: clean, type: null, isImdb: false };
 };
 
-// =========================================================================
-// CSV PARSING LOGIC & COMPONENT (කිසිම Dependency එකක් අවශ්‍ය නොවේ, Newlines support කරයි)
-// =========================================================================
+// 🟢 Telegram HTML Entities Fix (&, <, > ගැටලුව සම්පූර්ණයෙන්ම වළක්වයි)
+const escapeHtml = (text: string) =>
+  text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 function parseComplexCSV(text: string): string[][] {
   const result: string[][] = [];
   let row: string[] = [];
-  let entry = '';
+  let entry = "";
   let inQuotes = false;
 
   for (let i = 0; i < text.length; i++) {
@@ -279,17 +271,17 @@ function parseComplexCSV(text: string): string[][] {
     } else {
       if (char === '"') {
         inQuotes = true;
-      } else if (char === ',') {
+      } else if (char === ",") {
         row.push(entry);
-        entry = '';
-      } else if (char === '\n' || char === '\r') {
+        entry = "";
+      } else if (char === "\n" || char === "\r") {
         row.push(entry);
-        entry = '';
-        if (row.length > 0 && row.some(cell => cell.trim() !== '')) {
+        entry = "";
+        if (row.length > 0 && row.some((cell) => cell.trim() !== "")) {
           result.push(row);
         }
         row = [];
-        if (char === '\r' && nextChar === '\n') {
+        if (char === "\r" && nextChar === "\n") {
           i++;
         }
       } else {
@@ -299,7 +291,7 @@ function parseComplexCSV(text: string): string[][] {
   }
   if (entry || row.length > 0) {
     row.push(entry);
-    if (row.some(cell => cell.trim() !== '')) {
+    if (row.some((cell) => cell.trim() !== "")) {
       result.push(row);
     }
   }
@@ -312,16 +304,16 @@ interface CSVUploaderProps {
 
 function CSVUploader({ refetch }: CSVUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [errorDetails, setErrorDetails] = useState('');
+  const [message, setMessage] = useState("");
+  const [errorDetails, setErrorDetails] = useState("");
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
-    setMessage('Parsing CSV file...');
-    setErrorDetails('');
+    setMessage("Parsing CSV file...");
+    setErrorDetails("");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -329,39 +321,49 @@ function CSVUploader({ refetch }: CSVUploaderProps) {
       try {
         const rows = parseComplexCSV(text);
         if (rows.length < 2) {
-          throw new Error('CSV file is empty or formatted incorrectly.');
+          throw new Error("CSV file is empty or formatted incorrectly.");
         }
 
-        // BOM character එක ඇත්නම් ඉවත් කර Headers සකස් කිරීම
-        const headers = rows[0].map(h => h.trim().replace(/^\uFEFF/, ''));
+        const headers = rows[0].map((h) => h.trim().replace(/^\uFEFF/, ""));
         const parsedData: any[] = [];
 
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
           const obj: any = {};
-          
+
           headers.forEach((header, index) => {
             let value: any = row[index] !== undefined ? row[index] : null;
-            if (typeof value === 'string') {
+            if (typeof value === "string") {
               value = value.trim();
             }
-            
-            // Database Types වලට අනුව Data සකස් කිරීම
-            if (header === 'title' || header === 'image_url' || header === 'download_link') {
-              obj[header] = value || '';
-            } else if (header === 'telegram_link' || header === 'description' || header === 'genre' || header === 'metatags') {
+
+            if (header === "title" || header === "image_url" || header === "download_link") {
+              obj[header] = value || "";
+            } else if (
+              header === "telegram_link" ||
+              header === "description" ||
+              header === "genre" ||
+              header === "metatags"
+            ) {
               obj[header] = value || null;
-            } else if (header === 'rating' || header === 'year') {
-              obj[header] = value === null || value === '' ? null : (Number.isNaN(Number(value)) ? value : Number(value));
-            } else if (header === 'season' || header === 'episode') {
-              obj[header] = value === null || value === '' ? null : Number(value);
+            } else if (header === "rating" || header === "year") {
+              obj[header] =
+                value === null || value === ""
+                  ? null
+                  : Number.isNaN(Number(value))
+                  ? value
+                  : Number(value);
+            } else if (header === "season" || header === "episode") {
+              obj[header] = value === null || value === "" ? null : Number(value);
             } else {
               obj[header] = value;
             }
           });
-          
-          // Basic check to ensure valid row
+
           if (obj.title && obj.download_link) {
+            obj.direct_downloads = 0;
+            obj.telegram_downloads = 0;
+            obj.download_count = 0;
             parsedData.push(obj);
           }
         }
@@ -372,25 +374,22 @@ function CSVUploader({ refetch }: CSVUploaderProps) {
 
         setMessage(`Uploading ${parsedData.length} records to Database...`);
 
-        const { error } = await supabase
-          .from(SUBTITLES_TABLE) 
-          .insert(parsedData);
-
+        const { error } = await supabase.from(SUBTITLES_TABLE).insert(parsedData);
         if (error) throw error;
 
         setMessage(`Successfully uploaded ${parsedData.length} items via CSV! 🎉`);
         refetch();
       } catch (err: any) {
         console.error(err);
-        setMessage('Upload Failed!');
-        setErrorDetails(err.message || 'Unknown database error occurred.');
+        setMessage("Upload Failed!");
+        setErrorDetails(err.message || "Unknown database error occurred.");
       } finally {
         setUploading(false);
       }
     };
 
     reader.onerror = () => {
-      setMessage('Error reading file.');
+      setMessage("Error reading file.");
       setUploading(false);
     };
 
@@ -403,25 +402,33 @@ function CSVUploader({ refetch }: CSVUploaderProps) {
         <Upload className="w-4 h-4 text-primary" /> Bulk Upload via CSV (Subtitles / Episodes)
       </h3>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Upload multiple episodes instantly. CSV Headers must match: 
+        Upload multiple episodes instantly. CSV Headers must match:
         <code className="ml-1 px-1.5 py-0.5 rounded bg-muted text-foreground text-[10px] font-mono">
           title,download_link,image_url,genre,description,rating,year,season,episode,metatags,telegram_link
         </code>
       </p>
 
       <div className="pt-2">
-        <input 
-          type="file" 
-          accept=".csv" 
-          onChange={handleFileUpload} 
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
           disabled={uploading}
           className="flex h-10 w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-bold file:text-primary hover:cursor-pointer disabled:opacity-50"
         />
       </div>
 
       {message && (
-        <p className={`text-xs font-semibold flex items-center gap-1.5 ${message.includes('Successfully') ? 'text-green-500' : 'text-primary'}`}>
-          {message.includes('Successfully') ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        <p
+          className={`text-xs font-semibold flex items-center gap-1.5 ${
+            message.includes("Successfully") ? "text-green-500" : "text-primary"
+          }`}
+        >
+          {message.includes("Successfully") ? (
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          )}
           {message}
         </p>
       )}
@@ -433,8 +440,6 @@ function CSVUploader({ refetch }: CSVUploaderProps) {
     </div>
   );
 }
-
-// =========================================================================
 
 type Status =
   | { type: "idle" }
@@ -458,16 +463,16 @@ function Dashboard() {
   const [tgBotToken, setTgBotToken] = useState(() => localStorage.getItem("pixelpop_tg_bot_token") || "");
   const [tgChatId, setTgChatId] = useState(() => localStorage.getItem("pixelpop_tg_chat_id") || "");
 
-  // All Subtitles Query (සියලුම තීරු - Columns කියවා ගැනීමට select("*") එක් කර ඇත)
+  // All Subtitles Query
   const { data: rows, refetch } = useQuery({
     queryKey: ["subtitles", "admin-all"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from(SUBTITLES_TABLE)
-        .select("*") // <-- select("*") යෙදීමෙන් metatags, telegram_link, download_count සාර්ථකව කියවා ගනී
+        .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Subtitle[];
+      return (data ?? []) as any[];
     },
   });
 
@@ -484,26 +489,22 @@ function Dashboard() {
     enabled: activeTab === "requests",
   });
 
-  // 🟢 Download Analytics — raw event log (last 30 days, capped at 5000 rows)
-  // powers "downloads today" / "trending today" / "last 7 days" in the
-  // Analytics tab below. The lifetime total itself comes straight from
-  // rows[].download_count, which download_events.subtitle_id keeps in sync.
+  // 🟢 Download Events Query (Direct සහ Telegram වෙන වෙනම තත්පරයෙන් කියවා ගැනීම)
   const { data: downloadEvents, isLoading: analyticsLoading } = useQuery({
-    queryKey: ["download_events", "admin-last-30-days"],
+    queryKey: ["download_events", "admin-detailed"],
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("download_events")
-        .select("subtitle_id, downloaded_at")
+        .select("subtitle_id, variant, downloaded_at")
         .gte("downloaded_at", since)
         .order("downloaded_at", { ascending: false })
-        .limit(5000);
+        .limit(10000);
       if (error) throw error;
-      return (data ?? []) as { subtitle_id: number; downloaded_at: string }[];
+      return (data ?? []) as { subtitle_id: number; variant?: string; downloaded_at: string }[];
     },
     enabled: activeTab === "analytics",
   });
-
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -511,102 +512,183 @@ function Dashboard() {
     return (rows ?? []).filter((r) => r.title?.toLowerCase().includes(q));
   }, [rows, search]);
 
-  // 🟢 Download Analytics — derived stats for the Analytics tab.
-  // Episodes of the same TV series are grouped into one row (matching how the
-  // site itself groups them via buildGridItems), so "The Sopranos" appears
-  // ONCE with a combined count instead of once per episode row.
+  // 🟢 ADVANCED ANALYTICS ENGINE (Direct vs Telegram Deep Analysis)
   const analytics = useMemo(() => {
     const allRows = rows ?? [];
     const events = downloadEvents ?? [];
-    const items = buildGridItems(allRows);
+    const items = buildGridItems(allRows as any);
 
-    const totalAllTime = allRows.reduce((sum, r) => sum + (Number(r.download_count) || 0), 0);
+    // 1. All-time Totals from columns
+    const totalDirectAllTime = allRows.reduce((sum, r) => sum + (Number(r.direct_downloads) || 0), 0);
+    const totalTelegramAllTime = allRows.reduce((sum, r) => sum + (Number(r.telegram_downloads) || 0), 0);
+    const totalAllTime = totalDirectAllTime + totalTelegramAllTime;
 
+    // 2. Today & Week calculations
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
     sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    const todayCounts = new Map<number, number>();
-    const weekCounts = new Map<number, number>();
-    let todayTotal = 0;
-    let weekTotal = 0;
+    let todayDirect = 0;
+    let todayTelegram = 0;
+    let weekDirect = 0;
+    let weekTelegram = 0;
 
-    // Last 7 days, day-by-day, for the trend chart
-    const dayBuckets = new Map<string, number>();
-    for (let i = 6; i >= 0; i--) {
+    // Day-by-Day comparison (Last 14 Days)
+    const dayBuckets = new Map<string, { direct: number; telegram: number }>();
+    for (let i = 13; i >= 0; i--) {
       const d = new Date();
       d.setHours(0, 0, 0, 0);
       d.setDate(d.getDate() - i);
-      dayBuckets.set(d.toISOString().split("T")[0], 0);
+      dayBuckets.set(d.toISOString().split("T")[0], { direct: 0, telegram: 0 });
     }
+
+    // Peak Activity Hours (00:00 to 23:00)
+    const hourlyCounts = Array.from({ length: 24 }, (_, i) => ({
+      hour: `${String(i).padStart(2, "0")}:00`,
+      direct: 0,
+      telegram: 0,
+      total: 0,
+    }));
+
+    // Item-specific counters
+    const itemTodayCounts = new Map<number, { direct: number; telegram: number }>();
 
     for (const ev of events) {
       const t = new Date(ev.downloaded_at);
-      if (t >= sevenDaysAgo) {
-        weekTotal += 1;
-        weekCounts.set(ev.subtitle_id, (weekCounts.get(ev.subtitle_id) ?? 0) + 1);
-        const dayKey = new Date(t);
-        dayKey.setHours(0, 0, 0, 0);
-        const key = dayKey.toISOString().split("T")[0];
-        if (dayBuckets.has(key)) dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + 1);
+      const isTg = ev.variant === "telegram";
+      const h = t.getHours();
+
+      hourlyCounts[h].total += 1;
+      if (isTg) {
+        hourlyCounts[h].telegram += 1;
+      } else {
+        hourlyCounts[h].direct += 1;
       }
+
+      const dayKey = t.toISOString().split("T")[0];
+      if (dayBuckets.has(dayKey)) {
+        const b = dayBuckets.get(dayKey)!;
+        if (isTg) b.telegram += 1;
+        else b.direct += 1;
+      }
+
+      if (t >= sevenDaysAgo) {
+        if (isTg) weekTelegram += 1;
+        else weekDirect += 1;
+      }
+
       if (t >= startOfToday) {
-        todayTotal += 1;
-        todayCounts.set(ev.subtitle_id, (todayCounts.get(ev.subtitle_id) ?? 0) + 1);
+        if (isTg) todayTelegram += 1;
+        else todayDirect += 1;
+
+        const current = itemTodayCounts.get(ev.subtitle_id) ?? { direct: 0, telegram: 0 };
+        if (isTg) current.telegram += 1;
+        else current.direct += 1;
+        itemTodayCounts.set(ev.subtitle_id, current);
       }
     }
 
-    const dailyChartData = Array.from(dayBuckets.entries()).map(([date, count]) => ({
+    const todayTotal = todayDirect + todayTelegram;
+    const weekTotal = weekDirect + weekTelegram;
+
+    const dailyChartData = Array.from(dayBuckets.entries()).map(([date, counts]) => ({
       date: new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-      downloads: count,
+      direct: counts.direct,
+      telegram: counts.telegram,
+      total: counts.direct + counts.telegram,
     }));
 
-    // One stat row per movie/series — series episodes are summed together.
+    // Donut Ratio Data
+    const distributionData = [
+      { name: "Direct (.zip)", value: totalDirectAllTime || (totalAllTime ? 1 : 0), color: "#10b981" },
+      { name: "Telegram", value: totalTelegramAllTime, color: "#0ea5e9" },
+    ];
+
+    // Item stats with Direct & Telegram breakdown
     const itemStats = items.map((it) => {
       if (it.kind === "movie") {
         const id = Number(it.sub.id);
+        const directAll = Number(it.sub.direct_downloads) || 0;
+        const tgAll = Number(it.sub.telegram_downloads) || 0;
+        const todayStats = itemTodayCounts.get(id) ?? { direct: 0, telegram: 0 };
         return {
           key: it.key,
           title: it.sub.title,
           linkId: it.sub.id,
           episodeCount: null as number | null,
-          allTime: Number(it.sub.download_count) || 0,
-          today: todayCounts.get(id) ?? 0,
-          week: weekCounts.get(id) ?? 0,
+          directAll,
+          tgAll,
+          totalAll: directAll + tgAll,
+          todayDirect: todayStats.direct,
+          todayTg: todayStats.telegram,
+          todayTotal: todayStats.direct + todayStats.telegram,
         };
       }
-      const allTime = it.episodes.reduce((s, e) => s + (Number(e.download_count) || 0), 0);
-      const today = it.episodes.reduce((s, e) => s + (todayCounts.get(Number(e.id)) ?? 0), 0);
-      const week = it.episodes.reduce((s, e) => s + (weekCounts.get(Number(e.id)) ?? 0), 0);
+      const directAll = it.episodes.reduce((s, e: any) => s + (Number(e.direct_downloads) || 0), 0);
+      const tgAll = it.episodes.reduce((s, e: any) => s + (Number(e.telegram_downloads) || 0), 0);
+      const todayDirect = it.episodes.reduce(
+        (s, e) => s + (itemTodayCounts.get(Number(e.id))?.direct ?? 0),
+        0
+      );
+      const todayTg = it.episodes.reduce(
+        (s, e) => s + (itemTodayCounts.get(Number(e.id))?.telegram ?? 0),
+        0
+      );
       return {
         key: it.key,
         title: it.showName,
         linkId: it.id,
         episodeCount: it.episodes.length,
-        allTime,
-        today,
-        week,
+        directAll,
+        tgAll,
+        totalAll: directAll + tgAll,
+        todayDirect,
+        todayTg,
+        todayTotal: todayDirect + todayTg,
       };
     });
 
     const trendingToday = itemStats
-      .filter((x) => x.today > 0)
-      .sort((a, b) => b.today - a.today)
+      .filter((x) => x.todayTotal > 0)
+      .sort((a, b) => b.todayTotal - a.todayTotal)
       .slice(0, 10);
 
-    const topAllTime = [...itemStats].sort((a, b) => b.allTime - a.allTime).slice(0, 10);
-    const topShowsChart = [...itemStats]
-      .filter((x) => x.allTime > 0)
-      .sort((a, b) => b.allTime - a.allTime)
-      .slice(0, 8)
-      .map((x) => ({ name: x.title.length > 18 ? `${x.title.slice(0, 18)}…` : x.title, downloads: x.allTime }));
+    const topAllTime = [...itemStats].sort((a, b) => b.totalAll - a.totalAll).slice(0, 10);
 
-    return { totalAllTime, todayTotal, weekTotal, dailyChartData, trendingToday, topAllTime, topShowsChart };
+    // Live Feed (Last 15 downloads)
+    const recentFeed = events.slice(0, 15).map((ev) => {
+      const match = allRows.find((r) => Number(r.id) === Number(ev.subtitle_id));
+      return {
+        id: `${ev.subtitle_id}-${ev.downloaded_at}`,
+        title: match?.title || `Subtitle #${ev.subtitle_id}`,
+        variant: ev.variant === "telegram" ? "telegram" : "direct",
+        time: new Date(ev.downloaded_at).toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      };
+    });
+
+    return {
+      totalAllTime,
+      totalDirectAllTime,
+      totalTelegramAllTime,
+      todayTotal,
+      todayDirect,
+      todayTelegram,
+      weekTotal,
+      dailyChartData,
+      distributionData,
+      hourlyCounts,
+      trendingToday,
+      topAllTime,
+      recentFeed,
+    };
   }, [rows, downloadEvents]);
 
   const editing = form.id !== null;
-
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const resetForm = () => {
@@ -639,7 +721,7 @@ function Dashboard() {
     }
     setStatus({ type: "saving" });
     const payload = buildPayload();
-    
+
     const query = editing
       ? supabase.from(SUBTITLES_TABLE).update(payload).eq("id", form.id as Subtitle["id"]).select()
       : supabase.from(SUBTITLES_TABLE).insert(payload).select();
@@ -651,39 +733,41 @@ function Dashboard() {
       return;
     }
 
-    if (!error && dbData && dbData[0]) {
+    // 🟢 Telegram Auto-Post එක Insert කළ විට පමණක් ක්‍රියාත්මක වේ
+    if (!editing && dbData && dbData[0]) {
       const insertedRow = dbData[0];
       if (tgEnabled && tgBotToken && tgChatId) {
         try {
           const siteUrl = "https://pixelpoplk.pages.dev";
           const isSeries = insertedRow.season != null || insertedRow.episode != null;
-          
-          let caption = `<b>🎬 ${insertedRow.title}</b>\n\n`;
+
+          let caption = `<b>🎬 ${escapeHtml(insertedRow.title)}</b>\n\n`;
           if (insertedRow.year) caption += `📅 <b>Year:</b> ${insertedRow.year}\n`;
           if (insertedRow.rating) caption += `⭐ <b>Rating:</b> ${insertedRow.rating}/10\n`;
-          if (insertedRow.genre) caption += `🎭 <b>Genres:</b> ${insertedRow.genre}\n`;
+          if (insertedRow.genre) caption += `🎭 <b>Genres:</b> ${escapeHtml(insertedRow.genre)}\n`;
           if (isSeries) {
             caption += `📺 <b>Season:</b> ${insertedRow.season} | <b>Episode:</b> ${insertedRow.episode}\n`;
           }
           if (insertedRow.description) {
-            const desc = insertedRow.description.length > 250 
-              ? insertedRow.description.substring(0, 250) + "..."
-              : insertedRow.description;
-            caption += `\n📝 <b>Overview:</b>\n<i>${desc}</i>\n`;
+            const desc =
+              insertedRow.description.length > 250
+                ? insertedRow.description.substring(0, 250) + "..."
+                : insertedRow.description;
+            caption += `\n📝 <b>Overview:</b>\n<i>${escapeHtml(desc)}</i>\n`;
           }
-          
+
           caption += `\n📥 <b>Download Sinhala Subtitle:</b>\n`;
           caption += `<a href="${siteUrl}/content/${insertedRow.id}">Click Here to Download</a>\n\n`;
           caption += `Join ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`;
 
           await fetch(`https://api.telegram.org/bot${tgBotToken}/sendPhoto`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: tgChatId,
               photo: insertedRow.image_url || "https://pixelpoplk.pages.dev/placeholder-poster.jpg",
               caption: caption,
-              parse_mode: 'HTML',
+              parse_mode: "HTML",
             }),
           });
         } catch (err) {
@@ -692,32 +776,35 @@ function Dashboard() {
       }
     }
 
-    setStatus({ type: "success", msg: editing ? "Updated successfully and Broadcasted!" : "Inserted successfully and Broadcasted!" });
+    setStatus({
+      type: "success",
+      msg: editing ? "Updated successfully!" : "Inserted successfully & Broadcasted!",
+    });
     resetForm();
     qc.invalidateQueries({ queryKey: ["subtitles"] });
     refetch();
   };
 
-  const startEdit = (r: Subtitle) => {
+  const startEdit = (r: any) => {
     setForm({
       id: r.id,
       title: r.title ?? "",
       image_url: r.image_url ?? "",
       download_link: r.download_link ?? "",
-      telegram_link: (r as any).telegram_link ?? "", // <-- ආරක්ෂිතව සේව් වූ telegram_link කියවා ගනී
+      telegram_link: r.telegram_link ?? "",
       description: r.description ?? "",
       rating: r.rating == null ? "" : String(r.rating),
       year: r.year == null ? "" : String(r.year),
       genre: r.genre ?? "",
       season: r.season == null ? "" : String(r.season),
       episode: r.episode == null ? "" : String(r.episode),
-      metatags: (r as any).metatags ?? "", // <-- ආරක්ෂිතව සේව් වූ metatags කියවා ගනී
+      metatags: r.metatags ?? "",
     });
     setStatus({ type: "idle" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const remove = async (r: Subtitle) => {
+  const remove = async (r: any) => {
     if (!confirm(`Delete "${r.title}"? This cannot be undone.`)) return;
     const { error } = await supabase.from(SUBTITLES_TABLE).delete().eq("id", r.id);
     if (error) {
@@ -741,10 +828,7 @@ function Dashboard() {
 
   const toggleRequestStatus = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === "pending" ? "completed" : "pending";
-    const { error } = await supabase
-      .from("subtitle_requests")
-      .update({ status: nextStatus })
-      .eq("id", id);
+    const { error } = await supabase.from("subtitle_requests").update({ status: nextStatus }).eq("id", id);
     if (error) {
       alert(error.message);
       return;
@@ -760,9 +844,10 @@ function Dashboard() {
     }
   };
 
+  // 🟢 Enhanced TMDB + IMDb Support
   const handleFetchTmdb = async () => {
     if (!tmdbId.trim()) {
-      setStatus({ type: "error", msg: "Please enter a TMDB ID or Link!" });
+      setStatus({ type: "error", msg: "Please enter a TMDB ID, TMDB Link, or IMDb ID (tt...)!" });
       return;
     }
     if (!tmdbKey.trim()) {
@@ -774,31 +859,59 @@ function Dashboard() {
     setStatus({ type: "idle" });
 
     try {
-      const parsed = extractTmdbId(tmdbId);
-      const activeId = parsed.id;
-      const activeType = parsed.type || tmdbType;
+      const parsed = extractMediaId(tmdbId);
+      let data: any = null;
+      let detectedType: "movie" | "tv" = tmdbType;
 
-      if (parsed.type) {
-        setTmdbType(parsed.type);
+      if (parsed.isImdb) {
+        // IMDb ID (tt...) මගින් TMDB /find API හරහා fetch කිරීම
+        const findRes = await fetch(
+          `https://api.themoviedb.org/3/find/${parsed.id}?api_key=${tmdbKey}&external_source=imdb_id`
+        );
+        if (!findRes.ok) throw new Error("Failed to find IMDb ID on TMDB.");
+        const findData = await findRes.json();
+
+        if (findData.movie_results && findData.movie_results.length > 0) {
+          data = findData.movie_results[0];
+          detectedType = "movie";
+        } else if (findData.tv_results && findData.tv_results.length > 0) {
+          data = findData.tv_results[0];
+          detectedType = "tv";
+        } else {
+          throw new Error("No movie or TV show found for this IMDb ID.");
+        }
+      } else {
+        // TMDB ID / Link මගින් fetch කිරීම
+        const activeId = parsed.id;
+        const activeType = parsed.type || tmdbType;
+        detectedType = activeType;
+
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${activeType}/${activeId}?api_key=${tmdbKey}&language=en-US`
+        );
+
+        if (!res.ok) {
+          throw new Error(`TMDB returned status ${res.status}. Check your ID/Link and API Key.`);
+        }
+        data = await res.json();
       }
 
-      const res = await fetch(
-        `https://api.themoviedb.org/3/${activeType}/${activeId}?api_key=${tmdbKey}&language=en-US`
-      );
-
-      if (!res.ok) {
-        throw new Error(`TMDB returned status ${res.status}. Check your ID/Link and API Key.`);
-      }
-
-      const data = await res.json();
+      setTmdbType(detectedType);
 
       const title = data.title || data.name || "";
-      const year = activeType === "movie" 
-        ? (data.release_date ? data.release_date.split("-")[0] : "")
-        : (data.first_air_date ? data.first_air_date.split("-")[0] : "");
-      
-      const rating = data.vote_average ? data.vote_average.toFixed(1) : "";
-      const genres = data.genres ? data.genres.map((g: any) => g.name).join(", ") : "";
+      const year =
+        detectedType === "movie"
+          ? data.release_date
+            ? data.release_date.split("-")[0]
+            : ""
+          : data.first_air_date
+          ? data.first_air_date.split("-")[0]
+          : "";
+
+      const rating = data.vote_average ? Number(data.vote_average).toFixed(1) : "";
+      const genres = data.genres
+        ? data.genres.map((g: any) => g.name).join(", ")
+        : "";
       const imageUrl = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : "";
       const overview = data.overview || "";
 
@@ -812,10 +925,10 @@ function Dashboard() {
         description: overview,
       }));
 
-      setStatus({ type: "success", msg: `Successfully imported "${title}" from TMDB!` });
+      setStatus({ type: "success", msg: `Successfully imported "${title}"!` });
       setTmdbId("");
     } catch (err: any) {
-      setStatus({ type: "error", msg: err.message || "Failed to fetch from TMDB" });
+      setStatus({ type: "error", msg: err.message || "Failed to fetch details" });
     } finally {
       setTmdbLoading(false);
     }
@@ -885,7 +998,7 @@ function Dashboard() {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <BarChart3 className="w-4 h-4" /> Analytics
+            <BarChart3 className="w-4 h-4" /> Advanced Analytics
           </button>
         </div>
       </div>
@@ -896,7 +1009,7 @@ function Dashboard() {
             {/* TMDB Auto-fill Section */}
             <div className="bg-card-elevated rounded-3xl border border-border p-6 sm:p-8 shadow-card space-y-4">
               <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
-                <Sparkles className="w-4 h-4 animate-pulse text-amber-500" /> TMDB Auto-Fill Details
+                <Sparkles className="w-4 h-4 animate-pulse text-amber-500" /> TMDB & IMDb Auto-Fill
               </h3>
               <div className="grid sm:grid-cols-3 gap-4 items-end">
                 <label className="block">
@@ -911,12 +1024,14 @@ function Dashboard() {
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">TMDB ID or Link</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    TMDB ID, Link, or IMDb (tt...)
+                  </span>
                   <input
                     type="text"
                     value={tmdbId}
                     onChange={(e) => setTmdbId(e.target.value)}
-                    placeholder="e.g. 550 or Paste TMDB Link"
+                    placeholder="e.g. 550, tt0137523, or Link"
                     className="mt-2 w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-sm transition-colors"
                   />
                 </label>
@@ -933,11 +1048,12 @@ function Dashboard() {
                   )}
                 </button>
               </div>
-              
-              {/* Secret API Key Input */}
+
               <div className="pt-4 border-t border-border/50">
                 <label className="block max-w-sm">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">TMDB API Key (Saved on your browser)</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    TMDB API Key (Stored in your browser)
+                  </span>
                   <input
                     type="password"
                     value={tmdbKey}
@@ -945,13 +1061,10 @@ function Dashboard() {
                       setTmdbKey(e.target.value);
                       localStorage.setItem("pixelpop_tmdb_key", e.target.value);
                     }}
-                    placeholder="Paste your TMDB API Key (v3 auth) here"
+                    placeholder="Paste TMDB API Key"
                     className="mt-2.5 w-full px-3 py-2 rounded-lg bg-muted/30 border border-border focus:border-primary focus:outline-none text-xs transition-colors"
                   />
                 </label>
-                <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
-                  Get a free API Key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer" className="text-primary hover:underline font-semibold">themoviedb.org</a>. It is safely stored only in your browser's local storage.
-                </p>
               </div>
             </div>
 
@@ -972,13 +1085,15 @@ function Dashboard() {
                   className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30 cursor-pointer"
                 />
                 <label htmlFor="tg-enabled" className="text-xs font-semibold text-muted-foreground uppercase cursor-pointer">
-                  Enable Auto-Posting to Telegram Channel
+                  Enable Auto-Posting on New Insert
                 </label>
               </div>
               {tgEnabled && (
                 <div className="grid sm:grid-cols-2 gap-4 pt-2">
                   <label className="block">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Telegram Bot Token</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Telegram Bot Token
+                    </span>
                     <input
                       type="password"
                       value={tgBotToken}
@@ -986,12 +1101,14 @@ function Dashboard() {
                         setTgBotToken(e.target.value);
                         localStorage.setItem("pixelpop_tg_bot_token", e.target.value);
                       }}
-                      placeholder="e.g. 123456789:ABCdefGhI..."
+                      placeholder="Bot Token"
                       className="mt-2 w-full px-3 py-2 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-xs transition-colors"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Channel Username or Chat ID</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Channel Username or Chat ID
+                    </span>
                     <input
                       type="text"
                       value={tgChatId}
@@ -999,7 +1116,7 @@ function Dashboard() {
                         setTgChatId(e.target.value);
                         localStorage.setItem("pixelpop_tg_chat_id", e.target.value);
                       }}
-                      placeholder="e.g. @pixelpoplk or -100xxxxxxxx"
+                      placeholder="e.g. @pixelpoplk"
                       className="mt-2 w-full px-3 py-2.5 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none text-xs transition-colors"
                     />
                   </label>
@@ -1022,22 +1139,17 @@ function Dashboard() {
                   <Field label="Title *" value={form.title} onChange={(v) => set("title", v)} placeholder="e.g. Breaking Bad S01E01" />
                   <Field label="Download Link *" value={form.download_link} onChange={(v) => set("download_link", v)} placeholder="https://..." />
                   
-                  {/* Telegram Download Link Input */}
                   <Field label="Telegram Download Link" value={form.telegram_link} onChange={(v) => set("telegram_link", v)} placeholder="https://t.me/pixelpoplk/1234" />
-                  
                   <Field label="Image URL *" value={form.image_url} onChange={(v) => set("image_url", v)} placeholder="https://image.tmdb.org/..." className="sm:col-span-2" />
                   <Field label="Genre (comma separated)" value={form.genre} onChange={(v) => set("genre", v)} placeholder="Movie, Sci-Fi, Horror" className="sm:col-span-2" />
-                  
-                  <Field label="SEO Meta Tags" value={form.metatags} onChange={(v) => set("metatags", v)} placeholder="Keywords, description etc. e.g. breaking-bad-sinhala-sub, download-sub" className="sm:col-span-2" />
+                  <Field label="SEO Meta Tags" value={form.metatags} onChange={(v) => set("metatags", v)} placeholder="Keywords etc." className="sm:col-span-2" />
 
                   <Field label="Year" value={form.year} onChange={(v) => set("year", v)} placeholder="2024" />
                   <Field label="Rating (IMDb)" value={form.rating} onChange={(v) => set("rating", v)} placeholder="8.5" />
                   <Field label="Season" value={form.season} onChange={(v) => set("season", v)} placeholder="1" />
                   <Field label="Episode" value={form.episode} onChange={(v) => set("episode", v)} placeholder="1" />
                   <label className="sm:col-span-2 block">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Description
-                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
                     <textarea
                       value={form.description}
                       onChange={(e) => set("description", e.target.value)}
@@ -1062,9 +1174,7 @@ function Dashboard() {
                 </div>
 
                 <div className="space-y-3">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Poster Preview
-                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Poster Preview</span>
                   <div className="rounded-xl overflow-hidden border border-border aspect-[2/3] bg-muted">
                     {form.image_url ? (
                       <img
@@ -1074,9 +1184,7 @@ function Dashboard() {
                         onError={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = "0.2")}
                       />
                     ) : (
-                      <div className="w-full h-full grid place-items-center text-xs text-muted-foreground">
-                        No image
-                      </div>
+                      <div className="w-full h-full grid place-items-center text-xs text-muted-foreground">No image</div>
                     )}
                   </div>
                 </div>
@@ -1149,11 +1257,7 @@ function Dashboard() {
                         <th className="text-left px-4 py-3 font-semibold">Year</th>
                         <th className="text-left px-4 py-3 font-semibold">Rating</th>
                         <th className="text-left px-4 py-3 font-semibold">S/E</th>
-                        <th className="text-left px-4 py-3 font-semibold">
-                          <span className="inline-flex items-center gap-1">
-                            <Download className="w-3.5 h-3.5" /> Downloads
-                          </span>
-                        </th>
+                        <th className="text-left px-4 py-3 font-semibold">Downloads Breakdown</th>
                         <th className="text-right px-4 py-3 font-semibold">Actions</th>
                       </tr>
                     </thead>
@@ -1164,25 +1268,20 @@ function Dashboard() {
                           <tr key={String(r.id)} className="hover:bg-muted/20 transition">
                             <td className="px-4 py-3">
                               <div className="w-10 h-14 rounded overflow-hidden bg-muted">
-                                {r.image_url && (
-                                  <img src={r.image_url} alt={r.title} className="w-full h-full object-cover" />
-                                )}
+                                {r.image_url && <img src={r.image_url} alt={r.title} className="w-full h-full object-cover" />}
                               </div>
                             </td>
                             <td className="px-4 py-3 font-medium max-w-xs">
                               <div className="truncate">{r.title}</div>
-                              {r.description && (
-                                <div className="text-[11px] text-muted-foreground truncate max-w-[280px]">
-                                  {r.description}
-                                </div>
-                              )}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-wrap gap-1">
-                                {genres.slice(0, 3).map((g) => (
+                                {genres.slice(0, 2).map((g) => (
                                   <span
                                     key={g}
-                                    className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase ${genreBadgeClass(g.toLowerCase())}`}
+                                    className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${genreBadgeClass(
+                                      g.toLowerCase()
+                                    )}`}
                                   >
                                     {g}
                                   </span>
@@ -1192,11 +1291,18 @@ function Dashboard() {
                             <td className="px-4 py-3 text-muted-foreground">{r.year ?? "—"}</td>
                             <td className="px-4 py-3 text-muted-foreground">{r.rating ?? "—"}</td>
                             <td className="px-4 py-3 text-muted-foreground">
-                              {r.season != null || r.episode != null
-                                ? `S${r.season ?? "?"} · E${r.episode ?? "?"}`
-                                : "—"}
+                              {r.season != null || r.episode != null ? `S${r.season ?? "?"} · E${r.episode ?? "?"}` : "—"}
                             </td>
-                            <td className="px-4 py-3 font-semibold text-primary">{r.download_count ?? 0}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col text-xs gap-1">
+                                <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                                  <Download className="w-3.5 h-3.5" /> {Number(r.direct_downloads) || 0} Direct
+                                </span>
+                                <span className="text-sky-400 font-semibold flex items-center gap-1.5">
+                                  <Send className="w-3.5 h-3.5" /> {Number(r.telegram_downloads) || 0} TG
+                                </span>
+                              </div>
+                            </td>
                             <td className="px-4 py-3 text-right">
                               <div className="inline-flex gap-1">
                                 <button
@@ -1218,13 +1324,6 @@ function Dashboard() {
                           </tr>
                         );
                       })}
-                      {filtered.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
-                            No rows.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1232,7 +1331,6 @@ function Dashboard() {
             </section>
           </>
         ) : activeTab === "requests" ? (
-          /* User Requests Tab */
           <section className="space-y-4">
             <h2 className="text-xl font-bold tracking-tight">
               Subtitle Requests <span className="text-xs font-medium text-muted-foreground ml-2">{requests?.length ?? 0} total</span>
@@ -1256,217 +1354,349 @@ function Dashboard() {
                       <tr key={req.id} className="hover:bg-muted/20 transition">
                         <td className="px-4 py-3 font-medium">{req.title}</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase ${req.type === 'tv' ? 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                            {req.type === 'tv' ? 'TV Series' : 'Movie'}
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase ${
+                              req.type === "tv"
+                                ? "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                                : "bg-primary/10 text-primary border-primary/20"
+                            }`}
+                          >
+                            {req.type === "tv" ? "TV Series" : "Movie"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground max-w-xs truncate" title={req.notes}>
                           {req.notes ?? "—"}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {new Date(req.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                          {new Date(req.created_at).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => toggleRequestStatus(req.id, req.status)}
-                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border ${req.status === 'completed' ? 'bg-green-500/15 text-green-500 border-green-500/30' : 'bg-yellow-500/15 text-yellow-500 border-yellow-500/30'}`}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+                              req.status === "completed"
+                                ? "bg-green-500/15 text-green-500 border-green-500/30"
+                                : "bg-yellow-500/15 text-yellow-500 border-yellow-500/30"
+                            }`}
                           >
-                            {req.status === 'completed' ? 'Completed' : 'Pending'}
+                            {req.status === "completed" ? "Completed" : "Pending"}
                           </button>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => deleteRequest(req.id)}
                             className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
-                            aria-label="Delete Request"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
                     ))}
-                    {(!requests || requests.length === 0) && (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                          No requests submitted yet.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           </section>
         ) : (
-          /* Analytics Tab */
+          /* 🟢 ADVANCED ANALYTICS SECTION */
           <section className="space-y-6">
             <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary" /> Download Analytics
+              <BarChart3 className="w-5 h-5 text-primary" /> Advanced Download Intelligence
             </h2>
 
             {analyticsLoading && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading analytics…
+                <Loader2 className="w-4 h-4 animate-spin text-primary" /> Loading live analytics…
               </p>
             )}
 
-            {/* Stat cards */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-2xl border border-border bg-card/40 p-5">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                  <Download className="w-4 h-4" /> All-Time Downloads
+            {/* 6 Advanced KPI Stat Cards */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="rounded-2xl border border-border bg-card/40 p-4">
+                <div className="text-muted-foreground text-xs font-semibold uppercase flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-primary" /> Total Downloads
                 </div>
-                <p className="text-3xl font-extrabold mt-2">{analytics.totalAllTime.toLocaleString()}</p>
+                <p className="text-2xl font-extrabold mt-2 text-foreground">{analytics.totalAllTime.toLocaleString()}</p>
+                <span className="text-[10px] text-muted-foreground">All-time lifetime count</span>
               </div>
-              <div className="rounded-2xl border border-border bg-card/40 p-5">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                  <Flame className="w-4 h-4 text-amber-500" /> Downloads Today
+
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="text-emerald-400 text-xs font-semibold uppercase flex items-center gap-1.5">
+                  <Download className="w-3.5 h-3.5" /> Direct Downloads
                 </div>
-                <p className="text-3xl font-extrabold mt-2">{analytics.todayTotal.toLocaleString()}</p>
+                <p className="text-2xl font-extrabold mt-2 text-emerald-400">{analytics.totalDirectAllTime.toLocaleString()}</p>
+                <span className="text-[10px] text-muted-foreground">
+                  {analytics.totalAllTime
+                    ? Math.round((analytics.totalDirectAllTime / analytics.totalAllTime) * 100)
+                    : 0}
+                  % of all downloads
+                </span>
               </div>
-              <div className="rounded-2xl border border-border bg-card/40 p-5">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                  <TrendingUp className="w-4 h-4 text-emerald-500" /> Last 7 Days
+
+              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4">
+                <div className="text-sky-400 text-xs font-semibold uppercase flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5" /> Telegram Downloads
                 </div>
-                <p className="text-3xl font-extrabold mt-2">{analytics.weekTotal.toLocaleString()}</p>
+                <p className="text-2xl font-extrabold mt-2 text-sky-400">{analytics.totalTelegramAllTime.toLocaleString()}</p>
+                <span className="text-[10px] text-muted-foreground">
+                  {analytics.totalAllTime
+                    ? Math.round((analytics.totalTelegramAllTime / analytics.totalAllTime) * 100)
+                    : 0}
+                  % of all downloads
+                </span>
               </div>
-              <div className="rounded-2xl border border-border bg-card/40 p-5">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                  <Subtitles className="w-4 h-4" /> Tracked Titles
+
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                <div className="text-amber-400 text-xs font-semibold uppercase flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5" /> Downloads Today
                 </div>
-                <p className="text-3xl font-extrabold mt-2">{(rows ?? []).length.toLocaleString()}</p>
+                <p className="text-2xl font-extrabold mt-2 text-amber-400">{analytics.todayTotal.toLocaleString()}</p>
+                <span className="text-[10px] text-muted-foreground">
+                  Direct: {analytics.todayDirect} | TG: {analytics.todayTelegram}
+                </span>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card/40 p-4">
+                <div className="text-muted-foreground text-xs font-semibold uppercase flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Last 7 Days
+                </div>
+                <p className="text-2xl font-extrabold mt-2 text-foreground">{analytics.weekTotal.toLocaleString()}</p>
+                <span className="text-[10px] text-muted-foreground">Weekly run-rate</span>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card/40 p-4">
+                <div className="text-muted-foreground text-xs font-semibold uppercase flex items-center gap-1.5">
+                  <Subtitles className="w-3.5 h-3.5 text-cyan-400" /> Active Titles
+                </div>
+                <p className="text-2xl font-extrabold mt-2 text-foreground">{(rows ?? []).length.toLocaleString()}</p>
+                <span className="text-[10px] text-muted-foreground">Catalog size</span>
               </div>
             </div>
 
-            {/* Charts */}
-            <div className="grid lg:grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-border bg-card/40 p-5">
-                <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-4 h-4" /> Downloads — Last 7 Days
-                </h3>
-                <div className="h-64">
+            {/* Visual Charts Grid */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Daily Comparison Stacked Bar Chart (Last 14 Days) */}
+              <div className="lg:col-span-2 rounded-3xl border border-border bg-card/40 p-6 shadow-card">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" /> Direct vs Telegram — Last 14 Days
+                  </h3>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Direct
+                    </span>
+                    <span className="flex items-center gap-1.5 text-sky-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> Telegram
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={analytics.dailyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                    <BarChart data={analytics.dailyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.08)" />
                       <XAxis dataKey="date" tick={{ fill: "oklch(0.7 0 0)", fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fill: "oklch(0.7 0 0)", fontSize: 11 }} />
                       <Tooltip
                         contentStyle={{
                           background: "oklch(0.18 0.01 20)",
-                          border: "1px solid oklch(1 0 0 / 0.1)",
+                          border: "1px solid oklch(1 0 0 / 0.15)",
                           borderRadius: 12,
                           fontSize: 12,
                         }}
                       />
-                      <Line
-                        type="monotone"
-                        dataKey="downloads"
-                        stroke="oklch(0.62 0.24 25)"
-                        strokeWidth={2.5}
-                        dot={{ r: 3, fill: "oklch(0.62 0.24 25)" }}
-                      />
-                    </LineChart>
+                      <Bar dataKey="direct" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} name="Direct (.zip)" />
+                      <Bar dataKey="telegram" stackId="a" fill="#0ea5e9" radius={[4, 4, 0, 0]} name="Telegram" />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border bg-card/40 p-5">
-                <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2 mb-4">
-                  <BarChart3 className="w-4 h-4" /> Top Titles (All-Time)
+              {/* Donut Chart — Direct vs Telegram Distribution */}
+              <div className="rounded-3xl border border-border bg-card/40 p-6 shadow-card flex flex-col items-center justify-between">
+                <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2 w-full">
+                  <PieIcon className="w-4 h-4" /> Download Share Ratio
                 </h3>
-                <div className="h-64">
-                  {analytics.topShowsChart.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={analytics.topShowsChart}
-                        layout="vertical"
-                        margin={{ top: 5, right: 20, left: 0, bottom: 0 }}
+
+                <div className="h-56 w-full flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analytics.distributionData}
+                        innerRadius={60}
+                        outerRadius={85}
+                        paddingAngle={5}
+                        dataKey="value"
                       >
-                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.08)" horizontal={false} />
-                        <XAxis type="number" allowDecimals={false} tick={{ fill: "oklch(0.7 0 0)", fontSize: 11 }} />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          width={110}
-                          tick={{ fill: "oklch(0.85 0 0)", fontSize: 11 }}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            background: "oklch(0.18 0.01 20)",
-                            border: "1px solid oklch(1 0 0 / 0.1)",
-                            borderRadius: 12,
-                            fontSize: 12,
-                          }}
-                        />
-                        <Bar dataKey="downloads" fill="oklch(0.62 0.24 25)" radius={[0, 6, 6, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full grid place-items-center text-sm text-muted-foreground">
-                      No downloads recorded yet.
-                    </div>
-                  )}
+                        {analytics.distributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: "oklch(0.18 0.01 20)",
+                          border: "1px solid oklch(1 0 0 / 0.15)",
+                          borderRadius: 12,
+                          fontSize: 12,
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-black">{analytics.totalAllTime.toLocaleString()}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase">Total</span>
+                  </div>
+                </div>
+
+                <div className="w-full grid grid-cols-2 gap-2 pt-3 border-t border-border/60 text-xs">
+                  <div className="flex flex-col p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="text-emerald-400 font-bold text-sm">
+                      {analytics.totalAllTime
+                        ? Math.round((analytics.totalDirectAllTime / analytics.totalAllTime) * 100)
+                        : 0}
+                      %
+                    </span>
+                    <span className="text-muted-foreground text-[10px]">Direct (.zip)</span>
+                  </div>
+                  <div className="flex flex-col p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                    <span className="text-sky-400 font-bold text-sm">
+                      {analytics.totalAllTime
+                        ? Math.round((analytics.totalTelegramAllTime / analytics.totalAllTime) * 100)
+                        : 0}
+                      %
+                    </span>
+                    <span className="text-muted-foreground text-[10px]">Telegram</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Trending today — series episodes are combined into one row */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
-                <Flame className="w-4 h-4 text-amber-500" /> Trending Today
-              </h3>
-              <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-3 text-left">#</th>
-                        <th className="px-4 py-3 text-left">Title</th>
-                        <th className="px-4 py-3 text-left">Downloads Today</th>
-                        <th className="px-4 py-3 text-left"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {analytics.trendingToday.map((x, i) => (
-                        <tr key={x.key} className="hover:bg-muted/20 transition">
-                          <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                          <td className="px-4 py-3 font-medium max-w-xs truncate">
-                            {x.title}
-                            {x.episodeCount != null && (
-                              <span className="ml-2 text-[10px] font-normal text-muted-foreground">
-                                (TV Series — {x.episodeCount} ep tracked)
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-primary">{x.today}</td>
-                          <td className="px-4 py-3">
-                            <Link
-                              to="/content/$id"
-                              params={{ id: String(x.linkId) }}
-                              className="text-xs text-muted-foreground hover:text-foreground underline"
-                            >
-                              View
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
-                      {analytics.trendingToday.length === 0 && !analyticsLoading && (
+            {/* Peak Activity Hours Bar Chart (00:00 - 23:00) */}
+            <div className="rounded-3xl border border-border bg-card/40 p-6 shadow-card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500" /> Peak Activity Hours (Last 30 Days Traffic)
+                </h3>
+                <span className="text-xs text-muted-foreground">Hourly download volume (24h breakdown)</span>
+              </div>
+
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.hourlyCounts} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.08)" />
+                    <XAxis dataKey="hour" tick={{ fill: "oklch(0.7 0 0)", fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tick={{ fill: "oklch(0.7 0 0)", fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{
+                        background: "oklch(0.18 0.01 20)",
+                        border: "1px solid oklch(1 0 0 / 0.15)",
+                        borderRadius: 12,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar dataKey="total" fill="oklch(0.62 0.24 25)" radius={[4, 4, 0, 0]} name="Total Downloads" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Live Downloads Feed & Trending Tables */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Trending Today with Direct & TG breakdown */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-500" /> Trending Today (Direct vs TG)
+                </h3>
+                <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                         <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                            No downloads logged yet today.
-                          </td>
+                          <th className="px-4 py-3 text-left">#</th>
+                          <th className="px-4 py-3 text-left">Title</th>
+                          <th className="px-4 py-3 text-left">Direct</th>
+                          <th className="px-4 py-3 text-left">TG</th>
+                          <th className="px-4 py-3 text-left">Today Total</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {analytics.trendingToday.map((x, i) => (
+                          <tr key={x.key} className="hover:bg-muted/20 transition">
+                            <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
+                            <td className="px-4 py-3 font-medium max-w-xs truncate">{x.title}</td>
+                            <td className="px-4 py-3 text-emerald-400 font-semibold">{x.todayDirect}</td>
+                            <td className="px-4 py-3 text-sky-400 font-semibold">{x.todayTg}</td>
+                            <td className="px-4 py-3 font-bold text-primary">{x.todayTotal}</td>
+                          </tr>
+                        ))}
+                        {analytics.trendingToday.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                              No downloads logged yet today.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Real-time Downloads Activity Stream */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-500 animate-pulse" /> Live Recent Downloads Feed
+                </h3>
+                <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-3 text-left">Movie / Series</th>
+                          <th className="px-4 py-3 text-left">Channel</th>
+                          <th className="px-4 py-3 text-right">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {analytics.recentFeed.map((rf) => (
+                          <tr key={rf.id} className="hover:bg-muted/20 transition text-xs">
+                            <td className="px-4 py-2.5 font-medium max-w-[200px] truncate">{rf.title}</td>
+                            <td className="px-4 py-2.5">
+                              {rf.variant === "telegram" ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold text-[10px]">
+                                  <Send className="w-2.5 h-2.5" /> Telegram
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold text-[10px]">
+                                  <Download className="w-2.5 h-2.5" /> Direct .zip
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-muted-foreground font-mono">{rf.time}</td>
+                          </tr>
+                        ))}
+                        {analytics.recentFeed.length === 0 && (
+                          <tr>
+                            <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                              No recent events found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* All-time top downloads — series episodes are combined into one row */}
+            {/* All-time Top Downloads with Channel Breakdown */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold tracking-wide uppercase text-primary flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" /> All-Time Top Downloads
+                <TrendingUp className="w-4 h-4" /> Lifetime Top Titles (Direct vs Telegram)
               </h3>
               <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
                 <div className="overflow-x-auto">
@@ -1475,24 +1705,21 @@ function Dashboard() {
                       <tr>
                         <th className="px-4 py-3 text-left">#</th>
                         <th className="px-4 py-3 text-left">Title</th>
-                        <th className="px-4 py-3 text-left">Total Downloads</th>
-                        <th className="px-4 py-3 text-left"></th>
+                        <th className="px-4 py-3 text-left">Direct Downloads</th>
+                        <th className="px-4 py-3 text-left">Telegram Downloads</th>
+                        <th className="px-4 py-3 text-left">Lifetime Total</th>
+                        <th className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {analytics.topAllTime.map((x, i) => (
                         <tr key={x.key} className="hover:bg-muted/20 transition">
                           <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                          <td className="px-4 py-3 font-medium max-w-xs truncate">
-                            {x.title}
-                            {x.episodeCount != null && (
-                              <span className="ml-2 text-[10px] font-normal text-muted-foreground">
-                                (TV Series — {x.episodeCount} ep tracked)
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-primary">{x.allTime}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 font-medium max-w-xs truncate">{x.title}</td>
+                          <td className="px-4 py-3 text-emerald-400 font-bold">{x.directAll.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sky-400 font-bold">{x.tgAll.toLocaleString()}</td>
+                          <td className="px-4 py-3 font-extrabold text-primary">{x.totalAll.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">
                             <Link
                               to="/content/$id"
                               params={{ id: String(x.linkId) }}
@@ -1503,13 +1730,6 @@ function Dashboard() {
                           </td>
                         </tr>
                       ))}
-                      {analytics.topAllTime.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                            No downloads recorded yet.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
