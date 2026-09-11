@@ -20,11 +20,6 @@ import {
   Tag,
   ChevronRight,
   Home,
-  Sparkles,
-  Info,
-  FileArchive,
-  Video,
-  ShieldAlert,
 } from "lucide-react";
 
 import { ShareCardModal } from "@/components/ShareCardModal";
@@ -82,7 +77,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
     const { data: allEpisodes, error: secondError } = await supabase
       .from(SUBTITLES_TABLE)
       .select(SAFE_COLUMNS)
-      .ilike("title", `${safeShowPrefix}%`)
+      .ilike("title", `${parsed.showName}%`)
       .order("created_at", { ascending: false });
 
     if (secondError) throw secondError;
@@ -339,23 +334,8 @@ function GenreBadges({ genres }: { genres: string[] }) {
   );
 }
 
-function ShareBar({
-  title,
-  poster,
-  year,
-  rating,
-  genres = [],
-  kind = "movie",
-}: {
-  title: string;
-  poster?: string;
-  year?: string | null;
-  rating?: string | null;
-  genres?: string[];
-  kind?: "movie" | "series";
-}) {
+function ShareBar({ title }: { title: string }) {
   const [copied, setCopied] = useState(false);
-  const [showCardModal, setShowCardModal] = useState(false);
 
   const handleCopy = () => {
     if (typeof window !== "undefined") {
@@ -369,61 +349,35 @@ function ShareBar({
   const shareText = encodeURIComponent(`${title} Sinhala Subtitle | PixelPopLK`);
 
   return (
-    <>
-      <div className="mt-4 flex flex-wrap items-center gap-2 pt-4 border-t border-border/60">
-        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
-          <Share2 className="w-3.5 h-3.5" /> Share:
-        </span>
-        
-        {/* 🎨 1-Click Social Media Card Generator Modal Trigger */}
-        <button
-          onClick={() => setShowCardModal(true)}
-          type="button"
-          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-primary-foreground hover:opacity-90 text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-          <span>Share Card (.png)</span>
-        </button>
-
-        <a
-          href={`https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1"
-        >
-          WhatsApp
-        </a>
-        <a
-          href={`https://t.me/share/url?url=${shareUrl}&text=${shareText}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-semibold transition flex items-center gap-1"
-        >
-          Telegram
-        </a>
-        <button
-          onClick={handleCopy}
-          type="button"
-          className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : null}
-          {copied ? "Link Copied!" : "Copy Link"}
-        </button>
-      </div>
-
-      {showCardModal && (
-        <ShareCardModal
-          isOpen={showCardModal}
-          onClose={() => setShowCardModal(false)}
-          title={title}
-          year={year ?? undefined}
-          rating={rating}
-          posterUrl={poster}
-          genres={genres}
-          kind={kind}
-        />
-      )}
-    </>
+    <div className="mt-4 flex flex-wrap items-center gap-2 pt-4 border-t border-border/60">
+      <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
+        <Share2 className="w-3.5 h-3.5" /> Share:
+      </span>
+      <a
+        href={`https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1"
+      >
+        WhatsApp
+      </a>
+      <a
+        href={`https://t.me/share/url?url=${shareUrl}&text=${shareText}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-semibold transition flex items-center gap-1"
+      >
+        Telegram
+      </a>
+      <button
+        onClick={handleCopy}
+        type="button"
+        className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+      >
+        {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : null}
+        {copied ? "Link Copied!" : "Copy Link"}
+      </button>
+    </div>
   );
 }
 
@@ -460,7 +414,7 @@ function Hero({
             decoding="async"
             className="w-full h-full object-cover blur-lg scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
         </div>
       )}
       <div className="relative grid md:grid-cols-[320px_1fr] gap-0 w-full min-w-0">
@@ -520,14 +474,7 @@ function Hero({
 
           {children}
 
-          <ShareBar
-            title={title}
-            poster={poster}
-            year={year}
-            rating={rating}
-            genres={genres}
-            kind={kindLabel === "TV Series" ? "series" : "movie"}
-          />
+          <ShareBar title={title} />
         </div>
       </div>
     </div>
@@ -552,19 +499,17 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": String(s.rating),
+            "ratingValue": s.rating,
             "bestRating": "10",
-            "worstRating": "1",
-            "ratingCount": "1",
-            "description": "IMDb rating sourced from public data"
+            "ratingCount": "150"
           }
         }
       : {}),
     "workFeaturedBy": {
       "@type": "DataDownload",
       "name": `${s.title} Sinhala Subtitle`,
-      "encodingFormat": "application/zip",
-      "description": `Download Sinhala Subtitle (.zip) for ${s.title}`
+      "encodingFormat": "application/x-subrip",
+      "description": `Download Sinhala Subtitle (.srt) for ${s.title}`
     }
   };
 
@@ -584,33 +529,9 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
       
-      {/* 💡 Download Options Guide (Subtitle vs Video Explanation) */}
-      <div className="mt-6 p-4 rounded-2xl bg-card border border-border/70 shadow-sm flex flex-col gap-2.5 text-xs">
-        <div className="flex items-center gap-2 font-bold text-foreground">
-          <Info className="w-4 h-4 text-primary" />
-          <span>බාගත කිරීමේ විකල්ප (Download Options Guide):</span>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-2.5 text-muted-foreground">
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
-            <FileArchive className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-foreground block">1. Direct Download (.zip)</span>
-              <span className="text-[11px] leading-relaxed">චිත්‍රපටයේ <b>සිංහල උපසිරැසි ගොනුව පමණක්</b> (.zip) බාගත වේ. (Subtitle File Only)</span>
-            </div>
-          </div>
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
-            <Video className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-foreground block">2. Telegram Download</span>
-              <span className="text-[11px] leading-relaxed">චිත්‍රපටයේ <b>සම්පූර්ණ වීඩියෝව (Full Movie Video)</b> Telegram හරහා ලබාගත හැක. (Video File)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
-      <div className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
-        <DownloadButton subtitleId={s.id} title={s.title} label="Direct Download (.zip)" />
+      <div className="mt-7 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
+        <DownloadButton subtitleId={s.id} title={s.title} label="Direct Download (.srt)" />
         {(s as any).telegram_link && (
           <DownloadButton
             subtitleId={s.id}
@@ -620,24 +541,10 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
           />
         )}
       </div>
-
-      <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
-        <span>⚡ Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK ❤</span>
-        <button
-          type="button"
-          onClick={() => setDmcaOpen(true)}
-          className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition cursor-pointer"
-        >
-          <ShieldAlert className="w-3.5 h-3.5" />
-          <span>DMCA / Copyright Notice</span>
-        </button>
-      </div>
-
-      <DmcaModal
-        isOpen={dmcaOpen}
-        onClose={() => setDmcaOpen(false)}
-        initialTitle={s.title}
-      />
+      
+      <p className="mt-3 text-[11px] text-muted-foreground break-words">
+        Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK ❤
+      </p>
     </Hero>
   );
 }
@@ -687,11 +594,9 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": String(meta.rating),
+            "ratingValue": meta.rating,
             "bestRating": "10",
-            "worstRating": "1",
-            "ratingCount": "1",
-            "description": "IMDb rating sourced from public data"
+            "ratingCount": "250"
           }
         }
       : {})
@@ -785,9 +690,9 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
         .order("created_at", { ascending: false });
 
       if (isMovie) {
-        query = query.is("season", null).limit(8);
+        query = query.is("season", null).limit(15);
       } else {
-        query = query.not("season", "is", null).limit(14);
+        query = query.not("season", "is", null).limit(30);
       }
 
       const { data, error } = await query;
@@ -824,13 +729,10 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
               <img
                 src={itemPoster(it)}
                 alt={itemTitle(it)}
-                width={200}
-                height={300}
                 loading="lazy"
-                decoding="async"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
-              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/95 via-black/60 to-transparent">
+              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-background/90 to-transparent">
                 <p className="text-[11px] font-bold text-white truncate">{itemTitle(it)}</p>
               </div>
             </div>

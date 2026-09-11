@@ -7,10 +7,10 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        // Supabase වෙතින් සියලුම subtitles වල IDs, dates, image_url සහ title ලබා ගැනීම
+        // Supabase වෙතින් සියලුම subtitles වල IDs සහ dates ලබා ගැනීම
         const { data: subtitles, error } = await supabase
           .from(SUBTITLES_TABLE)
-          .select("id, created_at, updated_at, season, episode, image_url, title")
+          .select("id, created_at, updated_at, season, episode")
           .order("created_at", { ascending: false });
 
         if (error) {
@@ -26,10 +26,6 @@ export const Route = createFileRoute("/sitemap.xml")({
     <lastmod>${now}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <image:image>
-      <image:loc>${BASE_URL}/logo.png</image:loc>
-      <image:title>PixelPopLK — Sinhala Subtitles for Movies &amp; TV Series</image:title>
-    </image:image>
   </url>`,
         ];
 
@@ -43,33 +39,16 @@ export const Route = createFileRoute("/sitemap.xml")({
             ? new Date(sub.created_at).toISOString().split("T")[0]
             : now;
 
-          // Escape XML special characters in title
-          const safeTitle = (sub.title ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&apos;");
-
-          const imageBlock = sub.image_url
-            ? `
-    <image:image>
-      <image:loc>${sub.image_url}</image:loc>
-      <image:title>${safeTitle}</image:title>
-    </image:image>`
-            : "";
-
           return `  <url>
     <loc>${BASE_URL}${path}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>${isEpisode ? "0.7" : "0.9"}</priority>${imageBlock}
+    <priority>${isEpisode ? "0.7" : "0.9"}</priority>
   </url>`;
         });
 
         const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${staticUrls.join("\n")}
 ${dynamicUrls.join("\n")}
 </urlset>`;

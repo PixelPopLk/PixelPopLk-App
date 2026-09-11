@@ -14,15 +14,7 @@ import {
   ChevronRight,
   Tag,
   Home,
-  Sparkles,
-  Info,
-  FileArchive,
-  Video,
-  ShieldAlert,
 } from "lucide-react";
-
-import { ShareCardModal } from "@/components/ShareCardModal";
-import { DmcaModal } from "@/components/DmcaModal";
 
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import {
@@ -59,7 +51,7 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const { data: allEpisodes, error: secondError } = await supabase
     .from(SUBTITLES_TABLE)
     .select(SAFE_COLUMNS)
-    .ilike("title", `${safeShowPrefix}%`)
+    .ilike("title", `${parsed.showName}%`)
     .order("created_at", { ascending: false });
 
   if (secondError) throw secondError;
@@ -138,21 +130,8 @@ export const Route = createFileRoute("/episode/$id")({
   ),
 });
 
-function EpisodeShareBar({
-  title,
-  poster,
-  year,
-  rating,
-  genres = [],
-}: {
-  title: string;
-  poster?: string;
-  year?: string | null;
-  rating?: string | null;
-  genres?: string[];
-}) {
+function EpisodeShareBar({ title }: { title: string }) {
   const [copied, setCopied] = useState(false);
-  const [showCardModal, setShowCardModal] = useState(false);
 
   const handleCopy = () => {
     if (typeof window !== "undefined") {
@@ -166,61 +145,35 @@ function EpisodeShareBar({
   const shareText = encodeURIComponent(`${title} Sinhala Subtitle | PixelPopLK`);
 
   return (
-    <>
-      <div className="mt-5 flex flex-wrap items-center gap-2 pt-4 border-t border-border/60">
-        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
-          <Share2 className="w-3.5 h-3.5" /> Share:
-        </span>
-
-        {/* 🎨 1-Click Social Media Card Generator Modal Trigger */}
-        <button
-          onClick={() => setShowCardModal(true)}
-          type="button"
-          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-primary-foreground hover:opacity-90 text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-          <span>Share Card (.png)</span>
-        </button>
-
-        <a
-          href={`https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1"
-        >
-          WhatsApp
-        </a>
-        <a
-          href={`https://t.me/share/url?url=${shareUrl}&text=${shareText}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-semibold transition flex items-center gap-1"
-        >
-          Telegram
-        </a>
-        <button
-          onClick={handleCopy}
-          type="button"
-          className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : null}
-          {copied ? "Link Copied!" : "Copy Link"}
-        </button>
-      </div>
-
-      {showCardModal && (
-        <ShareCardModal
-          isOpen={showCardModal}
-          onClose={() => setShowCardModal(false)}
-          title={title}
-          year={year ?? undefined}
-          rating={rating}
-          posterUrl={poster}
-          genres={genres}
-          kind="series"
-        />
-      )}
-    </>
+    <div className="mt-5 flex flex-wrap items-center gap-2 pt-4 border-t border-border/60">
+      <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
+        <Share2 className="w-3.5 h-3.5" /> Share:
+      </span>
+      <a
+        href={`https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1"
+      >
+        WhatsApp
+      </a>
+      <a
+        href={`https://t.me/share/url?url=${shareUrl}&text=${shareText}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-semibold transition flex items-center gap-1"
+      >
+        Telegram
+      </a>
+      <button
+        onClick={handleCopy}
+        type="button"
+        className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+      >
+        {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : null}
+        {copied ? "Link Copied!" : "Copy Link"}
+      </button>
+    </div>
   );
 }
 
@@ -273,6 +226,22 @@ function EpisodePage() {
     };
   }, [series, ep]);
 
+  // 🟢 Next & Previous Episode Navigation Logic
+  const { prevEpisode, nextEpisode } = useMemo(() => {
+    if (!series || !ep) return { prevEpisode: null, nextEpisode: null };
+
+    const sorted = [...series.episodes].sort((a, b) => {
+      if (a.season !== b.season) return a.season - b.season;
+      return a.episode - b.episode;
+    });
+
+    const currentIndex = sorted.findIndex((e) => String(e.id) === String(ep.id));
+    return {
+      prevEpisode: currentIndex > 0 ? sorted[currentIndex - 1] : null,
+      nextEpisode: currentIndex !== -1 && currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null,
+    };
+  }, [series, ep]);
+
   const episodeSchema = series && ep ? {
     "@context": "https://schema.org",
     "@type": "TVEpisode",
@@ -293,19 +262,17 @@ function EpisodePage() {
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": String(rating),
+            "ratingValue": rating,
             "bestRating": "10",
-            "worstRating": "1",
-            "ratingCount": "1",
-            "description": "IMDb rating sourced from public data"
+            "ratingCount": "120"
           }
         }
       : {}),
     "workFeaturedBy": {
       "@type": "DataDownload",
       "name": `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle`,
-      "encodingFormat": "application/zip",
-      "description": `Download Sinhala Subtitle (.zip) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`
+      "encodingFormat": "application/x-subrip",
+      "description": `Download Sinhala Subtitle (.srt) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`
     }
   } : null;
 
@@ -340,9 +307,6 @@ function EpisodePage() {
       }
     ]
   } : null;
-
-  const backToUrl = series ? `/content/${series.id}` : "/";
-  const backToText = series ? `Back to ${series.showName}` : "Home";
 
   return (
     <EpisodeShell backTo={backToUrl} backText={backToText}>
@@ -397,7 +361,7 @@ function EpisodePage() {
                   decoding="async"
                   className="w-full h-full object-cover blur-lg scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
+                <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
               </div>
             )}
             <div className="relative grid md:grid-cols-[320px_1fr] gap-0">
@@ -476,36 +440,12 @@ function EpisodePage() {
                   <AdBanner type="300x250" />
                 </div>
 
-                {/* 🟢 Download Options Guide (Subtitle vs Telegram Video) */}
-                <div className="mt-6 p-4 rounded-2xl bg-card/80 border border-border shadow-sm text-xs text-muted-foreground space-y-2.5">
-                  <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-                    <Info className="w-4 h-4 text-primary shrink-0" />
-                    <span>Download Options Guide / බාගත කරගන්නේ කෙසේද?</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
-                      <FileArchive className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold text-foreground block">1. Direct Download (.zip)</span>
-                        <span className="text-[11px] leading-relaxed">මෙම කථාංගයේ <b>සිංහල උපසිරැසි ගොනුව පමණක්</b> (.zip) බාගත වේ. (Subtitle File Only)</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
-                      <Video className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold text-foreground block">2. Telegram Download</span>
-                        <span className="text-[11px] leading-relaxed">කථාංගයේ <b>සම්පූර්ණ වීඩියෝව (Episode Video)</b> Telegram හරහා ලබාගත හැක. (Video File)</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* 🟢 Secure Blob Download Buttons */}
-                <div className="mt-5 flex flex-col sm:flex-row gap-3" data-download-zone="true">
+                <div className="mt-7 flex flex-col sm:flex-row gap-3" data-download-zone="true">
                   <DownloadButton
                     subtitleId={ep.id}
                     title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                    label="Direct Download (.zip)"
+                    label="Direct Download (.srt)"
                   />
                   {(ep as any).telegram_link && (
                     <DownloadButton
@@ -516,24 +456,6 @@ function EpisodePage() {
                     />
                   )}
                 </div>
-
-                <div className="mt-3 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
-                  <span>⚡ Fast Episode Subtitle Download. Thank you for supporting PixelPopLK ❤</span>
-                  <button
-                    type="button"
-                    onClick={() => setDmcaOpen(true)}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition cursor-pointer"
-                  >
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>DMCA / Copyright Notice</span>
-                  </button>
-                </div>
-
-                <DmcaModal
-                  isOpen={dmcaOpen}
-                  onClose={() => setDmcaOpen(false)}
-                  initialTitle={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                />
 
                 {/* 🟢 Next Episode & Previous Episode Navigation Bar */}
                 <div className="mt-6 flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-2xl bg-card/60 border border-border">
@@ -575,13 +497,7 @@ function EpisodePage() {
                   <AdBanner type="160x300" />
                 </div>
 
-                <EpisodeShareBar
-                  title={`${series.showName} S${ep.season}E${ep.episode}`}
-                  poster={poster}
-                  year={year}
-                  rating={rating}
-                  genres={genres}
-                />
+                <EpisodeShareBar title={`${series.showName} S${ep.season}E${ep.episode}`} />
 
               </div>
             </div>

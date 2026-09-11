@@ -13,10 +13,9 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AgeGate } from "../components/AgeGate";
-import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 20000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
+const COOLDOWN_TIME = 15000;
 
 function NotFoundComponent() {
   return (
@@ -291,15 +290,28 @@ function RootComponent() {
         return;
       }
 
-      const now = Date.now();
-      const lastGlobalAdTime = Number(sessionStorage.getItem("last_global_ad_time") || 0);
+      const itemKey =
+        targetUrl ||
+        clickable.id ||
+        clickable.getAttribute("data-id") ||
+        (clickable.textContent ? clickable.textContent.trim().slice(0, 30) : "btn");
 
-      // තත්පර 35ක් යනතුරු නැවත Popunder Ads open නොකර සයිට් එක smooth ව තබාගැනීම
-      if (now - lastGlobalAdTime < COOLDOWN_TIME) {
+      let cooldowns: Record<string, number> = {};
+      try {
+        cooldowns = JSON.parse(sessionStorage.getItem("ad_cooldowns") || "{}");
+      } catch {
+        cooldowns = {};
+      }
+
+      const now = Date.now();
+      const lastClickedTime = cooldowns[itemKey];
+
+      if (lastClickedTime && now - lastClickedTime < COOLDOWN_TIME) {
         return;
       }
 
-      sessionStorage.setItem("last_global_ad_time", String(now));
+      cooldowns[itemKey] = now;
+      sessionStorage.setItem("ad_cooldowns", JSON.stringify(cooldowns));
 
       try {
         const adWindow = window.open(AD_URL, "_blank");
@@ -328,7 +340,6 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AgeGate />
-      <PwaInstallPrompt />
       <Outlet />
     </QueryClientProvider>
   );

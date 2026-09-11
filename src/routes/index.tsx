@@ -34,7 +34,6 @@ import {
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
 import AdBanner from "@/components/AdBanner";
-import { DmcaModal } from "@/components/DmcaModal";
 
 const homeSearchSchema = z.object({
   type: z.enum(["all", "movie", "series"]).optional().catch("all"),
@@ -252,6 +251,7 @@ function HomePage() {
   }, [featured.length]);
 
   const filtered = useMemo(() => {
+    const qClean = query.trim().toLowerCase();
     let result = items.filter(
       (it) =>
         matchesFilter(it, type, genre) &&
@@ -808,13 +808,14 @@ function Hero({
                     {formatDate(itemDate(current))}
                   </p>
                   <div className="mt-5 flex gap-3">
-                    <Link
-                      to="/content/$id"
-                      params={{ id: String(current.id) }}
+                    <button
+                      type="button"
+                      onClick={() => onDownload(String(current.id))}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
-                    </Link>
+                    </button>
+                    {/* 🟢 Real Link for Google Crawling & Speed */}
                     <Link
                       to="/content/$id"
                       params={{ id: String(current.id) }}
@@ -946,8 +947,12 @@ function Row({
   items: GridItem[]; 
   resetKey: string;
 }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(ROW_PAGE_SIZE);
+  }, [resetKey]);
 
   useEffect(() => {
     setVisibleCount(ROW_PAGE_SIZE);
@@ -976,6 +981,7 @@ function Row({
   if (items.length === 0) return null;
 
   const visibleItems = items.slice(0, visibleCount);
+  const hasMore = visibleCount < items.length;
 
   return (
     <div className="group/row relative">
@@ -985,6 +991,24 @@ function Row({
           {title}
           <span className="text-xs font-medium text-muted-foreground ml-1">({items.length})</span>
         </h3>
+        <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/row:opacity-100 transition">
+          <button
+            type="button"
+            aria-label="Scroll left"
+            onClick={() => scrollBy(-1)}
+            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Scroll right"
+            onClick={() => scrollBy(1)}
+            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
@@ -1000,16 +1024,14 @@ function Row({
           ))}
         </div>
 
-        {/* 🟢 Infinite Scroll Sentinel & Fallback Load Button */}
         {hasMore && (
-          <div ref={sentinelRef} className="flex justify-center px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="flex justify-center px-4 sm:px-6 lg:px-8 mt-5">
             <button
               type="button"
-              onClick={() => setVisibleCount((c) => Math.min(items.length, c + ROW_PAGE_SIZE))}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-full border border-border bg-card/70 backdrop-blur text-xs sm:text-sm font-semibold hover:bg-card hover:border-primary/40 transition cursor-pointer shadow-md"
+              onClick={() => setVisibleCount((c) => c + ROW_PAGE_SIZE)}
+              className="px-6 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-semibold hover:bg-card hover:border-primary/40 transition cursor-pointer"
             >
-              <ChevronDown className="w-4 h-4 text-primary" />
-              <span>Load More Subtitles ({items.length - visibleCount} remaining)</span>
+              Load More ({items.length - visibleCount} left)
             </button>
           </div>
         )}
