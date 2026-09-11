@@ -12,7 +12,11 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AgeGate } from "../components/AgeGate"; // AgeGate.tsx ගොනුව import කිරීම
+import { AgeGate } from "../components/AgeGate";
+import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
+
+const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
+const COOLDOWN_TIME = 35000; // තත්පර 35ක Cooldown එකක් (UX එක සුවපහසු කරගැනීමට)
 
 function NotFoundComponent() {
   return (
@@ -36,11 +40,26 @@ function NotFoundComponent() {
   );
 }
 
+// 🟢 Chunk Error එකක් ආවොත් Auto-Recover වෙන Error Component එක
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+
+    // Unexpected Token හෝ Module Error එකක් ආවොත් Infinite Loop නොවී එක්වරක් Reload කිරීම
+    if (
+      error?.message?.includes("dynamically imported module") ||
+      error?.message?.includes("Unexpected token")
+    ) {
+      const lastReload = sessionStorage.getItem("last_chunk_reload");
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        sessionStorage.setItem("last_chunk_reload", String(now));
+        window.location.reload();
+      }
+    }
   }, [error]);
 
   return (
@@ -55,12 +74,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              router.invalidate();
-              reset();
+              window.location.reload();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
           >
-            Try again
+            Refresh Page
           </button>
           <a
             href="/"
@@ -79,19 +97,43 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "PixelPopLK — Sinhala Subtitles" },
+      { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
-      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subitiles TV Series, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
+      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
       { name: "author", content: "PixelPopLK" },
-      { property: "og:title", content: "PixelPopLK — Sinhala Subtitles" },
+      { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "PixelPopLK" },
+      { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
+      { property: "og:image", content: "https://pixelpoplk.pages.dev/logo.png" },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
+      { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
+      { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles" },
+      { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Premium Sinhala subtitles for movies and TV series." },
+      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/logo.png" },
+      { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
+      { name: "theme-color", content: "#0e0e12" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [
+      {
+        rel: "icon",
+        href: "/logo.png",
+        type: "image/png",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "/logo.png",
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.json",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -110,6 +152,7 @@ const websiteSchema = {
   "name": "PixelPopLK",
   "url": "https://pixelpoplk.pages.dev",
   "description": "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads.",
+  "inLanguage": ["en", "si"],
   "potentialAction": {
     "@type": "SearchAction",
     "target": "https://pixelpoplk.pages.dev/?q={search_term_string}",
@@ -118,22 +161,66 @@ const websiteSchema = {
 };
 
 function RootShell({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const isAdminPage = location.pathname.startsWith("/manage-admin");
+
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
-        
-        {/* Google Search Console Verification Meta Tag */}
         <meta name="google-site-verification" content="VoErL02EHeHtDv46aBcjIEm5DpUTnJRhPF89ewoK-M4" />
         
+        {/* 🚀 Chunk / Unexpected Token Error ආවොත් Auto-Reload කරවන ආරක්ෂිත Script එක */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('vite:preloadError', function() {
+                var lastReload = sessionStorage.getItem('last_chunk_reload');
+                var now = Date.now();
+                if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+                  sessionStorage.setItem('last_chunk_reload', String(now));
+                  window.location.reload();
+                }
+              });
+              window.addEventListener('error', function(e) {
+                if (e.message && (e.message.includes('dynamically imported module') || e.message.includes('Unexpected token'))) {
+                  var lastReload = sessionStorage.getItem('last_chunk_reload');
+                  var now = Date.now();
+                  if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+                    sessionStorage.setItem('last_chunk_reload', String(now));
+                    window.location.reload();
+                  }
+                }
+              });
+            `,
+          }}
+        />
+
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+
+        {/* 📱 PWA Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
         />
       </head>
       <body>
         {children}
         <Scripts />
+
+        {!isAdminPage && (
+          <script async src="https://acorntar.com/f9/ab/d2/f9abd27b8744d3a0411d6b53882e464a.js" />
+        )}
       </body>
     </html>
   );
@@ -142,14 +229,91 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const location = useLocation();
+  const isAdminPage = location.pathname.startsWith("/manage-admin");
+
+  useEffect(() => {
+    if (isAdminPage) return;
+
+    const handleGlobalClick = (event: MouseEvent) => {
+      if (window.location.pathname.startsWith("/manage-admin")) return;
+
+      const target = event.target as HTMLElement;
+      if (!target) return;
+
+      // Popup, Dialog, Modal, AgeGate සම්පූර්ණයෙන්ම ignore කිරීම
+      const isInsidePopup = target.closest(
+        '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
+        '.modal, .dialog, .popup, [data-radix-dialog-content], ' +
+        '[data-sonner-toast], [data-toast], .toast, [role="alert"], ' +
+        '.age-gate, [data-age-gate], [class*="overlay"], [class*="backdrop"], [data-no-ad="true"]'
+      );
+      if (isInsidePopup) return;
+
+      const clickable = target.closest("a, button, [role='button'], [data-clickable='true']") as HTMLElement | null;
+      if (!clickable) return;
+
+      const linkElement = clickable.closest("a") as HTMLAnchorElement | null;
+      const targetUrl = linkElement ? linkElement.href : null;
+
+      // Download Buttons ignore කිරීම
+      const isDownloadButton =
+        clickable.hasAttribute("download") ||
+        Boolean(clickable.closest("[download], [data-download], [data-no-ad]")) ||
+        (typeof clickable.className === "string" && /download/i.test(clickable.className)) ||
+        (clickable.id && /download/i.test(clickable.id)) ||
+        (clickable.textContent && /download|බාගන්න/i.test(clickable.textContent)) ||
+        (targetUrl && (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) || /download/i.test(targetUrl)));
+
+      // Telegram Buttons ignore කිරීම
+      const isTelegramButton =
+        Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
+        Boolean(clickable.textContent && /telegram|ටෙලිග්‍රෑම්/i.test(clickable.textContent)) ||
+        (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
+        (clickable.id && /telegram/i.test(clickable.id));
+
+      if (isDownloadButton || isTelegramButton) {
+        return;
+      }
+
+      const now = Date.now();
+      const lastGlobalAdTime = Number(sessionStorage.getItem("last_global_ad_time") || 0);
+
+      // තත්පර 35ක් යනතුරු නැවත Popunder Ads open නොකර සයිට් එක smooth ව තබාගැනීම
+      if (now - lastGlobalAdTime < COOLDOWN_TIME) {
+        return;
+      }
+
+      sessionStorage.setItem("last_global_ad_time", String(now));
+
+      try {
+        const adWindow = window.open(AD_URL, "_blank");
+        if (adWindow) {
+          adWindow.blur();
+          window.focus();
+        }
+      } catch (e) {
+        const a = document.createElement("a");
+        a.href = AD_URL;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    };
+
+    document.addEventListener("click", handleGlobalClick);
+
+    return () => {
+      document.removeEventListener("click", handleGlobalClick);
+    };
+  }, [isAdminPage]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* 18+ Age Gate overlay එක */}
       <AgeGate />
-
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <PwaInstallPrompt />
       <Outlet />
     </QueryClientProvider>
   );
-                                    }
+}

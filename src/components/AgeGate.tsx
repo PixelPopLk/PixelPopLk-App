@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { ShieldAlert, Check, LogOut } from "lucide-react";
 
+// දින 2ක් සඳහා මිලිතත්පර ප්‍රමාණය (2 * 24 * 60 * 60 * 1000)
+const TWO_DAYS_MS = 172800000; 
+
 export function AgeGate(): React.JSX.Element | null {
   const [isVerified, setIsVerified] = useState<boolean>(true);
   const [mounted, setMounted] = useState<boolean>(false);
@@ -8,22 +11,37 @@ export function AgeGate(): React.JSX.Element | null {
   useEffect(() => {
     setMounted(true);
     try {
-      const verified = localStorage.getItem("age_verified");
-      if (verified !== "true") {
+      const verifiedTime = localStorage.getItem("age_verified_time");
+      
+      if (verifiedTime) {
+        const savedTime = parseInt(verifiedTime, 10);
+        const currentTime = Date.now();
+
+        // දින 2ක කාලය තවමත් ඉතිරිව තිබේදැයි බලයි
+        if (currentTime - savedTime < TWO_DAYS_MS) {
+          setIsVerified(true);
+        } else {
+          // කාලය අවසන් නම් පරණ දත්ත ඉවත් කර නැවත age gate එක පෙන්වයි
+          localStorage.removeItem("age_verified_time");
+          setIsVerified(false);
+        }
+      } else {
         setIsVerified(false);
       }
     } catch {
-      // localStorage බ්ලොක් වී ඇත්නම් overlay එක පෙන්වයි
+      // localStorage භාවිතය සීමා වී ඇත්නම් overlay එක පෙන්වයි
       setIsVerified(false);
     }
   }, []);
 
   const handleConfirm = (): void => {
     try {
-      localStorage.setItem("age_verified", "true");
+      // තහවුරු කළ වත්මන් වේලාව සුරැකීම
+      localStorage.setItem("age_verified_time", Date.now().toString());
     } catch {
       /* noop */
     }
+    // කිසිදු Ad එකකට redirect නොකර සයිට් එක කෙලින්ම unlock කිරීම
     setIsVerified(true);
   };
 
@@ -37,7 +55,9 @@ export function AgeGate(): React.JSX.Element | null {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto"
+      data-age-gate="true"
+      data-no-ad="true"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto age-gate"
       style={{
         background: "rgba(0, 0, 0, 0.92)",
         backdropFilter: "blur(12px)",
@@ -95,4 +115,4 @@ export function AgeGate(): React.JSX.Element | null {
       </div>
     </div>
   );
-    }
+}

@@ -19,10 +19,13 @@ export type Subtitle = {
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
+  auth: { persistSession: true, autoRefreshToken: true },
 });
 
 export const SUBTITLES_TABLE = "subtitles";
+// Safe columns for public listings (prevents leaking direct download_link to scrapers)
+export const SAFE_SUBTITLE_COLUMNS =
+  "id, created_at, title, image_url, genre, description, rating, year, season, episode, download_count";
 export const SUBTITLE_COLUMNS =
   "id, created_at, title, download_link, image_url, genre, description, rating, year, season, episode, download_count";
 

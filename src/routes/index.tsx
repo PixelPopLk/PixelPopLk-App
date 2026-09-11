@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
-import { supabase, SUBTITLES_TABLE, SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import { supabase, SUBTITLES_TABLE, SAFE_SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import { searchFuzzy } from "@/lib/fuzzySearch";
 import {
   buildGridItems,
   itemDate,
@@ -30,6 +31,7 @@ import {
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
+import AdBanner from "@/components/AdBanner";
 
 const homeSearchSchema = z.object({
   type: z.enum(["all", "movie", "series"]).optional().catch("all"),
@@ -37,12 +39,10 @@ const homeSearchSchema = z.object({
   q: z.string().optional().catch(undefined),
 });
 
-// 🟢 Shared fetch used by both the SSR loader and (for cache-key parity) any
-// future client refetch. Fetches the full subtitle catalog.
 async function fetchAllSubtitles(): Promise<Subtitle[]> {
   const { data, error } = await supabase
     .from(SUBTITLES_TABLE)
-    .select(SUBTITLE_COLUMNS)
+    .select(SAFE_SUBTITLE_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -51,10 +51,6 @@ async function fetchAllSubtitles(): Promise<Subtitle[]> {
 
 export const Route = createFileRoute("/")({
   validateSearch: (search) => homeSearchSchema.parse(search),
-  // 🟢 SSR loader — fetches the full catalog on the server so the homepage
-  // grid (and every /content/:id link on it) is present in the very first
-  // HTML response. This is what lets Google discover and crawl content pages
-  // immediately instead of waiting on a slower client-side JS render pass.
   loader: async () => fetchAllSubtitles(),
   head: () => ({
     meta: [
@@ -64,13 +60,22 @@ export const Route = createFileRoute("/")({
         content:
           "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK.",
       },
-      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subitiles TV Series, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
+      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
       { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
+      { property: "og:site_name", content: "PixelPopLK" },
+      { property: "og:image", content: "https://pixelpoplk.pages.dev/logo.png" },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
+      { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
+      { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
+      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/logo.png" },
+      { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
     ],
     links: [{ rel: "canonical", href: "https://pixelpoplk.pages.dev/" }],
   }),
@@ -98,7 +103,6 @@ function matchesFilter(it: GridItem, type: "all" | "movie" | "series", genre?: s
     const target = genre.toLowerCase();
     
     return genres.some((g) => {
-      // 💡 Database එකෙන් එන Genre එකත් lowercase කරගන්නවා
       const lowerG = String(g).toLowerCase(); 
 
       return (
@@ -160,7 +164,6 @@ function matchesRating(it: GridItem, rf: RatingFilter): boolean {
   return r >= min;
 }
 
-// 📌 Space තැබීමට හැකි වන පරිදි .trim() ඉවත් කර සකසා ඇත (Space typing fix)
 function sanitizeInput(str: string): string {
   if (!str) return "";
   return str.replace(/<[^>]*>/g, "");
@@ -190,7 +193,6 @@ function HomePage() {
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestStatusMsg, setRequestStatusMsg] = useState("");
 
-  // Sync URL search 'q' to local query state
   useEffect(() => {
     if (q !== undefined) {
       setQuery(sanitizeInput(q));
@@ -208,8 +210,6 @@ function HomePage() {
     });
   };
 
-  // 🟢 Already fetched server-side by the loader above — present immediately
-  // on first paint, and it's exactly what search engines see in the raw HTML.
   const data = Route.useLoaderData();
   const isLoading = false;
   const error: Error | null = null;
@@ -224,19 +224,33 @@ function HomePage() {
   }, [featured.length]);
 
   const filtered = useMemo(() => {
-    const qClean = query.trim().toLowerCase(); // සැබෑ සෙවුම සිදුවන විට පමණක් trim කරයි
     let result = items.filter(
       (it) =>
-        matchesQuery(it, qClean) &&
         matchesFilter(it, type, genre) &&
         matchesYear(it, yearFilter) &&
         matchesRating(it, ratingFilter),
     );
+
+    if (query.trim()) {
+      // 🟢 Smart Sinhala & English Fuzzy Search (Typo tolerant)
+      const candidates = result.map((it) => ({
+        ...it,
+        title: itemTitle(it),
+        epTitle: it.kind === "series" ? it.episodes.map((e) => e.epTitle || e.title).join(" ") : null,
+        genre: it.kind === "movie" ? it.sub.genre : it.episodes[0]?.genre,
+        year: getItemYear(it),
+        description: it.kind === "movie" ? it.sub.description : it.episodes[0]?.description,
+      }));
+      result = searchFuzzy(candidates, query);
+    }
+
     if (sortFilter === "alpha") {
       result = [...result].sort((a, b) => itemTitle(a).localeCompare(itemTitle(b)));
     }
     return result;
   }, [items, query, type, genre, yearFilter, ratingFilter, sortFilter]);
+
+  const rowResetKey = `${type}|${genre ?? ""}|${query}|${yearFilter}|${ratingFilter}|${sortFilter}`;
 
   const activeCategory = useMemo<Category>(() => {
     if (type === "all" && !genre) return "All";
@@ -259,10 +273,6 @@ function HomePage() {
     } else {
       navigate({ search: (prev) => ({ ...prev, type: "all", genre: cat }) });
     }
-  };
-
-  const handleDetailsClick = (id: string) => {
-    navigate({ to: "/content/$id", params: { id } });
   };
 
   const handleDownloadClick = (id: string) => {
@@ -336,45 +346,6 @@ function HomePage() {
     };
   }, [modalOpen, targetId, navigate]);
 
-  useEffect(() => {
-    if (!modalOpen) return;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !completedRef.current) {
-        setCountdown((prev) => {
-          if (prev > 0) return 5;
-          return prev;
-        });
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [modalOpen]);
-
-  useEffect(() => {
-    if (!modalOpen) return;
-
-    const handlePopState = () => {
-      if (!completedRef.current) {
-        window.history.pushState(null, "", window.location.href);
-        alert("Action Interrupted: Please wait until the timer finishes!");
-      }
-    };
-
-    window.history.pushState(null, "", window.location.href);
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, [modalOpen]);
-
-  const triggerAntiCheat = () => {
-    if (!completedRef.current) {
-      alert("Please wait until the countdown finishes to view content!");
-    }
-  };
-
   const collectionSchema = useMemo(() => {
     if (!filtered || filtered.length === 0) return null;
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://pixelpoplk.pages.dev";
@@ -400,18 +371,22 @@ function HomePage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
         />
       )}
-      <Navbar
-  showSearch
-  query={query}
-  setQuery={handleQueryChange}
-  searchResults={items.map((it) => ({
-    id: it.id,
-    title: itemTitle(it),
-    type: it.kind === "movie" ? "Movie" : "TV Series",
-    posterUrl: itemPoster(it),
-    year: getItemYear(it) ? String(getItemYear(it)) : undefined,
-  }))}
-/>
+      
+      {/* 🟢 Navbar එක data-no-ad යොදා Search input එක ආරක්ෂා කර ඇත */}
+      <div data-no-ad="true">
+        <Navbar
+          showSearch
+          query={query}
+          setQuery={handleQueryChange}
+          searchResults={items.map((it) => ({
+            id: it.id,
+            title: itemTitle(it),
+            type: it.kind === "movie" ? "Movie" : "TV Series",
+            posterUrl: itemPoster(it),
+            year: getItemYear(it) ? String(getItemYear(it)) : undefined,
+          }))}
+        />
+      </div>
 
       <Hero 
         featured={featured} 
@@ -419,7 +394,6 @@ function HomePage() {
         setSlide={setSlide} 
         loading={isLoading} 
         onDownload={handleDownloadClick} 
-        onDetails={handleDetailsClick} 
       />
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -434,7 +408,7 @@ function HomePage() {
             </p>
           </div>
           
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-no-ad="true">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold shrink-0">
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Filters
@@ -492,6 +466,11 @@ function HomePage() {
 
         <FilterTabs active={activeCategory} onChange={handleCategoryChange} />
 
+        {/* 🟢 High CTR Banner 300x250 */}
+        <div className="my-6">
+          <AdBanner type="300x250" />
+        </div>
+
         {error && (
           <div className="mt-8 p-6 rounded-xl border border-destructive/30 bg-destructive/10 text-sm">
             Failed to load subtitles: {(error as Error).message}
@@ -507,8 +486,7 @@ function HomePage() {
             title="Search Results" 
             icon={<Search className="w-4 h-4" />} 
             items={filtered} 
-            onDownload={handleDownloadClick} 
-            onDetails={handleDetailsClick} 
+            resetKey={rowResetKey}
           />
         ) : (
           <div className="mt-8 space-y-12">
@@ -517,8 +495,7 @@ function HomePage() {
                 title={genre ? `${genre} Movies` : "Movies"}
                 icon={<Film className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "movie")}
-                onDownload={handleDownloadClick}
-                onDetails={handleDetailsClick}
+                resetKey={rowResetKey}
               />
             )}
             {type !== "movie" && (
@@ -526,8 +503,7 @@ function HomePage() {
                 title={genre ? `${genre} TV Series` : "TV Series"}
                 icon={<Tv className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "series")}
-                onDownload={handleDownloadClick}
-                onDetails={handleDetailsClick}
+                resetKey={rowResetKey}
               />
             )}
           </div>
@@ -554,13 +530,14 @@ function HomePage() {
 
       <Footer />
 
-      {/* Request Subtitle Modal */}
+      {/* 🟢 Request Subtitle Modal (data-no-ad යොදා ad popups වළක්වා ඇත) */}
       <AnimatePresence>
         {requestModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            data-no-ad="true"
             className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-default"
           >
             <motion.div
@@ -570,6 +547,7 @@ function HomePage() {
               className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative"
             >
               <button
+                type="button"
                 onClick={() => {
                   setRequestModalOpen(false);
                   setRequestTitle("");
@@ -646,25 +624,25 @@ function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* Monetag Countdown Interception Modal */}
+      {/* 🟢 Clean Countdown Modal (Alerts සහ freeze ඉවත් කර ඇත) */}
       <AnimatePresence>
         {modalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={triggerAntiCheat}
-            className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer"
+            data-no-ad="true"
+            className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-default"
           >
             <motion.div
               initial={{ scale: 0.95, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 10 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl relative overflow-hidden cursor-default"
+              className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
             >
               <button
-                onClick={triggerAntiCheat}
+                type="button"
+                onClick={() => setModalOpen(false)}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -687,7 +665,7 @@ function HomePage() {
               </div>
 
               <p className="text-[11px] text-muted-foreground/70 bg-muted/30 py-2.5 px-3 rounded-xl border border-border leading-relaxed">
-                Do not close this window or navigate back, or the loading process will be interrupted.
+                Loading your destination, please do not close this window.
               </p>
             </motion.div>
           </motion.div>
@@ -703,14 +681,12 @@ function Hero({
   setSlide,
   loading,
   onDownload,
-  onDetails,
 }: {
   featured: GridItem[];
   slide: number;
   setSlide: (i: number | ((s: number) => number)) => void;
   loading: boolean;
   onDownload: (id: string) => void;
-  onDetails: (id: string) => void;
 }) {
   if (loading) {
     return (
@@ -792,18 +768,20 @@ function Hero({
                   </p>
                   <div className="mt-5 flex gap-3">
                     <button
+                      type="button"
                       onClick={() => onDownload(String(current.id))}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
                     </button>
-                    {/* 'no-popunder' පන්තිය (Class) එක් කිරීමෙන් ඇඩ් එක මඟහැරීම */}
-                    <button
-                      onClick={() => onDetails(String(current.id))}
-                      className="no-popunder inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-medium hover:bg-card transition cursor-pointer"
+                    {/* 🟢 Real Link for Google Crawling & Speed */}
+                    <Link
+                      to="/content/$id"
+                      params={{ id: String(current.id) }}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-medium hover:bg-card transition cursor-pointer"
                     >
                       Details
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -813,6 +791,7 @@ function Hero({
           {featured.length > 1 && (
             <>
               <button
+                type="button"
                 onClick={prev}
                 aria-label="Previous"
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/60 backdrop-blur border border-border hover:bg-background grid place-items-center transition"
@@ -820,6 +799,7 @@ function Hero({
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
+                type="button"
                 onClick={next}
                 aria-label="Next"
                 className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/60 backdrop-blur border border-border hover:bg-background grid place-items-center transition"
@@ -831,6 +811,7 @@ function Hero({
                 {featured.map((_, i) => (
                   <button
                     key={i}
+                    type="button"
                     onClick={() => setSlide(i)}
                     aria-label={`Slide ${i + 1}`}
                     className={`h-1.5 rounded-full transition-all ${
@@ -890,12 +871,13 @@ function FilterSelect({
 
 function FilterTabs({ active, onChange }: { active: Category; onChange: (c: Category) => void }) {
   return (
-    <div id="browse" className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 py-1">
+    <div id="browse" className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 py-1" data-no-ad="true">
       {CATEGORIES.map((c) => {
         const isActive = active === c;
         return (
           <button
             key={c}
+            type="button"
             onClick={() => onChange(c)}
             className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition ${
               isActive
@@ -911,29 +893,49 @@ function FilterTabs({ active, onChange }: { active: Category; onChange: (c: Cate
   );
 }
 
+const ROW_PAGE_SIZE = 24;
+
 function Row({ 
   title, 
   icon, 
   items, 
-  onDownload, 
-  onDetails 
+  resetKey,
 }: { 
   title: string; 
   icon?: React.ReactNode; 
   items: GridItem[]; 
-  onDownload: (id: string) => void; 
-  onDetails: (id: string) => void;
+  resetKey: string;
 }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const scrollBy = (dir: 1 | -1) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const amount = Math.round(el.clientWidth * 0.85) * dir;
-    el.scrollBy({ left: amount, behavior: "smooth" });
-  };
+  useEffect(() => {
+    setVisibleCount(ROW_PAGE_SIZE);
+  }, [resetKey]);
+
+  const hasMore = visibleCount < items.length;
+
+  // 🟢 Infinite Scroll Sentinel: Scroll වෙද්දී Auto-Load වීම
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => Math.min(items.length, c + ROW_PAGE_SIZE));
+        }
+      },
+      { rootMargin: "400px" }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, items.length]);
 
   if (items.length === 0) return null;
+
+  const visibleItems = items.slice(0, visibleCount);
 
   return (
     <div className="group/row relative">
@@ -941,37 +943,36 @@ function Row({
         <h3 className="flex items-center gap-2 text-lg sm:text-xl font-bold tracking-tight">
           <span className="text-primary">{icon}</span>
           {title}
-          <span className="text-xs font-medium text-muted-foreground ml-1">{items.length}</span>
+          <span className="text-xs font-medium text-muted-foreground ml-1">({items.length})</span>
         </h3>
-        <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/row:opacity-100 transition">
-          <button
-            aria-label="Scroll left"
-            onClick={() => scrollBy(-1)}
-            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            aria-label="Scroll right"
-            onClick={() => scrollBy(1)}
-            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-8 sm:w-12 bg-gradient-to-r from-background to-transparent z-10" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 sm:w-12 bg-gradient-to-l from-background to-transparent z-10" />
 
+        {/* 🟢 Grid Cards Container */}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 px-4 sm:px-6 lg:px-8 py-1">
-  {items.map((it, i) => (
-    <div key={it.key}>
-      <SubtitleCard item={it} index={i} onDownload={onDownload} onDetails={onDetails} />
-    </div>
-  ))}
-</div>
+          {visibleItems.map((it, i) => (
+            <div key={it.key}>
+              <SubtitleCard item={it} index={i} />
+            </div>
+          ))}
+        </div>
+
+        {/* 🟢 Infinite Scroll Sentinel & Fallback Load Button */}
+        {hasMore && (
+          <div ref={sentinelRef} className="flex justify-center px-4 sm:px-6 lg:px-8 mt-6">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((c) => Math.min(items.length, c + ROW_PAGE_SIZE))}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full border border-border bg-card/70 backdrop-blur text-xs sm:text-sm font-semibold hover:bg-card hover:border-primary/40 transition cursor-pointer shadow-md"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+              <span>Scroll down or click to load more ({items.length - visibleCount} left)</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1003,31 +1004,30 @@ function SkeletonRow() {
   );
 }
 
+// 🟢 ප්‍රධානම වෙනස: <button> වෙනුවට සැබෑ <Link> (<a> tag) භාවිතා කිරීම
+// මේ නිසා Google Search Engine එකට site එකේ තියෙන සියලුම Subtitles auto index කරගැනීමට හැකියාව ලැබේ!
 function SubtitleCard({ 
   item, 
   index, 
-  onDownload, 
-  onDetails 
 }: { 
   item: GridItem; 
   index: number; 
-  onDownload: (id: string) => void; 
-  onDetails: (id: string) => void;
 }) {
   const tv = item.kind === "series";
   const title = itemTitle(item);
   const poster = itemPoster(item);
   const seasonCount = tv ? new Set(item.episodes.map((e) => e.season)).size : 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.3) }}
     >
-      {/* 'no-popunder' පන්තිය (Class) එක් කිරීමෙන් ඇඩ් එක මඟහැරීම */}
-      <button
-        onClick={() => onDetails(String(item.id))}
-        className="no-popunder group block text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
+      <Link
+        to="/content/$id"
+        params={{ id: String(item.id) }}
+        className="group block text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
       >
         <div className="relative aspect-[2/3] bg-muted overflow-hidden">
           {poster ? (
@@ -1070,7 +1070,7 @@ function SubtitleCard({
           </h3>
           <p className="mt-1 text-[11px] text-muted-foreground">{formatDate(itemDate(item))}</p>
         </div>
-      </button>
+      </Link>
     </motion.div>
   );
 }
@@ -1105,4 +1105,4 @@ function Footer() {
       </div>
     </footer>
   );
-        }
+}

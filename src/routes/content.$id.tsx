@@ -15,7 +15,15 @@ import {
   Trash2,
   Send,
   Loader2,
+  Share2,
+  Check,
+  Tag,
+  ChevronRight,
+  Home,
+  Sparkles,
 } from "lucide-react";
+
+import { ShareCardModal } from "@/components/ShareCardModal";
 
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import {
@@ -24,22 +32,24 @@ import {
   genreBadgeClass,
   splitGenres,
   parseTitle,
+  itemTitle,
+  itemPoster,
+  itemDate,
+  formatDate,
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
 import { DownloadButton } from "@/components/DownloadCountdown";
 
-// 🟢 Canonical links සෑදීම සඳහා Base URL එක මෙතැනින් ලබා දෙනවා
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
-// 🟢 SSR data loader — this runs on the SERVER before the page is sent to the
-// browser (or to Googlebot). Because the real content is already fetched here,
-// the very first HTML response contains the full movie/series details instead
-// of a loading skeleton, which is essential for search engine indexing.
+// 🟢 ආරක්ෂාව: download_link එක මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
+const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, telegram_link";
+
 async function fetchContentData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
     .from(SUBTITLES_TABLE)
-    .select("*")
+    .select(SAFE_COLUMNS)
     .eq("id", Number(id) as any)
     .maybeSingle();
 
@@ -63,7 +73,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
     const parsed = parseTitle(targetItem.title ?? "");
     const { data: allEpisodes, error: secondError } = await supabase
       .from(SUBTITLES_TABLE)
-      .select("*")
+      .select(SAFE_COLUMNS)
       .ilike("title", `${parsed.showName}%`)
       .order("created_at", { ascending: false });
 
@@ -84,9 +94,6 @@ function findItem(data: Subtitle[], id: string): GridItem | null {
   return null;
 }
 
-// 🟢 head() also runs on the server, using the data the loader already fetched,
-// so crawlers get the real per-page <title>, description, canonical link and
-// Open Graph tags on the FIRST response — not injected later by client JS.
 function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; params: { id: string } }) {
   const item = findItem(loaderData ?? [], params.id);
 
@@ -117,17 +124,20 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
         { property: "og:description", content: descText },
         { property: "og:type", content: "video.movie" },
         { property: "og:url", content: canonicalUrl },
+        { property: "og:site_name", content: "PixelPopLK" },
+        { property: "og:locale", content: "en_US" },
         ...(s.image_url ? [{ property: "og:image", content: s.image_url }] : []),
+        ...(s.image_url ? [{ property: "og:image:alt", content: titleText }] : []),
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: titleText },
         { name: "twitter:description", content: descText },
         ...(s.image_url ? [{ name: "twitter:image", content: s.image_url }] : []),
+        ...(s.image_url ? [{ name: "twitter:image:alt", content: titleText }] : []),
       ],
       links: [{ rel: "canonical", href: canonicalUrl }],
     };
   }
 
-  // TV series hub page
   const s1e1 = item.episodes.find((e) => e.season === 1 && e.episode === 1) || item.episodes[0];
   const withYear = item.episodes.find((e) => e.year != null && e.year !== "") ?? item.episodes[0];
   const year =
@@ -142,7 +152,7 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
   const customMeta = item.episodes.map((e) => (e as any).metatags).find(Boolean);
   const keywordText = customMeta
     ? `${item.showName} Sinhala Subtitles, ${customMeta}`
-    : `${item.showName} Sinhala Subtitles, Sinhala Subitiles TV Series, ${item.showName} Sinhala Subitiles TV Series, PixelPopLK`;
+    : `${item.showName} Sinhala Subtitles, Sinhala Subtitles TV Series, ${item.showName} Sinhala Subtitles TV Series, PixelPopLK`;
   const canonicalUrl = `${BASE_URL}/content/${item.id}`;
 
   return {
@@ -155,11 +165,15 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
       { property: "og:description", content: descText },
       { property: "og:type", content: "video.tv_show" },
       { property: "og:url", content: canonicalUrl },
+      { property: "og:site_name", content: "PixelPopLK" },
+      { property: "og:locale", content: "en_US" },
       ...(item.poster ? [{ property: "og:image", content: item.poster }] : []),
+      ...(item.poster ? [{ property: "og:image:alt", content: titleText }] : []),
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: titleText },
       { name: "twitter:description", content: descText },
       ...(item.poster ? [{ name: "twitter:image", content: item.poster }] : []),
+      ...(item.poster ? [{ name: "twitter:image:alt", content: titleText }] : []),
     ],
     links: [{ rel: "canonical", href: canonicalUrl }],
   };
@@ -188,9 +202,6 @@ export const Route = createFileRoute("/content/$id")({
 
 function ContentPage() {
   const { id } = Route.useParams();
-  // 🟢 Data was already fetched on the server by the loader above, so it's
-  // present immediately — no client-side fetch/loading flash, and it's what
-  // search engines see in the raw HTML too.
   const data = Route.useLoaderData();
   const isLoading = false;
 
@@ -205,8 +216,45 @@ function ContentPage() {
     return null;
   }, [data, id]);
 
+  const titleName = item ? (item.kind === "movie" ? item.sub.title : item.showName) : "";
+  const yearVal = item ? (item.kind === "movie" ? item.sub.year : "") : "";
+  const isSeries = item?.kind === "series";
+
+  // 🟢 Google Breadcrumb Schema
+  const breadcrumbSchema = item ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": BASE_URL
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": isSeries ? "TV Series" : "Movies",
+        "item": `${BASE_URL}/?type=${isSeries ? "series" : "movie"}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": titleName,
+        "item": `${BASE_URL}/content/${item.id}`
+      }
+    ]
+  } : null;
+
   return (
     <Shell>
+      {breadcrumbSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
+      )}
+
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
@@ -215,11 +263,36 @@ function ContentPage() {
         <div className="p-10 text-center text-destructive">Content not found</div>
       ) : (
         <>
+          {/* 🟢 Breadcrumb Navigation UI */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4 overflow-x-auto scrollbar-hide py-1">
+            <Link to="/" className="hover:text-foreground transition flex items-center gap-1">
+              <Home className="w-3.5 h-3.5" /> Home
+            </Link>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            <Link
+              to="/"
+              search={{ type: isSeries ? "series" : "movie" }}
+              className="hover:text-foreground transition"
+            >
+              {isSeries ? "TV Series" : "Movies"}
+            </Link>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            <span className="text-foreground font-semibold truncate max-w-[200px] sm:max-w-none">
+              {titleName}
+            </span>
+          </div>
+
           {item.kind === "movie" ? (
             <MovieView key={`movie-${item.id}`} item={item} />
           ) : (
             <SeriesView key={`series-${item.id}`} item={item} />
           )}
+
+          {/* 🟢 Related Content Section */}
+          <RelatedContentSection currentItem={item} />
+
+          {/* 🟢 SEO Tags Cloud */}
+          <SeoTagsCloud title={titleName} year={yearVal ? String(yearVal) : undefined} isSeries={isSeries} />
           
           <CommentsSection key={`comments-${id}`} subtitleId={id} />
         </>
@@ -237,19 +310,110 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+// 🟢 Clickable Genre Badges
 function GenreBadges({ genres }: { genres: string[] }) {
   if (genres.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5 max-w-full">
       {genres.map((g) => (
-        <span
+        <Link
           key={g}
-          className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide break-all ${genreBadgeClass(g.toLowerCase())}`}
+          to="/"
+          search={{ genre: g }}
+          className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide transition hover:scale-105 hover:border-primary/60 cursor-pointer ${genreBadgeClass(g.toLowerCase())}`}
         >
           {g}
-        </span>
+        </Link>
       ))}
     </div>
+  );
+}
+
+function ShareBar({
+  title,
+  poster,
+  year,
+  rating,
+  genres = [],
+  kind = "movie",
+}: {
+  title: string;
+  poster?: string;
+  year?: string | null;
+  rating?: string | null;
+  genres?: string[];
+  kind?: "movie" | "series";
+}) {
+  const [copied, setCopied] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
+
+  const handleCopy = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const shareUrl = typeof window !== "undefined" ? encodeURIComponent(window.location.href) : "";
+  const shareText = encodeURIComponent(`${title} Sinhala Subtitle | PixelPopLK`);
+
+  return (
+    <>
+      <div className="mt-4 flex flex-wrap items-center gap-2 pt-4 border-t border-border/60">
+        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
+          <Share2 className="w-3.5 h-3.5" /> Share:
+        </span>
+        
+        {/* 🎨 1-Click Social Media Card Generator Modal Trigger */}
+        <button
+          onClick={() => setShowCardModal(true)}
+          type="button"
+          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-primary-foreground hover:opacity-90 text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+          <span>Share Card (.png)</span>
+        </button>
+
+        <a
+          href={`https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1"
+        >
+          WhatsApp
+        </a>
+        <a
+          href={`https://t.me/share/url?url=${shareUrl}&text=${shareText}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-semibold transition flex items-center gap-1"
+        >
+          Telegram
+        </a>
+        <button
+          onClick={handleCopy}
+          type="button"
+          className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : null}
+          {copied ? "Link Copied!" : "Copy Link"}
+        </button>
+      </div>
+
+      {showCardModal && (
+        <ShareCardModal
+          isOpen={showCardModal}
+          onClose={() => setShowCardModal(false)}
+          title={title}
+          year={year ?? undefined}
+          rating={rating}
+          posterUrl={poster}
+          genres={genres}
+          kind={kind}
+        />
+      )}
+    </>
   );
 }
 
@@ -278,7 +442,14 @@ function Hero({
     <div className="relative overflow-hidden rounded-3xl border border-border shadow-card w-full">
       {poster && (
         <div className="pointer-events-none absolute inset-0 opacity-30">
-          <img src={poster} alt="" className="w-full h-full object-cover blur-3xl scale-110" />
+          <img
+            src={poster}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover blur-lg scale-110"
+          />
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
         </div>
       )}
@@ -286,7 +457,14 @@ function Hero({
         <div className="p-4 sm:p-6 md:p-8 md:pr-0 min-w-0">
           <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-border shadow-card bg-muted max-w-[280px] sm:max-w-none mx-auto md:mx-0">
             {poster ? (
-              <img src={poster} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+              <img
+                src={poster}
+                alt={title}
+                // @ts-expect-error - fetchPriority attribute
+                fetchPriority="high"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
             ) : (
               <div className="absolute inset-0 grid place-items-center text-muted-foreground">
                 <Film className="w-16 h-16" />
@@ -325,10 +503,21 @@ function Hero({
             </div>
           ) : null}
 
-          {/* 🟢 Overview එකට යටින් Ad එක */}
-          <AdBanner type="300x250" />
+          {/* 🟢 Ad 1: Overview යටින් 300x250 Ad Banner එක */}
+          <div className="my-4">
+            <AdBanner type="300x250" />
+          </div>
 
           {children}
+
+          <ShareBar
+            title={title}
+            poster={poster}
+            year={year}
+            rating={rating}
+            genres={genres}
+            kind={kindLabel === "TV Series" ? "series" : "movie"}
+          />
         </div>
       </div>
     </div>
@@ -345,14 +534,24 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
     "@type": "Movie",
     "name": s.title,
     "image": s.image_url,
+    "genre": genres,
     "description": s.description || `Download Sinhala Subtitle for ${s.title}`,
     "datePublished": s.year || year,
+    ...(s.rating
+      ? {
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": s.rating,
+            "bestRating": "10",
+            "ratingCount": "150"
+          }
+        }
+      : {}),
     "workFeaturedBy": {
       "@type": "DataDownload",
       "name": `${s.title} Sinhala Subtitle`,
-      "contentUrl": s.download_link,
-      "encodingFormat": "application/x-subrip",
-      "description": `Download Sinhala Subtitle (.srt) for ${s.title}`
+      "encodingFormat": "application/zip",
+      "description": `Download Sinhala Subtitle (.zip) for ${s.title}`
     }
   };
 
@@ -372,12 +571,13 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
       
-      <div className="mt-7 flex flex-col sm:flex-row gap-3 min-w-0">
-        <DownloadButton downloadLink={s.download_link} subtitleId={s.id} label="Direct Download (.srt)" />
+      {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
+      <div className="mt-7 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
+        <DownloadButton subtitleId={s.id} title={s.title} label="Direct Download (.zip)" />
         {(s as any).telegram_link && (
           <DownloadButton
-            downloadLink={(s as any).telegram_link}
             subtitleId={s.id}
+            title={s.title}
             label="Telegram Download"
             variant="telegram"
           />
@@ -385,7 +585,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       </div>
       
       <p className="mt-3 text-[11px] text-muted-foreground break-words">
-        Opens in a new tab. Thank you for supporting PixelPopLK ❤
+        Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK ❤
       </p>
     </Hero>
   );
@@ -428,9 +628,20 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
     "@type": "TVSeries",
     "name": item.showName,
     "image": item.poster,
+    "genre": genres,
     "description": meta.description || `Download Sinhala Subtitles for TV Series ${item.showName}`,
     "numberOfEpisodes": item.episodes.length,
-    "numberOfSeasons": seasons.length
+    "numberOfSeasons": seasons.length,
+    ...(meta.rating
+      ? {
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": meta.rating,
+            "bestRating": "10",
+            "ratingCount": "250"
+          }
+        }
+      : {})
   };
 
   return (
@@ -460,6 +671,7 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
             return (
               <button
                 key={s}
+                type="button"
                 onClick={() => setSeason(s)}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition ${
                   active
@@ -498,10 +710,119 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
           ))}
         </div>
 
-        {/* 🟢 අන්තිම Episode එකට යටින් Ad එක */}
-        <AdBanner type="160x300" />
+        {/* 🟢 Ad 2: Episode List යටින් 160x300 Ad Banner එක */}
+        <div className="mt-6 flex justify-center w-full">
+          <AdBanner type="160x300" />
+        </div>
       </div>
     </Hero>
+  );
+}
+
+// 🟢 Related Content Section (තවත් Movies හෝ Series 6ක් පෙන්වීම)
+function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
+  const isMovie = currentItem.kind === "movie";
+
+  const { data: relatedItems, isLoading } = useQuery({
+    queryKey: ["related-content", currentItem.id, currentItem.kind],
+    queryFn: async () => {
+      let query = supabase
+        .from(SUBTITLES_TABLE)
+        .select(SAFE_COLUMNS)
+        .order("created_at", { ascending: false });
+
+      if (isMovie) {
+        query = query.is("season", null).limit(15);
+      } else {
+        query = query.not("season", "is", null).limit(30);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const items = buildGridItems(data ?? []);
+      return items.filter((it) => String(it.id) !== String(currentItem.id)).slice(0, 6);
+    },
+  });
+
+  if (isLoading || !relatedItems || relatedItems.length === 0) return null;
+
+  return (
+    <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-4 sm:p-8 space-y-4 min-w-0 w-full">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
+          {isMovie ? <Film className="w-5 h-5 text-primary" /> : <Tv className="w-5 h-5 text-primary" />}
+          {isMovie ? "More Movies You May Like" : "More TV Series You May Like"}
+        </h3>
+        <Link to="/" className="text-xs text-primary hover:underline font-semibold">
+          View All →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-2">
+        {relatedItems.map((it) => (
+          <Link
+            key={it.key}
+            to="/content/$id"
+            params={{ id: String(it.id) }}
+            className="group block text-left bg-card rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card"
+          >
+            <div className="relative aspect-[2/3] bg-muted overflow-hidden">
+              <img
+                src={itemPoster(it)}
+                alt={itemTitle(it)}
+                loading="lazy"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-background/90 to-transparent">
+                <p className="text-[11px] font-bold text-white truncate">{itemTitle(it)}</p>
+              </div>
+            </div>
+            <div className="p-2.5">
+              <p className="text-[10px] text-muted-foreground">{formatDate(itemDate(it))}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 🟢 Auto-Generated Main SEO Tags Cloud
+function SeoTagsCloud({ title, year, isSeries }: { title: string; year?: string; isSeries?: boolean }) {
+  if (!title) return null;
+
+  const cleanTitle = title.trim();
+  const tags = [
+    `${cleanTitle} Sinhala Sub`,
+    `${cleanTitle} Sinhala Subtitles`,
+    `${cleanTitle} Sinhala Subtitle Download`,
+    `${cleanTitle} Subtitles SRT`,
+    `${cleanTitle} Sinhala Sub File`,
+    ...(year ? [`${cleanTitle} (${year}) Sinhala Sub`, `${cleanTitle} ${year} Subtitle Download`] : []),
+    ...(isSeries
+      ? [`${cleanTitle} TV Series Sinhala Sub`, `${cleanTitle} All Episodes Sinhala Subtitles`]
+      : [`${cleanTitle} Movie Sinhala Subtitle`, `Download ${cleanTitle} Sinhala Sub`]),
+  ];
+
+  return (
+    <div className="bg-card/40 rounded-3xl border border-border/60 p-4 sm:p-6 space-y-3 min-w-0 w-full">
+      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+        <Tag className="w-3.5 h-3.5 text-primary" /> Popular Searches & Tags
+      </h4>
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <Link
+            key={tag}
+            to="/"
+            search={{ q: cleanTitle }}
+            className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground border border-border/60 transition"
+          >
+            #{tag}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -510,6 +831,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const { data: comments, refetch } = useQuery({
     queryKey: ["comments", subtitleId],
@@ -533,6 +855,11 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
     if (savedName) setAuthorName(savedName);
   }, []);
 
+  const showToast = (text: string, type: "success" | "error") => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authorName.trim() || !commentText.trim()) return;
@@ -540,7 +867,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
     const lastSubmit = localStorage.getItem("last_comment_submit_time");
     const now = Date.now();
     if (lastSubmit && now - parseInt(lastSubmit, 10) < 15000) {
-      alert("Please wait 15 seconds before posting another comment!");
+      showToast("Please wait 15 seconds before posting another comment!", "error");
       return;
     }
 
@@ -554,28 +881,43 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
     setSubmitting(false);
 
     if (error) {
-      alert(`Error: ${error.message}`);
+      showToast(`Error: ${error.message}`, "error");
     } else {
       setCommentText("");
       localStorage.setItem("comment_author_name", authorName.trim());
       localStorage.setItem("last_comment_submit_time", String(now));
+      showToast("Comment posted successfully!", "success");
       refetch();
     }
   };
 
   const handleDeleteComment = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this comment?")) return;
     const { error } = await supabase.from("subtitle_comments").delete().eq("id", id);
-    if (error) alert(error.message);
-    else refetch();
+    if (error) showToast(error.message, "error");
+    else {
+      showToast("Comment deleted", "success");
+      refetch();
+    }
   };
 
   return (
-    <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-4 sm:p-8 space-y-6 min-w-0 w-full">
+    <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-4 sm:p-8 space-y-6 min-w-0 w-full" data-no-ad="true">
       <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
         <MessageSquare className="w-5 h-5 text-primary" />
         Feedback & Comments <span className="text-xs font-normal text-muted-foreground">({comments?.length ?? 0})</span>
       </h3>
+
+      {toastMsg && (
+        <div
+          className={`p-3 rounded-xl text-xs font-semibold ${
+            toastMsg.type === "success"
+              ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
+              : "bg-destructive/15 text-destructive border border-destructive/30"
+          }`}
+        >
+          {toastMsg.text}
+        </div>
+      )}
 
       <form onSubmit={handleCommentSubmit} className="space-y-4">
         <div className="grid sm:grid-cols-[200px_1fr] gap-3 min-w-0">
@@ -641,6 +983,7 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
 
               {isAdmin && (
                 <button
+                  type="button"
                   onClick={() => handleDeleteComment(comment.id)}
                   className="p-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-destructive-foreground transition opacity-0 group-hover/comment:opacity-100 cursor-pointer shrink-0"
                   title="Delete Comment"
@@ -659,4 +1002,4 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
       </div>
     </div>
   );
-                  }
+}

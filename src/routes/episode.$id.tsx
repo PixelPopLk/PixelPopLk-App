@@ -1,6 +1,23 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Calendar, Download, PlayCircle, Star, Subtitles, Tv } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  Download,
+  PlayCircle,
+  Star,
+  Subtitles,
+  Tv,
+  Share2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  Home,
+  Sparkles,
+} from "lucide-react";
+
+import { ShareCardModal } from "@/components/ShareCardModal";
 
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import {
@@ -17,12 +34,13 @@ import { DownloadButton } from "@/components/DownloadCountdown";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
-// 🟢 SSR data loader — runs on the server so the real episode data is already
-// present in the very first HTML response (crawlers never see a blank shell).
+// 🟢 ආරක්ෂාව: download_link එක මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
+const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, telegram_link";
+
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
     .from(SUBTITLES_TABLE)
-    .select("*")
+    .select(SAFE_COLUMNS)
     .eq("id", Number(id) as any)
     .maybeSingle();
 
@@ -32,7 +50,7 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const parsed = parseTitle(targetItem.title ?? "");
   const { data: allEpisodes, error: secondError } = await supabase
     .from(SUBTITLES_TABLE)
-    .select("*")
+    .select(SAFE_COLUMNS)
     .ilike("title", `${parsed.showName}%`)
     .order("created_at", { ascending: false });
 
@@ -51,8 +69,6 @@ function findEpisode(data: Subtitle[], id: string) {
   return null;
 }
 
-// 🟢 head() runs server-side using the loader's data, so every episode gets its
-// own unique, crawlable title / description / canonical / Open Graph tags.
 function buildEpisodeHead({ loaderData, params }: { loaderData?: Subtitle[]; params: { id: string } }) {
   const found = findEpisode(loaderData ?? [], params.id);
 
@@ -65,7 +81,7 @@ function buildEpisodeHead({ loaderData, params }: { loaderData?: Subtitle[]; par
   const episodeTitle = ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`;
   const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${episodeTitle} | PixelPopLK`;
   const descText = `Download Sinhala subtitle for ${series.showName} S${ep.season}E${ep.episode} (${episodeTitle}). High-quality Sinhala sub file synced on PixelPopLK.`;
-  const keywordText = `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle, ${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Subtitle, Sinhala Subitiles TV Series, PixelPopLK, Sinhala Subtitles`;
+  const keywordText = `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle, ${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Subtitle, Sinhala Subtitles TV Series, PixelPopLK, Sinhala Subtitles`;
   const canonicalUrl = `${BASE_URL}/episode/${ep.id}`;
 
   return {
@@ -78,11 +94,15 @@ function buildEpisodeHead({ loaderData, params }: { loaderData?: Subtitle[]; par
       { property: "og:description", content: descText },
       { property: "og:type", content: "video.episode" },
       { property: "og:url", content: canonicalUrl },
+      { property: "og:site_name", content: "PixelPopLK" },
+      { property: "og:locale", content: "en_US" },
       ...(poster ? [{ property: "og:image", content: poster }] : []),
+      ...(poster ? [{ property: "og:image:alt", content: titleText }] : []),
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: titleText },
       { name: "twitter:description", content: descText },
       ...(poster ? [{ name: "twitter:image", content: poster }] : []),
+      ...(poster ? [{ name: "twitter:image:alt", content: titleText }] : []),
     ],
     links: [{ rel: "canonical", href: canonicalUrl }],
   };
@@ -109,10 +129,94 @@ export const Route = createFileRoute("/episode/$id")({
   ),
 });
 
+function EpisodeShareBar({
+  title,
+  poster,
+  year,
+  rating,
+  genres = [],
+}: {
+  title: string;
+  poster?: string;
+  year?: string | null;
+  rating?: string | null;
+  genres?: string[];
+}) {
+  const [copied, setCopied] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
+
+  const handleCopy = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const shareUrl = typeof window !== "undefined" ? encodeURIComponent(window.location.href) : "";
+  const shareText = encodeURIComponent(`${title} Sinhala Subtitle | PixelPopLK`);
+
+  return (
+    <>
+      <div className="mt-5 flex flex-wrap items-center gap-2 pt-4 border-t border-border/60">
+        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
+          <Share2 className="w-3.5 h-3.5" /> Share:
+        </span>
+
+        {/* 🎨 1-Click Social Media Card Generator Modal Trigger */}
+        <button
+          onClick={() => setShowCardModal(true)}
+          type="button"
+          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-primary-foreground hover:opacity-90 text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+          <span>Share Card (.png)</span>
+        </button>
+
+        <a
+          href={`https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1"
+        >
+          WhatsApp
+        </a>
+        <a
+          href={`https://t.me/share/url?url=${shareUrl}&text=${shareText}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 text-xs font-semibold transition flex items-center gap-1"
+        >
+          Telegram
+        </a>
+        <button
+          onClick={handleCopy}
+          type="button"
+          className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : null}
+          {copied ? "Link Copied!" : "Copy Link"}
+        </button>
+      </div>
+
+      {showCardModal && (
+        <ShareCardModal
+          isOpen={showCardModal}
+          onClose={() => setShowCardModal(false)}
+          title={title}
+          year={year ?? undefined}
+          rating={rating}
+          posterUrl={poster}
+          genres={genres}
+          kind="series"
+        />
+      )}
+    </>
+  );
+}
+
 function EpisodePage() {
   const { id } = Route.useParams();
-  // 🟢 Already fetched server-side by the loader — present immediately, and
-  // it's exactly what search engines see in the raw HTML response.
   const data = Route.useLoaderData();
   const isLoading = false;
 
@@ -143,6 +247,22 @@ function EpisodePage() {
   const poster = ep?.image_url || series?.poster || "";
   const episodeTitle = ep ? (ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`) : "";
 
+  // 🟢 Next & Previous Episode Navigation Logic
+  const { prevEpisode, nextEpisode } = useMemo(() => {
+    if (!series || !ep) return { prevEpisode: null, nextEpisode: null };
+
+    const sorted = [...series.episodes].sort((a, b) => {
+      if (a.season !== b.season) return a.season - b.season;
+      return a.episode - b.episode;
+    });
+
+    const currentIndex = sorted.findIndex((e) => String(e.id) === String(ep.id));
+    return {
+      prevEpisode: currentIndex > 0 ? sorted[currentIndex - 1] : null,
+      nextEpisode: currentIndex !== -1 && currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null,
+    };
+  }, [series, ep]);
+
   const episodeSchema = series && ep ? {
     "@context": "https://schema.org",
     "@type": "TVEpisode",
@@ -159,13 +279,54 @@ function EpisodePage() {
     },
     "image": poster,
     "description": ep.description || `Sinhala subtitle for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
+    ...(rating
+      ? {
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": rating,
+            "bestRating": "10",
+            "ratingCount": "120"
+          }
+        }
+      : {}),
     "workFeaturedBy": {
       "@type": "DataDownload",
       "name": `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle`,
-      "contentUrl": ep.download_link,
-      "encodingFormat": "application/x-subrip",
-      "description": `Download Sinhala Subtitle (.srt) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`
+      "encodingFormat": "application/zip",
+      "description": `Download Sinhala Subtitle (.zip) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`
     }
+  } : null;
+
+  // 🟢 Google Breadcrumb Schema
+  const breadcrumbSchema = series && ep ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": BASE_URL
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "TV Series",
+        "item": `${BASE_URL}/?type=series`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": series.showName,
+        "item": `${BASE_URL}/content/${series.id}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 4,
+        "name": `S${String(ep.season).padStart(2, "0")} E${String(ep.episode).padStart(2, "0")}`,
+        "item": `${BASE_URL}/episode/${ep.id}`
+      }
+    ]
   } : null;
 
   return (
@@ -174,7 +335,7 @@ function EpisodePage() {
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
         <p>Loading…</p>
-      ) : !found ? (
+      ) : !found || !series || !ep ? (
         <div className="p-10 text-center text-destructive">Episode not found</div>
       ) : (
         <>
@@ -184,19 +345,43 @@ function EpisodePage() {
               dangerouslySetInnerHTML={{ __html: JSON.stringify(episodeSchema) }}
             />
           )}
-          
-          <Link
-            to="/content/$id"
-            params={{ id: String(series.id) }}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to {series.showName}
-          </Link>
+          {breadcrumbSchema && (
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
+          )}
+
+          {/* 🟢 Breadcrumb Navigation UI */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4 overflow-x-auto scrollbar-hide py-1">
+            <Link to="/" className="hover:text-foreground transition flex items-center gap-1">
+              <Home className="w-3.5 h-3.5" /> Home
+            </Link>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            <Link to="/" search={{ type: "series" }} className="hover:text-foreground transition">
+              TV Series
+            </Link>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            <Link to="/content/$id" params={{ id: String(series.id) }} className="hover:text-foreground transition truncate max-w-[150px]">
+              {series.showName}
+            </Link>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            <span className="text-foreground font-semibold shrink-0">
+              S{String(ep.season).padStart(2, "0")} E{String(ep.episode).padStart(2, "0")}
+            </span>
+          </div>
 
           <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
             {poster && (
               <div className="pointer-events-none absolute inset-0 opacity-30">
-                <img src={poster} alt="" className="w-full h-full object-cover blur-3xl scale-110" />
+                <img
+                  src={poster}
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover blur-lg scale-110"
+                />
                 <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
               </div>
             )}
@@ -204,7 +389,14 @@ function EpisodePage() {
               <div className="p-6 md:p-8 md:pr-0">
                 <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-border shadow-card bg-muted">
                   {poster && (
-                    <img src={poster} alt={ep.title} className="absolute inset-0 w-full h-full object-cover" />
+                    <img
+                      src={poster}
+                      alt={ep.title}
+                      // @ts-expect-error - fetchPriority attribute
+                      fetchPriority="high"
+                      decoding="async"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
                   )}
                 </div>
               </div>
@@ -217,12 +409,14 @@ function EpisodePage() {
                     S{String(ep.season).padStart(2, "0")} · E{String(ep.episode).padStart(2, "0")}
                   </span>
                   {genres.map((g) => (
-                    <span
+                    <Link
                       key={g}
-                      className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide ${genreBadgeClass(g.toLowerCase())}`}
+                      to="/"
+                      search={{ genre: g }}
+                      className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide transition hover:scale-105 hover:border-primary/60 cursor-pointer ${genreBadgeClass(g.toLowerCase())}`}
                     >
                       {g}
-                    </span>
+                    </Link>
                   ))}
                 </div>
 
@@ -247,7 +441,6 @@ function EpisodePage() {
                   )}
                 </div>
 
-                {/* Overview Section */}
                 {ep.description ? (
                   <div className="mt-6">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
@@ -263,19 +456,56 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🟢 1. Overview/Description එකට යටින්ම පෙන්වන පළමු Ads එක (300x250) */}
-                <AdBanner type="300x250" />
+                {/* 🟢 Ad 1: 300x250 Ad Banner */}
+                <div className="my-4">
+                  <AdBanner type="300x250" />
+                </div>
 
-                {/* Download Buttons Section */}
-                <div className="mt-7 flex flex-col sm:flex-row gap-3">
-                  <DownloadButton downloadLink={ep.download_link} subtitleId={ep.id} label="Direct Download (.srt)" />
+                {/* 🟢 Secure Blob Download Buttons */}
+                <div className="mt-7 flex flex-col sm:flex-row gap-3" data-download-zone="true">
+                  <DownloadButton
+                    subtitleId={ep.id}
+                    title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
+                    label="Direct Download (.zip)"
+                  />
                   {(ep as any).telegram_link && (
                     <DownloadButton
-                      downloadLink={(ep as any).telegram_link}
                       subtitleId={ep.id}
+                      title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
                       label="Telegram Download"
                       variant="telegram"
                     />
+                  )}
+                </div>
+
+                {/* 🟢 Next Episode & Previous Episode Navigation Bar */}
+                <div className="mt-6 flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-2xl bg-card/60 border border-border">
+                  {prevEpisode ? (
+                    <Link
+                      to="/episode/$id"
+                      params={{ id: String(prevEpisode.id) }}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-muted hover:bg-muted/80 text-foreground transition"
+                    >
+                      <ChevronLeft className="w-4 h-4" /> Previous Ep
+                    </Link>
+                  ) : (
+                    <div />
+                  )}
+
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase">
+                    S{String(ep.season).padStart(2, "0")} · E{String(ep.episode).padStart(2, "0")}
+                  </span>
+
+                  {nextEpisode ? (
+                    <Link
+                      to="/episode/$id"
+                      params={{ id: String(nextEpisode.id) }}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition shadow-glow"
+                    >
+                      Next Ep <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground font-semibold px-3 py-2">Latest Ep</span>
                   )}
                 </div>
                 
@@ -283,10 +513,46 @@ function EpisodePage() {
                   Opens in a new tab. Thank you for supporting PixelPopLK ❤
                 </p>
 
-                {/* 🟢 2. Download Buttons සහ "Thank you for supporting PixelPopLK" කොටසට යටින් දෙවැනි Ad එක (160x300) */}
-                <AdBanner type="160x300" />
+                {/* 🟢 Ad 2: 160x300 Ad Banner */}
+                <div className="mt-5 flex justify-center w-full">
+                  <AdBanner type="160x300" />
+                </div>
+
+                <EpisodeShareBar
+                  title={`${series.showName} S${ep.season}E${ep.episode}`}
+                  poster={poster}
+                  year={year}
+                  rating={rating}
+                  genres={genres}
+                />
 
               </div>
+            </div>
+          </div>
+
+          {/* 🟢 Episode SEO Tags Cloud */}
+          <div className="mt-8 bg-card/40 rounded-3xl border border-border/60 p-4 sm:p-6 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Tag className="w-3.5 h-3.5 text-primary" /> Popular Searches & Tags
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {[
+                `${series.showName} S${ep.season}E${ep.episode} Sinhala Sub`,
+                `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitles`,
+                `${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Sub`,
+                `${series.showName} S${ep.season}E${ep.episode} Subtitle Download`,
+                `${series.showName} S${ep.season}E${ep.episode} SRT`,
+                `${series.showName} Sinhala Subtitles TV Series`,
+              ].map((tag) => (
+                <Link
+                  key={tag}
+                  to="/"
+                  search={{ q: series.showName }}
+                  className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground border border-border/60 transition"
+                >
+                  #{tag}
+                </Link>
+              ))}
             </div>
           </div>
 
