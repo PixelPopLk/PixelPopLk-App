@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DmcaModal } from "@/components/DmcaModal";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,7 +20,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
-import { supabase, SUBTITLES_TABLE, SAFE_SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import { searchFuzzy } from "@/lib/fuzzySearch";
 import {
   buildGridItems,
@@ -34,6 +33,10 @@ import {
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
 import AdBanner from "@/components/AdBanner";
+import { DmcaModal } from "@/components/DmcaModal";
+
+// 🟢 ආරක්ෂාව: client.ts එකෙන් import නොකර මෙතනම define කරන ලදී
+const SAFE_SUBTITLE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, telegram_link";
 
 const homeSearchSchema = z.object({
   type: z.enum(["all", "movie", "series"]).optional().catch("all"),
@@ -1130,6 +1133,8 @@ function EmptyState() {
 }
 
 function Footer() {
+  const [dmcaOpen, setDmcaOpen] = useState(false);
+
   return (
     <footer className="border-t border-border mt-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -1143,8 +1148,18 @@ function Footer() {
         </div>
         <div className="flex items-center gap-4 flex-wrap justify-center text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} PixelPopLK · Sinhala Subtitles for Movies & TV Series</p>
+          <span className="hidden sm:inline text-border">|</span>
+          <button
+            type="button"
+            onClick={() => setDmcaOpen(true)}
+            className="inline-flex items-center gap-1 hover:text-primary transition underline cursor-pointer"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>DMCA / Copyright Disclaimer</span>
+          </button>
         </div>
       </div>
+      <DmcaModal isOpen={dmcaOpen} onClose={() => setDmcaOpen(false)} />
     </footer>
   );
 }
