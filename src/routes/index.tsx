@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Loader2,
   ShieldAlert,
-  ChevronDown,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -251,7 +250,6 @@ function HomePage() {
   }, [featured.length]);
 
   const filtered = useMemo(() => {
-    const qClean = query.trim().toLowerCase();
     let result = items.filter(
       (it) =>
         matchesFilter(it, type, genre) &&
@@ -567,7 +565,7 @@ function HomePage() {
 
       <Footer />
 
-      {/* 🟢 Request Subtitle Modal (data-no-ad යොදා ad popups වළක්වා ඇත) */}
+      {/* 🟢 Request Subtitle Modal */}
       <AnimatePresence>
         {requestModalOpen && (
           <motion.div
@@ -661,7 +659,7 @@ function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* 🟢 Clean Countdown Modal (Alerts සහ freeze ඉවත් කර ඇත) */}
+      {/* 🟢 Clean Countdown Modal */}
       <AnimatePresence>
         {modalOpen && (
           <motion.div
@@ -815,7 +813,6 @@ function Hero({
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
                     </button>
-                    {/* 🟢 Real Link for Google Crawling & Speed */}
                     <Link
                       to="/content/$id"
                       params={{ id: String(current.id) }}
@@ -947,13 +944,10 @@ function Row({
   items: GridItem[]; 
   resetKey: string;
 }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
 
-  useEffect(() => {
-    setVisibleCount(ROW_PAGE_SIZE);
-  }, [resetKey]);
-
+  // Reset pagination when filter/search changes
   useEffect(() => {
     setVisibleCount(ROW_PAGE_SIZE);
   }, [resetKey]);
@@ -981,7 +975,6 @@ function Row({
   if (items.length === 0) return null;
 
   const visibleItems = items.slice(0, visibleCount);
-  const hasMore = visibleCount < items.length;
 
   return (
     <div className="group/row relative">
@@ -991,24 +984,6 @@ function Row({
           {title}
           <span className="text-xs font-medium text-muted-foreground ml-1">({items.length})</span>
         </h3>
-        <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/row:opacity-100 transition">
-          <button
-            type="button"
-            aria-label="Scroll left"
-            onClick={() => scrollBy(-1)}
-            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Scroll right"
-            onClick={() => scrollBy(1)}
-            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
@@ -1023,6 +998,9 @@ function Row({
             </div>
           ))}
         </div>
+
+        {/* Sentinel element for infinite scrolling */}
+        <div ref={sentinelRef} className="h-4" />
 
         {hasMore && (
           <div className="flex justify-center px-4 sm:px-6 lg:px-8 mt-5">
@@ -1066,8 +1044,6 @@ function SkeletonRow() {
   );
 }
 
-// 🟢 ප්‍රධානම වෙනස: <button> වෙනුවට සැබෑ <Link> (<a> tag) භාවිතා කිරීම
-// මේ නිසා Google Search Engine එකට site එකේ තියෙන සියලුම Subtitles auto index කරගැනීමට හැකියාව ලැබේ!
 function SubtitleCard({ 
   item, 
   index, 
@@ -1153,8 +1129,6 @@ function EmptyState() {
 }
 
 function Footer() {
-  const [dmcaOpen, setDmcaOpen] = useState(false);
-
   return (
     <footer className="border-t border-border mt-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -1168,18 +1142,8 @@ function Footer() {
         </div>
         <div className="flex items-center gap-4 flex-wrap justify-center text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} PixelPopLK · Sinhala Subtitles for Movies & TV Series</p>
-          <span className="hidden sm:inline text-border">|</span>
-          <button
-            type="button"
-            onClick={() => setDmcaOpen(true)}
-            className="inline-flex items-center gap-1 hover:text-primary transition underline cursor-pointer"
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>DMCA / Copyright Disclaimer</span>
-          </button>
         </div>
       </div>
-      <DmcaModal isOpen={dmcaOpen} onClose={() => setDmcaOpen(false)} />
     </footer>
   );
 }
