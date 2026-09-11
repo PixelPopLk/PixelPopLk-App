@@ -208,25 +208,8 @@ function EpisodePage() {
 
   const poster = ep?.image_url || series?.poster || "";
   const episodeTitle = ep ? (ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`) : "";
-  const [dmcaOpen, setDmcaOpen] = useState(false);
 
-  // 🟢 Next & Previous Episode Navigation Logic
-  const { prevEpisode, nextEpisode } = useMemo(() => {
-    if (!series || !ep) return { prevEpisode: null, nextEpisode: null };
-
-    const sorted = [...series.episodes].sort((a, b) => {
-      if (a.season !== b.season) return a.season - b.season;
-      return a.episode - b.episode;
-    });
-
-    const currentIndex = sorted.findIndex((e) => String(e.id) === String(ep.id));
-    return {
-      prevEpisode: currentIndex > 0 ? sorted[currentIndex - 1] : null,
-      nextEpisode: currentIndex !== -1 && currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null,
-    };
-  }, [series, ep]);
-
-  // 🟢 Next & Previous Episode Navigation Logic
+  // 🟢 Next & Previous Episode Navigation Logic (Duplicate එක ඉවත් කරන ලදී)
   const { prevEpisode, nextEpisode } = useMemo(() => {
     if (!series || !ep) return { prevEpisode: null, nextEpisode: null };
 
@@ -307,6 +290,9 @@ function EpisodePage() {
       }
     ]
   } : null;
+
+  const backToUrl = series ? `/content/${series.id}` : "/";
+  const backToText = series ? series.showName : "Home";
 
   return (
     <EpisodeShell backTo={backToUrl} backText={backToText}>
