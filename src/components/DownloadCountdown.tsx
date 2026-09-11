@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Download, Lock, CheckCircle2, Loader2, Send, ExternalLink, RefreshCw } from "lucide-react";
+import { Download, Lock, CheckCircle2, Loader2, Send, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
 import { supabase, SUBTITLES_TABLE, logDownload } from "@/integrations/supabase/client";
 
 const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
@@ -114,6 +114,7 @@ export function DownloadButton({
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
   const [downloadLink, setDownloadLink] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -317,8 +318,9 @@ export function DownloadButton({
           setState("ready");
         }, 1500);
       } else {
-        alert("මෙම උපසිරැසිය සඳහා download link එකක් තවමත් එක් කර නොමැත. කරුණාකර සුළු වේලාවකින් නැවත උත්සාහ කරන්න.");
+        setErrorMsg("මෙම උපසිරැසිය සඳහා download link එකක් තවමත් එක් කර නොමැත. කරුණාකර සුළු වේලාවකින් නැවත උත්සාහ කරන්න.");
         resetToLocked();
+        setTimeout(() => setErrorMsg(""), 6000);
       }
     }
   };
@@ -329,7 +331,11 @@ export function DownloadButton({
         return (
           <>
             <Lock className="w-4 h-4" />
-            <span>{normalizedVariant === "telegram" ? "🔓 Unlock Telegram Subtitle" : `🔓 Unlock ${label}`}</span>
+            <span>
+              {normalizedVariant === "telegram"
+                ? "🔓 Unlock Video File (Telegram)"
+                : "🔓 Unlock Sinhala Subtitle (.zip)"}
+            </span>
           </>
         );
 
@@ -346,7 +352,7 @@ export function DownloadButton({
           <>
             {normalizedVariant === "telegram" ? <Send className="w-4 h-4" /> : <Download className="w-4 h-4" />}
             <span className="font-extrabold">
-              {normalizedVariant === "telegram" ? "Open Telegram Subtitle" : "Download Now (.zip)"}
+              {normalizedVariant === "telegram" ? "Get Video File (Telegram)" : "Download Subtitle (.zip)"}
             </span>
           </>
         );
@@ -380,15 +386,23 @@ export function DownloadButton({
   };
 
   return (
-    <button
-      type="button"
-      data-no-ad="true"
-      data-download="true"
-      onClick={handleButtonClick}
-      className={className ? `${className} ${getButtonClass()}` : getButtonClass()}
-    >
-      {getButtonContent()}
-    </button>
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        data-no-ad="true"
+        data-download="true"
+        onClick={handleButtonClick}
+        className={className ? `${className} ${getButtonClass()}` : getButtonClass()}
+      >
+        {getButtonContent()}
+      </button>
+      {errorMsg && (
+        <div className="flex items-center gap-1.5 p-2 rounded-xl bg-destructive/15 text-destructive border border-destructive/30 text-xs font-semibold animate-shake">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+    </div>
   );
 }
 

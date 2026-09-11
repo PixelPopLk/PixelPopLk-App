@@ -21,9 +21,14 @@ import {
   ChevronRight,
   Home,
   Sparkles,
+  Info,
+  FileArchive,
+  Video,
+  ShieldAlert,
 } from "lucide-react";
 
 import { ShareCardModal } from "@/components/ShareCardModal";
+import { DmcaModal } from "@/components/DmcaModal";
 
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import {
@@ -71,10 +76,13 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
 
   if (isSeries) {
     const parsed = parseTitle(targetItem.title ?? "");
+    const safeShowPrefix = (parsed.showName || targetItem.title || "")
+      .replace(/[%_\\]/g, "\\$&")
+      .trim();
     const { data: allEpisodes, error: secondError } = await supabase
       .from(SUBTITLES_TABLE)
       .select(SAFE_COLUMNS)
-      .ilike("title", `${parsed.showName}%`)
+      .ilike("title", `${safeShowPrefix}%`)
       .order("created_at", { ascending: false });
 
     if (secondError) throw secondError;
@@ -126,6 +134,7 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
         { property: "og:url", content: canonicalUrl },
         { property: "og:site_name", content: "PixelPopLK" },
         { property: "og:locale", content: "en_US" },
+        { property: "og:locale:alternate", content: "si_LK" },
         ...(s.image_url ? [{ property: "og:image", content: s.image_url }] : []),
         ...(s.image_url ? [{ property: "og:image:alt", content: titleText }] : []),
         { name: "twitter:card", content: "summary_large_image" },
@@ -167,6 +176,7 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
       { property: "og:url", content: canonicalUrl },
       { property: "og:site_name", content: "PixelPopLK" },
       { property: "og:locale", content: "en_US" },
+      { property: "og:locale:alternate", content: "si_LK" },
       ...(item.poster ? [{ property: "og:image", content: item.poster }] : []),
       ...(item.poster ? [{ property: "og:image:alt", content: titleText }] : []),
       { name: "twitter:card", content: "summary_large_image" },
@@ -450,7 +460,7 @@ function Hero({
             decoding="async"
             className="w-full h-full object-cover blur-lg scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
         </div>
       )}
       <div className="relative grid md:grid-cols-[320px_1fr] gap-0 w-full min-w-0">
@@ -525,6 +535,7 @@ function Hero({
 }
 
 function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
+  const [dmcaOpen, setDmcaOpen] = useState(false);
   const s = item.sub;
   const year = s.year != null && s.year !== "" ? String(s.year) : new Date(s.created_at).getFullYear().toString();
   const genres = splitGenres(s.genre);
@@ -541,9 +552,11 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": s.rating,
+            "ratingValue": String(s.rating),
             "bestRating": "10",
-            "ratingCount": "150"
+            "worstRating": "1",
+            "ratingCount": "1",
+            "description": "IMDb rating sourced from public data"
           }
         }
       : {}),
@@ -571,8 +584,32 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
       
+      {/* 💡 Download Options Guide (Subtitle vs Video Explanation) */}
+      <div className="mt-6 p-4 rounded-2xl bg-card border border-border/70 shadow-sm flex flex-col gap-2.5 text-xs">
+        <div className="flex items-center gap-2 font-bold text-foreground">
+          <Info className="w-4 h-4 text-primary" />
+          <span>බාගත කිරීමේ විකල්ප (Download Options Guide):</span>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-2.5 text-muted-foreground">
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
+            <FileArchive className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-foreground block">1. Direct Download (.zip)</span>
+              <span className="text-[11px] leading-relaxed">චිත්‍රපටයේ <b>සිංහල උපසිරැසි ගොනුව පමණක්</b> (.zip) බාගත වේ. (Subtitle File Only)</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
+            <Video className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-foreground block">2. Telegram Download</span>
+              <span className="text-[11px] leading-relaxed">චිත්‍රපටයේ <b>සම්පූර්ණ වීඩියෝව (Full Movie Video)</b> Telegram හරහා ලබාගත හැක. (Video File)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
-      <div className="mt-7 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
+      <div className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
         <DownloadButton subtitleId={s.id} title={s.title} label="Direct Download (.zip)" />
         {(s as any).telegram_link && (
           <DownloadButton
@@ -583,10 +620,24 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
           />
         )}
       </div>
-      
-      <p className="mt-3 text-[11px] text-muted-foreground break-words">
-        Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK ❤
-      </p>
+
+      <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
+        <span>⚡ Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK ❤</span>
+        <button
+          type="button"
+          onClick={() => setDmcaOpen(true)}
+          className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition cursor-pointer"
+        >
+          <ShieldAlert className="w-3.5 h-3.5" />
+          <span>DMCA / Copyright Notice</span>
+        </button>
+      </div>
+
+      <DmcaModal
+        isOpen={dmcaOpen}
+        onClose={() => setDmcaOpen(false)}
+        initialTitle={s.title}
+      />
     </Hero>
   );
 }
@@ -636,9 +687,11 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": meta.rating,
+            "ratingValue": String(meta.rating),
             "bestRating": "10",
-            "ratingCount": "250"
+            "worstRating": "1",
+            "ratingCount": "1",
+            "description": "IMDb rating sourced from public data"
           }
         }
       : {})
@@ -732,9 +785,9 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
         .order("created_at", { ascending: false });
 
       if (isMovie) {
-        query = query.is("season", null).limit(15);
+        query = query.is("season", null).limit(8);
       } else {
-        query = query.not("season", "is", null).limit(30);
+        query = query.not("season", "is", null).limit(14);
       }
 
       const { data, error } = await query;
@@ -771,10 +824,13 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
               <img
                 src={itemPoster(it)}
                 alt={itemTitle(it)}
+                width={200}
+                height={300}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
-              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-background/90 to-transparent">
+              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/95 via-black/60 to-transparent">
                 <p className="text-[11px] font-bold text-white truncate">{itemTitle(it)}</p>
               </div>
             </div>

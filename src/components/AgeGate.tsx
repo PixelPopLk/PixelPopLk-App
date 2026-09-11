@@ -41,8 +41,17 @@ export function AgeGate(): React.JSX.Element | null {
     } catch {
       /* noop */
     }
-    // කිසිදු Ad එකකට redirect නොකර සයිට් එක කෙලින්ම unlock කිරීම
+    // අඩවිය වහාම Unlock කිරීම (User සයිට් එකේම රැඳේ)
     setIsVerified(true);
+
+    // Ad එක වෙනම New Tab එකක open කර Impression එක සහ Revenue එක ලබාගැනීම
+    try {
+      const adUrl = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+      const w = window.open(adUrl, "_blank", "noopener");
+      if (w) w.opener = null;
+    } catch {
+      /* noop */
+    }
   };
 
   const handleExit = (): void => {

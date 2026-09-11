@@ -16,7 +16,7 @@ import { AgeGate } from "../components/AgeGate";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 35000; // තත්පර 35ක Cooldown එකක් (UX එක සුවපහසු කරගැනීමට)
+const COOLDOWN_TIME = 20000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
 
 function NotFoundComponent() {
   return (
@@ -106,15 +106,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "PixelPopLK" },
       { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
-      { property: "og:image", content: "https://pixelpoplk.pages.dev/logo.png" },
-      { property: "og:image:width", content: "512" },
-      { property: "og:image:height", content: "512" },
+      { property: "og:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:locale", content: "en_US" },
+      { property: "og:locale:alternate", content: "si_LK" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Premium Sinhala subtitles for movies and TV series." },
-      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/logo.png" },
+      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
       { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "theme-color", content: "#0e0e12" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -167,6 +168,21 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
+        {/* 🌓 Pre-hydration Theme Script (Prevents FOUC Light/Dark Flash) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var theme = localStorage.getItem('theme');
+                if (theme === 'light') {
+                  document.documentElement.classList.remove('dark');
+                } else if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <HeadContent />
         <meta name="google-site-verification" content="VoErL02EHeHtDv46aBcjIEm5DpUTnJRhPF89ewoK-M4" />
         

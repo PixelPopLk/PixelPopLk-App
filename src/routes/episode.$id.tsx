@@ -15,9 +15,14 @@ import {
   Tag,
   Home,
   Sparkles,
+  Info,
+  FileArchive,
+  Video,
+  ShieldAlert,
 } from "lucide-react";
 
 import { ShareCardModal } from "@/components/ShareCardModal";
+import { DmcaModal } from "@/components/DmcaModal";
 
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import {
@@ -48,10 +53,13 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   if (!targetItem) return [] as Subtitle[];
 
   const parsed = parseTitle(targetItem.title ?? "");
+  const safeShowPrefix = (parsed.showName || targetItem.title || "")
+    .replace(/[%_\\]/g, "\\$&")
+    .trim();
   const { data: allEpisodes, error: secondError } = await supabase
     .from(SUBTITLES_TABLE)
     .select(SAFE_COLUMNS)
-    .ilike("title", `${parsed.showName}%`)
+    .ilike("title", `${safeShowPrefix}%`)
     .order("created_at", { ascending: false });
 
   if (secondError) throw secondError;
@@ -96,6 +104,7 @@ function buildEpisodeHead({ loaderData, params }: { loaderData?: Subtitle[]; par
       { property: "og:url", content: canonicalUrl },
       { property: "og:site_name", content: "PixelPopLK" },
       { property: "og:locale", content: "en_US" },
+      { property: "og:locale:alternate", content: "si_LK" },
       ...(poster ? [{ property: "og:image", content: poster }] : []),
       ...(poster ? [{ property: "og:image:alt", content: titleText }] : []),
       { name: "twitter:card", content: "summary_large_image" },
@@ -246,6 +255,7 @@ function EpisodePage() {
 
   const poster = ep?.image_url || series?.poster || "";
   const episodeTitle = ep ? (ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`) : "";
+  const [dmcaOpen, setDmcaOpen] = useState(false);
 
   // 🟢 Next & Previous Episode Navigation Logic
   const { prevEpisode, nextEpisode } = useMemo(() => {
@@ -283,9 +293,11 @@ function EpisodePage() {
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": rating,
+            "ratingValue": String(rating),
             "bestRating": "10",
-            "ratingCount": "120"
+            "worstRating": "1",
+            "ratingCount": "1",
+            "description": "IMDb rating sourced from public data"
           }
         }
       : {}),
@@ -329,8 +341,11 @@ function EpisodePage() {
     ]
   } : null;
 
+  const backToUrl = series ? `/content/${series.id}` : "/";
+  const backToText = series ? `Back to ${series.showName}` : "Home";
+
   return (
-    <EpisodeShell>
+    <EpisodeShell backTo={backToUrl} backText={backToText}>
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
@@ -382,7 +397,7 @@ function EpisodePage() {
                   decoding="async"
                   className="w-full h-full object-cover blur-lg scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
               </div>
             )}
             <div className="relative grid md:grid-cols-[320px_1fr] gap-0">
@@ -461,8 +476,32 @@ function EpisodePage() {
                   <AdBanner type="300x250" />
                 </div>
 
+                {/* 🟢 Download Options Guide (Subtitle vs Telegram Video) */}
+                <div className="mt-6 p-4 rounded-2xl bg-card/80 border border-border shadow-sm text-xs text-muted-foreground space-y-2.5">
+                  <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+                    <Info className="w-4 h-4 text-primary shrink-0" />
+                    <span>Download Options Guide / බාගත කරගන්නේ කෙසේද?</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
+                      <FileArchive className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-foreground block">1. Direct Download (.zip)</span>
+                        <span className="text-[11px] leading-relaxed">මෙම කථාංගයේ <b>සිංහල උපසිරැසි ගොනුව පමණක්</b> (.zip) බාගත වේ. (Subtitle File Only)</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
+                      <Video className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-foreground block">2. Telegram Download</span>
+                        <span className="text-[11px] leading-relaxed">කථාංගයේ <b>සම්පූර්ණ වීඩියෝව (Episode Video)</b> Telegram හරහා ලබාගත හැක. (Video File)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* 🟢 Secure Blob Download Buttons */}
-                <div className="mt-7 flex flex-col sm:flex-row gap-3" data-download-zone="true">
+                <div className="mt-5 flex flex-col sm:flex-row gap-3" data-download-zone="true">
                   <DownloadButton
                     subtitleId={ep.id}
                     title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
@@ -477,6 +516,24 @@ function EpisodePage() {
                     />
                   )}
                 </div>
+
+                <div className="mt-3 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
+                  <span>⚡ Fast Episode Subtitle Download. Thank you for supporting PixelPopLK ❤</span>
+                  <button
+                    type="button"
+                    onClick={() => setDmcaOpen(true)}
+                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition cursor-pointer"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>DMCA / Copyright Notice</span>
+                  </button>
+                </div>
+
+                <DmcaModal
+                  isOpen={dmcaOpen}
+                  onClose={() => setDmcaOpen(false)}
+                  initialTitle={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
+                />
 
                 {/* 🟢 Next Episode & Previous Episode Navigation Bar */}
                 <div className="mt-6 flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-2xl bg-card/60 border border-border">
@@ -610,10 +667,18 @@ function OtherEpisodes({
   );
 }
 
-function EpisodeShell({ children }: { children: React.ReactNode }) {
+function EpisodeShell({
+  children,
+  backTo = "/",
+  backText = "Home",
+}: {
+  children: React.ReactNode;
+  backTo?: string;
+  backText?: string;
+}) {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar showBack backTo="/" backText="Home" />
+      <Navbar showBack backTo={backTo} backText={backText} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
     </div>
   );
