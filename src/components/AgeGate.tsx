@@ -41,10 +41,17 @@ export function AgeGate(): React.JSX.Element | null {
     } catch {
       /* noop */
     }
+    // අඩවිය වහාම Unlock කිරීම (User සයිට් එකේම රැඳේ)
     setIsVerified(true);
-    
-    // Adsterra ලින්ක් එක වෙත redirect කිරීම
-    window.location.href = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+
+    // Ad එක වෙනම New Tab එකක open කර Impression එක සහ Revenue එක ලබාගැනීම
+    try {
+      const adUrl = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+      const w = window.open(adUrl, "_blank", "noopener");
+      if (w) w.opener = null;
+    } catch {
+      /* noop */
+    }
   };
 
   const handleExit = (): void => {
@@ -57,7 +64,9 @@ export function AgeGate(): React.JSX.Element | null {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto"
+      data-age-gate="true"
+      data-no-ad="true"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto age-gate"
       style={{
         background: "rgba(0, 0, 0, 0.92)",
         backdropFilter: "blur(12px)",

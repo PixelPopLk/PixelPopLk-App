@@ -16,10 +16,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  ShieldAlert,
+  ChevronDown,
 } from "lucide-react";
 import { z } from "zod";
 
-import { supabase, SUBTITLES_TABLE, SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import { supabase, SUBTITLES_TABLE, SAFE_SUBTITLE_COLUMNS, type Subtitle } from "@/integrations/supabase/client";
+import { searchFuzzy } from "@/lib/fuzzySearch";
 import {
   buildGridItems,
   itemDate,
@@ -31,6 +34,7 @@ import {
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
 import AdBanner from "@/components/AdBanner";
+import { DmcaModal } from "@/components/DmcaModal";
 
 const homeSearchSchema = z.object({
   type: z.enum(["all", "movie", "series"]).optional().catch("all"),
@@ -41,7 +45,7 @@ const homeSearchSchema = z.object({
 async function fetchAllSubtitles(): Promise<Subtitle[]> {
   const { data, error } = await supabase
     .from(SUBTITLES_TABLE)
-    .select(SUBTITLE_COLUMNS)
+    .select(SAFE_SUBTITLE_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -59,13 +63,23 @@ export const Route = createFileRoute("/")({
         content:
           "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK.",
       },
-      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subitiles TV Series, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
+      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
       { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
+      { property: "og:site_name", content: "PixelPopLK" },
+      { property: "og:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:locale:alternate", content: "si_LK" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
+      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
+      { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
     ],
     links: [{ rel: "canonical", href: "https://pixelpoplk.pages.dev/" }],
   }),
@@ -209,19 +223,55 @@ function HomePage() {
 
   useEffect(() => {
     if (featured.length < 2) return;
-    const t = setInterval(() => setSlide((s) => (s + 1) % featured.length), 5500);
-    return () => clearInterval(t);
+    let t: NodeJS.Timeout | null = null;
+
+    const startTimer = () => {
+      if (t) clearInterval(t);
+      t = setInterval(() => {
+        if (!document.hidden) {
+          setSlide((s) => (s + 1) % featured.length);
+        }
+      }, 5500);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (t) clearInterval(t);
+      } else {
+        startTimer();
+      }
+    };
+
+    startTimer();
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      if (t) clearInterval(t);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [featured.length]);
 
   const filtered = useMemo(() => {
-    const qClean = query.trim().toLowerCase();
     let result = items.filter(
       (it) =>
-        matchesQuery(it, qClean) &&
         matchesFilter(it, type, genre) &&
         matchesYear(it, yearFilter) &&
         matchesRating(it, ratingFilter),
     );
+
+    if (query.trim()) {
+      // 🟢 Smart Sinhala & English Fuzzy Search (Typo tolerant)
+      const candidates = result.map((it) => ({
+        ...it,
+        title: itemTitle(it),
+        epTitle: it.kind === "series" ? it.episodes.map((e) => e.epTitle || e.title).join(" ") : null,
+        genre: it.kind === "movie" ? it.sub.genre : it.episodes[0]?.genre,
+        year: getItemYear(it),
+        description: it.kind === "movie" ? it.sub.description : it.episodes[0]?.description,
+      }));
+      result = searchFuzzy(candidates, query);
+    }
+
     if (sortFilter === "alpha") {
       result = [...result].sort((a, b) => itemTitle(a).localeCompare(itemTitle(b)));
     }
@@ -498,7 +548,16 @@ function HomePage() {
             Submit a request and we will translate and upload it as soon as possible!
           </p>
           <button
-            onClick={() => setRequestModalOpen(true)}
+            onClick={() => {
+              const lastSubmit = localStorage.getItem("last_request_submit_time");
+              const now = Date.now();
+              if (lastSubmit && now - parseInt(lastSubmit, 10) < 15000) {
+                const remaining = Math.ceil((15000 - (now - parseInt(lastSubmit, 10))) / 1000);
+                alert(`කරුණාකර තවත් තත්පර ${remaining} ක් රැඳී සිටින්න. (Please wait ${remaining}s before next request)`);
+                return;
+              }
+              setRequestModalOpen(true);
+            }}
             className="mt-5 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
           >
             <Sparkles className="w-4 h-4" /> Request a Subtitle
@@ -722,37 +781,40 @@ function Hero({
               <img
                 src={itemPoster(current)}
                 alt={itemTitle(current)}
+                loading={slide === 0 ? "eager" : "lazy"}
+                // @ts-expect-error - fetchPriority attribute
+                fetchPriority={slide === 0 ? "high" : "low"}
+                decoding="async"
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = "0")}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/30 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent" />
 
               <div className="relative h-full flex items-end sm:items-center">
                 <div className="p-6 sm:p-10 max-w-2xl">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/20 text-primary text-xs font-semibold">
-                    {tv ? <Tv className="w-3 h-3" /> : <Film className="w-3 h-3" />}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/25 text-white text-xs font-semibold backdrop-blur-sm border border-white/10">
+                    {tv ? <Tv className="w-3 h-3 text-primary" /> : <Film className="w-3 h-3 text-primary" />}
                     {tv ? "TV Series" : "Movie"}
                   </span>
-                  <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+                  <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white drop-shadow-md">
                     {itemTitle(current)}
                   </h2>
-                  <p className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5" />
+                  <p className="mt-2 text-sm text-zinc-300 flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5 text-primary" />
                     {tv
                       ? `${current.episodes.length} episode${current.episodes.length === 1 ? "" : "s"} · Updated `
                       : "Released "}
                     {formatDate(itemDate(current))}
                   </p>
                   <div className="mt-5 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => onDownload(String(current.id))}
+                    <Link
+                      to="/content/$id"
+                      params={{ id: String(current.id) }}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
-                    </button>
-                    {/* 🟢 Real Link for Google Crawling & Speed */}
+                    </Link>
                     <Link
                       to="/content/$id"
                       params={{ id: String(current.id) }}
@@ -884,24 +946,36 @@ function Row({
   items: GridItem[]; 
   resetKey: string;
 }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setVisibleCount(ROW_PAGE_SIZE);
   }, [resetKey]);
 
-  const scrollBy = (dir: 1 | -1) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const amount = Math.round(el.clientWidth * 0.85) * dir;
-    el.scrollBy({ left: amount, behavior: "smooth" });
-  };
+  const hasMore = visibleCount < items.length;
+
+  // 🟢 Infinite Scroll Sentinel: Scroll වෙද්දී Auto-Load වීම
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => Math.min(items.length, c + ROW_PAGE_SIZE));
+        }
+      },
+      { rootMargin: "400px" }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, items.length]);
 
   if (items.length === 0) return null;
 
   const visibleItems = items.slice(0, visibleCount);
-  const hasMore = visibleCount < items.length;
 
   return (
     <div className="group/row relative">
@@ -909,26 +983,8 @@ function Row({
         <h3 className="flex items-center gap-2 text-lg sm:text-xl font-bold tracking-tight">
           <span className="text-primary">{icon}</span>
           {title}
-          <span className="text-xs font-medium text-muted-foreground ml-1">{items.length}</span>
+          <span className="text-xs font-medium text-muted-foreground ml-1">({items.length})</span>
         </h3>
-        <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/row:opacity-100 transition">
-          <button
-            type="button"
-            aria-label="Scroll left"
-            onClick={() => scrollBy(-1)}
-            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Scroll right"
-            onClick={() => scrollBy(1)}
-            className="w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border hover:border-primary/50 hover:text-primary grid place-items-center transition"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
@@ -936,22 +992,24 @@ function Row({
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 sm:w-12 bg-gradient-to-l from-background to-transparent z-10" />
 
         {/* 🟢 Grid Cards Container */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 px-4 sm:px-6 lg:px-8 py-1">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 px-4 sm:px-6 lg:px-8 py-1 items-stretch">
           {visibleItems.map((it, i) => (
-            <div key={it.key}>
+            <div key={it.key} className="h-full">
               <SubtitleCard item={it} index={i} />
             </div>
           ))}
         </div>
 
+        {/* 🟢 Infinite Scroll Sentinel & Fallback Load Button */}
         {hasMore && (
-          <div className="flex justify-center px-4 sm:px-6 lg:px-8 mt-5">
+          <div ref={sentinelRef} className="flex justify-center px-4 sm:px-6 lg:px-8 mt-6">
             <button
               type="button"
-              onClick={() => setVisibleCount((c) => c + ROW_PAGE_SIZE)}
-              className="px-6 py-2.5 rounded-full border border-border bg-card/60 backdrop-blur text-sm font-semibold hover:bg-card hover:border-primary/40 transition cursor-pointer"
+              onClick={() => setVisibleCount((c) => Math.min(items.length, c + ROW_PAGE_SIZE))}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full border border-border bg-card/70 backdrop-blur text-xs sm:text-sm font-semibold hover:bg-card hover:border-primary/40 transition cursor-pointer shadow-md"
             >
-              Load More ({items.length - visibleCount} left)
+              <ChevronDown className="w-4 h-4 text-primary" />
+              <span>Load More Subtitles ({items.length - visibleCount} remaining)</span>
             </button>
           </div>
         )}
@@ -1005,18 +1063,22 @@ function SubtitleCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.3) }}
+      className="h-full"
     >
       <Link
         to="/content/$id"
         params={{ id: String(item.id) }}
-        className="group block text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
+        className="group flex flex-col h-full text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
       >
-        <div className="relative aspect-[2/3] bg-muted overflow-hidden">
+        <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden shrink-0">
           {poster ? (
             <img
               src={poster}
               alt={title}
+              width={300}
+              height={450}
               loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -1040,17 +1102,19 @@ function SubtitleCard({
               </span>
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-background/95 to-transparent opacity-0 group-hover:opacity-100 transition">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
-              <Download className="w-3.5 h-3.5" /> View details
+          <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-white">
+              <Download className="w-3.5 h-3.5 text-primary" /> View details
             </div>
           </div>
         </div>
-        <div className="p-3">
-          <h3 className="text-sm font-semibold line-clamp-2 leading-snug group-hover:text-primary transition">
-            {title}
-          </h3>
-          <p className="mt-1 text-[11px] text-muted-foreground">{formatDate(itemDate(item))}</p>
+        <div className="p-3 flex flex-col flex-1 justify-between gap-1.5">
+          <div className="h-[2.75rem] overflow-hidden">
+            <h3 className="text-sm font-semibold line-clamp-2 leading-snug group-hover:text-primary transition" title={title}>
+              {title}
+            </h3>
+          </div>
+          <p className="text-[11px] text-muted-foreground shrink-0">{formatDate(itemDate(item))}</p>
         </div>
       </Link>
     </motion.div>
@@ -1070,6 +1134,8 @@ function EmptyState() {
 }
 
 function Footer() {
+  const [dmcaOpen, setDmcaOpen] = useState(false);
+
   return (
     <footer className="border-t border-border mt-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -1081,10 +1147,20 @@ function Footer() {
             Pixel<span className="text-gradient">Pop</span>LK
           </span>
         </div>
-        <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} PixelPopLK · Sinhala Subtitles for Movies & TV Series
-        </p>
+        <div className="flex items-center gap-4 flex-wrap justify-center text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} PixelPopLK · Sinhala Subtitles for Movies & TV Series</p>
+          <span className="hidden sm:inline text-border">|</span>
+          <button
+            type="button"
+            onClick={() => setDmcaOpen(true)}
+            className="inline-flex items-center gap-1 hover:text-primary transition underline cursor-pointer"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>DMCA / Copyright Disclaimer</span>
+          </button>
+        </div>
       </div>
+      <DmcaModal isOpen={dmcaOpen} onClose={() => setDmcaOpen(false)} />
     </footer>
   );
 }

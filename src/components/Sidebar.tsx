@@ -1,6 +1,5 @@
 import React from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-// Languages icon එක මෙතනට එකතු කර ඇත
 import { Film, Tv, Home, Subtitles, Languages } from "lucide-react";
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -10,6 +9,34 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { TelegramIcon, FacebookIcon } from "./SocialIcons";
+
+// 🟢 Ad Network URLs
+const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
+const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+
+const AD_COOLDOWN_MS = 15000; // තත්පර 15ක Cooldown කාලය (15,000 ms)
+const LAST_AD_STORAGE_KEY = "pxl_sidebar_last_ad_time";
+
+const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
+
+// 🚀 තත්පර 15කට වරක් පමණක් Ad එක Trigger වන Function එක
+const triggerAdWithCooldown = () => {
+  try {
+    const lastAdTime = localStorage.getItem(LAST_AD_STORAGE_KEY);
+    const now = Date.now();
+
+    // මුල්ම වතාවේ හෝ අවසන් වරට Ad එකක් පෙන්වා තත්පර 15ක් ගතවී ඇත්නම් පමණක් Ad එක Open කිරීම
+    if (!lastAdTime || now - parseInt(lastAdTime, 10) >= AD_COOLDOWN_MS) {
+      localStorage.setItem(LAST_AD_STORAGE_KEY, String(now));
+      
+      const activeAdUrl = getRandomAdUrl();
+      const w = window.open(activeAdUrl, "_blank", "noopener");
+      if (w) w.opener = null;
+    }
+  } catch {
+    /* noop */
+  }
+};
 
 const MOVIE_GENRES = ["Action", "Sci-Fi", "Horror", "Thriller", "Comedy", "Romance", "Drama"];
 const TV_GENRES = ["Action", "Drama", "Mystery", "Animation", "Crime", "Sci-Fi", "Comedy"];
@@ -22,7 +49,9 @@ export function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate();
 
   const handleCategoryClick = (type: "movie" | "series", genre: string) => {
-    // ඇඩ් ඕපන් වෙන කොටස සම්පූර්ණයෙන්ම අයින් කර ඇත
+    // 🎯 Genre එකක් click කරපු ගමන් Ad එක Trigger වේ (Cooldown පරීක්ෂා කර)
+    triggerAdWithCooldown();
+
     navigate({
       to: "/",
       search: {
@@ -35,6 +64,9 @@ export function Sidebar({ onClose }: SidebarProps) {
   };
 
   const handleHomeClick = () => {
+    // 🎯 Home click කළ විටත් අවශ්‍ය නම් Ad එක Trigger වේ
+    triggerAdWithCooldown();
+
     navigate({
       to: "/",
       search: {
@@ -111,12 +143,15 @@ export function Sidebar({ onClose }: SidebarProps) {
             </AccordionItem>
           </Accordion>
 
-          {/* Translate Option එක මෙතනට එකතු කර ඇත */}
+          {/* Translate Option */}
           <a
             href="https://ais-pre-ezmra3hcelmmewl23jj6wg-128742997540.asia-east1.run.app/"
             target="_blank"
             rel="noopener noreferrer"
-            onClick={onClose}
+            onClick={() => {
+              triggerAdWithCooldown();
+              onClose();
+            }}
             className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-200"
           >
             <Languages className="w-4 h-4 text-primary" />

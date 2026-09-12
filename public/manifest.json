@@ -1,0 +1,32 @@
+{
+  "name": "PixelPopLK — Sinhala Subtitles",
+  "short_name": "PixelPopLK",
+  "description": "Download premium Sinhala subtitles for Movies and TV Series with fast direct downloads.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e0e12",
+  "theme_color": "#0e0e12",
+  "categories": ["entertainment", "movies"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
