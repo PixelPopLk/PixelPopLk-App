@@ -4,6 +4,7 @@ import { Menu, Search, X, ArrowLeft, Sun, Moon } from "lucide-react";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 import { TelegramIcon, FacebookIcon } from "./SocialIcons";
+import { searchFuzzy } from "@/lib/fuzzySearch";
 
 export interface SearchItem {
   id: string;
@@ -90,9 +91,7 @@ export function Navbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredResults = searchResults.filter((item) =>
-    item.title.toLowerCase().includes(query.toLowerCase().trim())
-  );
+  const filteredResults = searchFuzzy(searchResults, query);
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border transition-colors duration-300">

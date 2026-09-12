@@ -13,9 +13,10 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AgeGate } from "../components/AgeGate";
+import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 15000;
+const COOLDOWN_TIME = 20000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
 
 function NotFoundComponent() {
   return (
@@ -98,17 +99,42 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
-      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subitiles TV Series, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
+      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
       { name: "author", content: "PixelPopLK" },
       { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "PixelPopLK" },
+      { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
+      { property: "og:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:locale:alternate", content: "si_LK" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Premium Sinhala subtitles for movies and TV series." },
+      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
+      { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
+      { name: "theme-color", content: "#0e0e12" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [
+      {
+        rel: "icon",
+        href: "/logo.png",
+        type: "image/png",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "/logo.png",
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.json",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -127,6 +153,7 @@ const websiteSchema = {
   "name": "PixelPopLK",
   "url": "https://pixelpoplk.pages.dev",
   "description": "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads.",
+  "inLanguage": ["en", "si"],
   "potentialAction": {
     "@type": "SearchAction",
     "target": "https://pixelpoplk.pages.dev/?q={search_term_string}",
@@ -139,8 +166,23 @@ function RootShell({ children }: { children: ReactNode }) {
   const isAdminPage = location.pathname.startsWith("/manage-admin");
 
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
+        {/* 🌓 Pre-hydration Theme Script (Prevents FOUC Light/Dark Flash) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var theme = localStorage.getItem('theme');
+                if (theme === 'light') {
+                  document.documentElement.classList.remove('dark');
+                } else if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <HeadContent />
         <meta name="google-site-verification" content="VoErL02EHeHtDv46aBcjIEm5DpUTnJRhPF89ewoK-M4" />
         
@@ -173,6 +215,19 @@ function RootShell({ children }: { children: ReactNode }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+
+        {/* 📱 PWA Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
         />
       </head>
       <body>
@@ -236,28 +291,15 @@ function RootComponent() {
         return;
       }
 
-      const itemKey =
-        targetUrl ||
-        clickable.id ||
-        clickable.getAttribute("data-id") ||
-        (clickable.textContent ? clickable.textContent.trim().slice(0, 30) : "btn");
-
-      let cooldowns: Record<string, number> = {};
-      try {
-        cooldowns = JSON.parse(sessionStorage.getItem("ad_cooldowns") || "{}");
-      } catch {
-        cooldowns = {};
-      }
-
       const now = Date.now();
-      const lastClickedTime = cooldowns[itemKey];
+      const lastGlobalAdTime = Number(sessionStorage.getItem("last_global_ad_time") || 0);
 
-      if (lastClickedTime && now - lastClickedTime < COOLDOWN_TIME) {
+      // තත්පර 35ක් යනතුරු නැවත Popunder Ads open නොකර සයිට් එක smooth ව තබාගැනීම
+      if (now - lastGlobalAdTime < COOLDOWN_TIME) {
         return;
       }
 
-      cooldowns[itemKey] = now;
-      sessionStorage.setItem("ad_cooldowns", JSON.stringify(cooldowns));
+      sessionStorage.setItem("last_global_ad_time", String(now));
 
       try {
         const adWindow = window.open(AD_URL, "_blank");
@@ -286,6 +328,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AgeGate />
+      <PwaInstallPrompt />
       <Outlet />
     </QueryClientProvider>
   );
