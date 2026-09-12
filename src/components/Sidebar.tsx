@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Film, Tv, Home, Subtitles, Languages } from "lucide-react";
+import { Film, Tv, Home, Subtitles } from "lucide-react";
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Accordion,
@@ -142,6 +142,8 @@ export function Sidebar({ onClose }: SidebarProps) {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        </nav>
+      </div>
 
       {/* Social Media Buttons at the bottom for Mobile */}
       <div className="flex flex-col gap-3 pt-6 border-t border-border/40">
