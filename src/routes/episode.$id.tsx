@@ -40,8 +40,8 @@ import { DownloadButton } from "@/components/DownloadCountdown";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
-// 🟢 ආරක්ෂාව: download_link එක මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
-const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, telegram_link";
+// 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
+const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at";
 
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
@@ -64,7 +64,24 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
     .order("created_at", { ascending: false });
 
   if (secondError) throw secondError;
-  return (allEpisodes ?? []) as Subtitle[];
+  const episodes = (allEpisodes ?? []) as Subtitle[];
+
+  // 🟢 ආරක්ෂාව: telegram_link raw URL එක API response එකට නොයවා, link එකක් පවතීදැයි (id පමණක්) පරීක්ෂා කිරීම
+  const { data: tgCheck } = await supabase
+    .from(SUBTITLES_TABLE)
+    .select("id")
+    .ilike("title", `${safeShowPrefix}%`)
+    .not("telegram_link", "is", null)
+    .neq("telegram_link", "");
+
+  const tgSet = new Set((tgCheck ?? []).map((e) => e.id));
+  for (const ep of episodes) {
+    if (tgSet.has(ep.id)) {
+      ep.has_telegram = true;
+    }
+  }
+
+  return episodes;
 }
 
 function findEpisode(data: Subtitle[], id: string) {
@@ -518,7 +535,7 @@ function EpisodePage() {
                     title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
                     label="Direct Download (.zip)"
                   />
-                  {(ep as any).telegram_link && (
+                  {Boolean((ep as any).has_telegram || (ep as any).telegram_link) && (
                     <DownloadButton
                       subtitleId={ep.id}
                       title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}

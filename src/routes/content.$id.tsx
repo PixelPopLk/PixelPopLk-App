@@ -49,8 +49,8 @@ import { DownloadButton } from "@/components/DownloadCountdown";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
-// 🟢 ආරක්ෂාව: download_link එක මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
-const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, telegram_link";
+// 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
+const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
@@ -87,7 +87,36 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
       .order("created_at", { ascending: false });
 
     if (secondError) throw secondError;
-    return (allEpisodes ?? []) as Subtitle[];
+    const episodes = (allEpisodes ?? []) as Subtitle[];
+
+    // 🟢 ආරක්ෂාව: telegram_link raw URL එක මෙහි select නොකර id පමණක් පරීක්ෂා කර has_telegram සකසයි
+    const { data: tgCheck } = await supabase
+      .from(SUBTITLES_TABLE)
+      .select("id")
+      .ilike("title", `${safeShowPrefix}%`)
+      .not("telegram_link", "is", null)
+      .neq("telegram_link", "");
+
+    const tgSet = new Set((tgCheck ?? []).map((e) => e.id));
+    for (const ep of episodes) {
+      if (tgSet.has(ep.id)) {
+        ep.has_telegram = true;
+      }
+    }
+    return episodes;
+  }
+
+  // 🟢 ආරක්ෂාව: Movie සඳහා telegram_link raw URL එක මෙහි select නොකර id පමණක් පරීක්ෂා කර has_telegram සකසයි
+  const { data: tgCheck } = await supabase
+    .from(SUBTITLES_TABLE)
+    .select("id")
+    .eq("id", Number(id) as any)
+    .not("telegram_link", "is", null)
+    .neq("telegram_link", "")
+    .maybeSingle();
+
+  if (tgCheck) {
+    (targetItem as Subtitle).has_telegram = true;
   }
 
   return [targetItem] as Subtitle[];
@@ -622,7 +651,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
       <div className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
         <DownloadButton subtitleId={s.id} title={s.title} label="Direct Download (.zip)" />
-        {(s as any).telegram_link && (
+        {Boolean((s as any).has_telegram || (s as any).telegram_link) && (
           <DownloadButton
             subtitleId={s.id}
             title={s.title}

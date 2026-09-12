@@ -1,11 +1,8 @@
 // 🟢 Mirrors src/lib/subtitles.ts (parseTitle / isSeriesRow / buildGridItems)
-// just enough to group rows the same way the app does, so the sitemap only
-// ever lists real, unique, canonical URLs — one per movie, one per TV series
-// "hub" page, plus one per individual episode. Keeping this logic in sync
-// with generate-sitemap.js and src/lib/subtitles.ts if that grouping logic
-// ever changes.
+// just enough to group rows the same way the app does, so the sitemap lists
+// canonical URLs: one per movie, one per TV series "hub" page, plus one per individual episode.
 function cleanShowName(raw) {
-  return raw
+  return (raw || "")
     .replace(/[._]+/g, " ")
     .replace(/\s+-\s+$/, "")
     .replace(/[\s\-:]+$/g, "")
@@ -37,7 +34,7 @@ function num(v) {
   return Number.isNaN(n) ? null : n;
 }
 
-function isEpisodeRow(row) {
+function isSeriesRow(row) {
   const sNum = num(row.season);
   const eNum = num(row.episode);
   if (sNum != null && eNum != null) return true;
@@ -48,44 +45,29 @@ function isEpisodeRow(row) {
   return parseTitle(row.title ?? "").episode != null;
 }
 
-function safeDate(value) {
-  if (!value) return new Date().toISOString().split("T")[0];
+function safeDate(value, fallback) {
+  if (!value) return fallback;
   try {
     return new Date(value).toISOString().split("T")[0];
   } catch {
-    return new Date().toISOString().split("T")[0];
+    return fallback;
   }
 }
 
-function buildSitemapEntries(rows, baseUrl) {
-  const entries = [];
-  const showLatest = new Map();
-
-  for (const row of rows) {
-    if (isEpisodeRow(row)) {
-      entries.push({ loc: `${baseUrl}/episode/${row.id}`, lastmod: safeDate(row.created_at) });
-
-      const key = parseTitle(row.title ?? "").showName.toLowerCase() || `id:${row.id}`;
-      const existing = showLatest.get(key);
-      if (!existing || new Date(row.created_at) > new Date(existing.created_at)) {
-        showLatest.set(key, row);
-      }
-    } else {
-      entries.push({ loc: `${baseUrl}/content/${row.id}`, lastmod: safeDate(row.created_at) });
-    }
-  }
-
-  for (const row of showLatest.values()) {
-    entries.push({ loc: `${baseUrl}/content/${row.id}`, lastmod: safeDate(row.created_at) });
-  }
-
-  return entries;
+function escapeXml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 export async function onRequest(context) {
   // Cloudflare Environment Variables වලින් Keys අදිනවා
-  const SUPABASE_URL = context.env.VITE_SUPABASE_URL || context.env.SUPABASE_URL;
-  const SUPABASE_ANON_KEY = context.env.VITE_SUPABASE_ANON_KEY || context.env.SUPABASE_ANON_KEY;
+  const SUPABASE_URL = context.env.VITE_SUPABASE_URL || context.env.SUPABASE_URL || "https://gilnzvsnkwrnfbwhobow.supabase.co";
+  const SUPABASE_ANON_KEY = context.env.VITE_SUPABASE_ANON_KEY || context.env.SUPABASE_ANON_KEY || "sb_publishable_ZWL-aXdaOXfnYKKaTJO58w_FIya45KL";
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return new Response("Missing Supabase credentials", { status: 500 });
@@ -94,12 +76,13 @@ export async function onRequest(context) {
   try {
     // Supabase REST API එකෙන් Subtitles වල Data අදිනවා
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/subtitles?select=id,created_at,title,genre,season,episode&order=created_at.desc`,
+      `${SUPABASE_URL}/rest/v1/subtitles?select=id,created_at,updated_at,title,genre,season,episode,image_url&order=created_at.desc`,
       {
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-        }
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Range: "0-99999",
+        },
       }
     );
 
@@ -109,26 +92,88 @@ export async function onRequest(context) {
 
     const subtitles = await res.json();
     const baseUrl = "https://pixelpoplk.pages.dev";
+    const today = new Date().toISOString().split("T")[0];
 
-    const entries = buildSitemapEntries(subtitles, baseUrl);
+    const showLatestMap = new Map();
+    const episodeEntries = [];
+    const movieEntries = [];
+
+    for (const sub of subtitles) {
+      const isEp = isSeriesRow(sub);
+      const date = safeDate(sub.updated_at || sub.created_at, today);
+
+      if (isEp) {
+        episodeEntries.push({
+          url: `${baseUrl}/episode/${sub.id}`,
+          date,
+          changefreq: "monthly",
+          priority: "0.7",
+          title: escapeXml(sub.title || "Episode Subtitle"),
+          image_url: sub.image_url,
+        });
+
+        const showKey = cleanShowName(parseTitle(sub.title || "").showName).toLowerCase() || `id:${sub.id}`;
+        const existing = showLatestMap.get(showKey);
+        if (!existing || new Date(sub.created_at) > new Date(existing.created_at)) {
+          showLatestMap.set(showKey, sub);
+        }
+      } else {
+        movieEntries.push({
+          url: `${baseUrl}/content/${sub.id}`,
+          date,
+          changefreq: "weekly",
+          priority: "0.9",
+          title: escapeXml(sub.title || "Movie Subtitle"),
+          image_url: sub.image_url,
+        });
+      }
+    }
+
+    const seriesHubEntries = [];
+    for (const latestSub of showLatestMap.values()) {
+      const showName = cleanShowName(parseTitle(latestSub.title || "").showName);
+      const date = safeDate(latestSub.updated_at || latestSub.created_at, today);
+      seriesHubEntries.push({
+        url: `${baseUrl}/content/${latestSub.id}`,
+        date,
+        changefreq: "weekly",
+        priority: "0.9",
+        title: escapeXml(`${showName} Sinhala Subtitles`),
+        image_url: latestSub.image_url,
+      });
+    }
+
+    const allItems = [...seriesHubEntries, ...movieEntries, ...episodeEntries];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
+    xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
 
     // 1. Home Page
     xml += `  <url>\n`;
     xml += `    <loc>${baseUrl}/</loc>\n`;
+    xml += `    <lastmod>${today}</lastmod>\n`;
     xml += `    <changefreq>daily</changefreq>\n`;
     xml += `    <priority>1.0</priority>\n`;
+    xml += `    <image:image>\n`;
+    xml += `      <image:loc>${baseUrl}/og-banner.png</image:loc>\n`;
+    xml += `      <image:title>PixelPopLK — Sinhala Subtitles for Movies &amp; TV Series</image:title>\n`;
+    xml += `    </image:image>\n`;
     xml += `  </url>\n`;
 
-    // 2. Movie / Series Hub / Episode Pages (Auto update වෙන කොටස)
-    for (const entry of entries) {
+    // 2. Dynamic Items
+    for (const item of allItems) {
       xml += `  <url>\n`;
-      xml += `    <loc>${entry.loc}</loc>\n`;
-      xml += `    <lastmod>${entry.lastmod}</lastmod>\n`;
-      xml += `    <changefreq>weekly</changefreq>\n`;
-      xml += `    <priority>0.8</priority>\n`;
+      xml += `    <loc>${item.url}</loc>\n`;
+      xml += `    <lastmod>${item.date}</lastmod>\n`;
+      xml += `    <changefreq>${item.changefreq}</changefreq>\n`;
+      xml += `    <priority>${item.priority}</priority>\n`;
+      if (item.image_url) {
+        xml += `    <image:image>\n`;
+        xml += `      <image:loc>${escapeXml(item.image_url)}</image:loc>\n`;
+        xml += `      <image:title>${item.title} — PixelPopLK</image:title>\n`;
+        xml += `    </image:image>\n`;
+      }
       xml += `  </url>\n`;
     }
 
@@ -136,9 +181,9 @@ export async function onRequest(context) {
 
     return new Response(xml, {
       headers: {
-        'Content-Type': 'application/xml',
-        'Cache-Control': 'public, max-age=3600, s-maxage=3600'
-      }
+        "Content-Type": "application/xml",
+        "Cache-Control": "public, max-age=3600, s-maxage=3600",
+      },
     });
   } catch (err) {
     return new Response("Failed to generate sitemap", { status: 500 });

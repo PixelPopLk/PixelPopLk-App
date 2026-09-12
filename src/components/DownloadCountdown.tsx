@@ -7,6 +7,7 @@ const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf
 
 const REQUIRED_AD_SECONDS = 5;
 const RELOCK_DELAY_MS = 3000; // File එක download වූ පසු තත්පර 3කින් නැවත Lock වීම
+const MAX_UNLOCK_VALIDITY_MS = 10 * 60 * 1000; // Unlock කර විනාඩි 10ක් ඇතුළත download නොකළහොත් නැවත lock වීම
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
@@ -208,9 +209,16 @@ export function DownloadButton({
       const expireAtStr = localStorage.getItem(lockExpiryKey);
       if (expireAtStr) {
         const expireAt = parseInt(expireAtStr, 10);
-        if (Date.now() >= expireAt) {
+        const remaining = expireAt - Date.now();
+        if (remaining <= 0) {
           resetToLocked();
           return;
+        } else {
+          // Download වී තත්පර 3 ඉතිරි කාලය තුළ නැවත Lock වීමට timer එකක් සැකසීම
+          if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
+          reLockTimerRef.current = setTimeout(() => {
+            resetToLocked();
+          }, remaining);
         }
       }
 
@@ -219,6 +227,12 @@ export function DownloadButton({
 
       const startTime = parseInt(startTimeStr, 10);
       const elapsedMs = Date.now() - startTime;
+
+      // Unlock වී බොහෝ වේලාවක් ගතවී ඇත්නම් (max validity window) නැවත lock කිරීම
+      if (elapsedMs > MAX_UNLOCK_VALIDITY_MS) {
+        resetToLocked();
+        return;
+      }
 
       if (elapsedMs >= REQUIRED_AD_SECONDS * 1000) {
         setState("ready");
@@ -306,7 +320,14 @@ export function DownloadButton({
 
         logDownload(subtitleId, normalizedVariant);
 
-        // ⏱️ File එක download වී හරියටම තත්පර 3කින් නැවත Lock කිරීම
+        // ⏱️ File එක download වී හරියටම තත්පර 3කින් නැවත Lock කිරීම (LocalStorage එකට දමා Reload bypass වැළැක්වීම)
+        const expireAt = Date.now() + RELOCK_DELAY_MS;
+        try {
+          localStorage.setItem(lockExpiryKey, String(expireAt));
+        } catch {
+          /* noop */
+        }
+
         if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
         reLockTimerRef.current = setTimeout(() => {
           resetToLocked();
