@@ -14,6 +14,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AgeGate } from "../components/AgeGate";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
+// 🟢 1. AntiAdBlock Component එක මෙතනින් Import කළා
+import { AntiAdBlock } from "../components/AntiAdBlock";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
 const COOLDOWN_TIME = 3000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
@@ -327,6 +329,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {/* 🟢 2. Admin Page එකේ නොවන විට පමණක් AntiAdBlock එක Run වීම */}
+      {!isAdminPage && <AntiAdBlock />}
+      
       <AgeGate />
       <PwaInstallPrompt />
       <Outlet />
