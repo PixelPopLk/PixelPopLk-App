@@ -33,6 +33,9 @@ export const SUBTITLES_TABLE = "subtitles";
 export const SUBTITLE_COLUMNS =
   "id, created_at, updated_at, title, download_link, telegram_link, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads";
 
+// 🟢 Build Error එක විසඳීමට SAFE_SUBTITLE_COLUMNS මෙහි Export කර ඇත
+export const SAFE_SUBTITLE_COLUMNS = SUBTITLE_COLUMNS;
+
 // 🟢 Download analytics — logs one event + bumps direct vs telegram counters via atomic RPC
 export function logDownload(subtitleId: number | string | null | undefined, variant: string = "direct") {
   if (subtitleId == null) return;
