@@ -16,7 +16,7 @@ import { AgeGate } from "../components/AgeGate";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 20000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
+const COOLDOWN_TIME = 3000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
 
 function NotFoundComponent() {
   return (
