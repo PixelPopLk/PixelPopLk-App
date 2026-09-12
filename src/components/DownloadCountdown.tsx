@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState, useCallback, useId } from "react";
-import { Download, Lock, CheckCircle2, Loader2, Send, AlertCircle } from "lucide-react";
+import { Download, Lock, CheckCircle2, Loader2, Send, AlertCircle, AlertTriangle } from "lucide-react";
 import { supabase, SUBTITLES_TABLE, logDownload } from "@/integrations/supabase/client";
 
 const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
 const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
-const RELOCK_DELAY_MS = 3000; // File එක download වූ පසු තත්පර 3කින් නැවත Lock වීම
+const RELOCK_DELAY_MS = 3000; // File එක download වූ පසු තත්පර 3කින් Re-lock වීම
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
-// 🟢 Safe URL Validator: ඕනෑම වලංගු HTTP / HTTPS link එකකට ඉඩ දීම
+// 🟢 Safe URL Validator
 export function isSafeUrl(url: string | null | undefined): boolean {
   if (!url || typeof window === "undefined") return false;
   try {
@@ -23,7 +23,7 @@ export function isSafeUrl(url: string | null | undefined): boolean {
   }
 }
 
-// 🚀 Fast Native Download: Tab එක Redirect නොවී කෙලින්ම Device එකට Download කිරීම
+// 🚀 Fast Native Download
 async function triggerFastNativeDownload(rawUrl: string, title?: string) {
   const fullUrl = rawUrl.trim();
   const rawTitle = title || "Subtitle";
@@ -41,20 +41,18 @@ async function triggerFastNativeDownload(rawUrl: string, title?: string) {
     const extension = extMatch ? extMatch[1].toLowerCase() : "zip";
     const fileName = `${safeTitle} Sinhala Sub - PixelPopLK.${extension}`;
 
-    // Cloud Hosters (Google Drive, Mediafire, Mega, Dropbox, PixelDrain) -> New Tab එකක open කිරීම
+    // Cloud Hosters
     const isCloudHost = /drive\.google\.com|mediafire\.com|mega\.nz|dropbox\.com|pixeldrain\.com|1drv\.ms/i.test(urlObj.hostname);
     if (isCloudHost) {
       window.open(fullUrl, "_blank", "noopener,noreferrer");
       return;
     }
 
-    // Supabase Storage Link නම් ?download=fileName එක් කිරීම
     if (urlObj.hostname.endsWith("supabase.co")) {
       urlObj.searchParams.set("download", fileName);
     }
     const downloadUrl = urlObj.toString();
 
-    // 1. Blob Download ක්‍රමය (Page navigation එක සම්පූර්ණයෙන්ම වළක්වයි)
     try {
       const res = await fetch(downloadUrl);
       if (res.ok) {
@@ -70,10 +68,9 @@ async function triggerFastNativeDownload(rawUrl: string, title?: string) {
         return;
       }
     } catch {
-      // CORS Error ආවොත් Fallback Anchor එකට යයි
+      /* fallback */
     }
 
-    // 2. Fallback Anchor Download
     const a = document.createElement("a");
     a.href = downloadUrl;
     a.setAttribute("download", fileName);
@@ -104,16 +101,14 @@ export function DownloadButton({
   className,
   variant = "direct",
 }: DownloadButtonProps) {
-  // Direct සහ Telegram සම්පූර්ණයෙන්ම වෙන් කිරීම
   const normalizedVariant = variant === "telegram" ? "telegram" : "direct";
-  
-  // අනෙකුත් Buttons සමඟ Storage Keys clash වීම වැළැක්වීමට unique id එකක් භාවිතය
+
+  // Unique key generation (Direct සහ Telegram වෙනම තබා ගැනීමට)
   const autoId = useId().replace(/[^a-zA-Z0-9_-]/g, "_");
   const subId = subtitleId !== undefined && subtitleId !== null && String(subtitleId).trim() !== ""
     ? String(subtitleId).trim()
     : autoId;
 
-  // 🟢 Isolated Storage Keys (Direct සහ Telegram වලට වෙන වෙනම)
   const timeStorageKey = `pxl_timer_${subId}_${normalizedVariant}`;
   const lockExpiryKey = `pxl_relock_${subId}_${normalizedVariant}`;
 
@@ -125,11 +120,10 @@ export function DownloadButton({
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 🟢 Database එකෙන් Link එක ලබාගැනීම
+  // Link Fetching Function
   const fetchLink = useCallback(async (): Promise<string | null> => {
     if (!subtitleId) return null;
     try {
-      // 1. මුලින් RPC එකෙන් උත්සාහ කිරීම
       const { data, error } = await supabase.rpc("get_single_download_link", {
         target_id: Number(subtitleId),
       });
@@ -139,7 +133,6 @@ export function DownloadButton({
         if (link) return String(link).trim();
       }
 
-      // 2. Direct Table Fallback
       const { data: directData } = await supabase
         .from(SUBTITLES_TABLE)
         .select("download_link, telegram_link")
@@ -156,7 +149,7 @@ export function DownloadButton({
     return null;
   }, [subtitleId, normalizedVariant]);
 
-  // Lock තත්ත්වයට reset කිරීම සහ storage clear කිරීම
+  // Reset to Locked State
   const resetToLocked = useCallback(() => {
     setState("locked");
     setRemainingSec(REQUIRED_AD_SECONDS);
@@ -177,7 +170,7 @@ export function DownloadButton({
     }
   }, [timeStorageKey, lockExpiryKey]);
 
-  // 🟢 Live Ticker: Verifying අවස්ථාවේදී තත්පර 5 count-down වීම
+  // 🟢 Live Ticker
   const startLiveCountdown = useCallback((startTime: number) => {
     if (tickerRef.current) clearInterval(tickerRef.current);
 
@@ -202,7 +195,7 @@ export function DownloadButton({
     tickerRef.current = setInterval(tick, 300);
   }, [fetchLink]);
 
-  // Timestamp අනුව Lock තත්ත්වය පරීක්ෂා කිරීම
+  // 🟢 පරිශීලකයා Ad Tab එකේ ගත කළ කාලය සත්‍යාපනය කිරීම (Anti-Cheat / Early Back Check)
   const verifyAdTime = useCallback(async () => {
     try {
       const expireAtStr = localStorage.getItem(lockExpiryKey);
@@ -220,26 +213,32 @@ export function DownloadButton({
       const startTime = parseInt(startTimeStr, 10);
       const elapsedMs = Date.now() - startTime;
 
-      if (elapsedMs >= REQUIRED_AD_SECONDS * 1000) {
-        setState("ready");
-        const link = await fetchLink();
-        if (link && isSafeUrl(link)) {
-          setDownloadLink(link);
-        }
-      } else {
-        setState("verifying");
-        startLiveCountdown(startTime);
+      // පරිශීලකයා Ad එක open කර තත්පර 5ක් යාමට පෙර එකපාරටම Tab එකට පැමිණියහොත්:
+      if (elapsedMs < REQUIRED_AD_SECONDS * 1000) {
+        const remaining = Math.ceil((REQUIRED_AD_SECONDS * 1000 - elapsedMs) / 1000);
+        setErrorMsg(`⚠️ Ad එක සම්පූර්ණයෙන් නරඹන්න! තව තත්පර ${remaining}ක් රැඳී සිටින්න.`);
+        resetToLocked();
+        setTimeout(() => setErrorMsg(""), 5000);
+        return;
+      }
+
+      // තත්පර 5ක් සම්පූර්ණ වී ඇත්නම් පමණක් Ready කිරීම
+      setState("ready");
+      const link = await fetchLink();
+      if (link && isSafeUrl(link)) {
+        setDownloadLink(link);
       }
     } catch {
       /* noop */
     }
-  }, [lockExpiryKey, timeStorageKey, resetToLocked, fetchLink, startLiveCountdown]);
+  }, [lockExpiryKey, timeStorageKey, resetToLocked, fetchLink]);
 
+  // User නැවත Tab එකට එද්දී පමණක් verify කිරීම
   useEffect(() => {
-    verifyAdTime();
-
     const handleActive = () => {
-      verifyAdTime();
+      if (state === "verifying") {
+        verifyAdTime();
+      }
     };
 
     document.addEventListener("visibilitychange", handleActive);
@@ -253,15 +252,17 @@ export function DownloadButton({
       if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
       if (tickerRef.current) clearInterval(tickerRef.current);
     };
-  }, [verifyAdTime]);
+  }, [verifyAdTime, state]);
 
-  // Button Click Logic
+  // Button Click Handler
   const handleButtonClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 1. LOCKED අවස්ථාවේදී: Ad එක Open කර තත්පර 5ක Timer එක ආරම්භ කිරීම
+    // 1. LOCKED: Ad එක විවෘත කර පසුබිමේ කාලය ගණනය ආරම්භ කිරීම
     if (state === "locked") {
       const now = Date.now();
+      setErrorMsg("");
+
       try {
         localStorage.setItem(timeStorageKey, String(now));
       } catch {
@@ -281,11 +282,16 @@ export function DownloadButton({
       return;
     }
 
-    if (state === "verifying" || state === "downloading") {
+    // 2. VERIFYING අවස්ථාවේ Click කළහොත් Warning එකක් දීම
+    if (state === "verifying") {
+      setErrorMsg("⚠️ කරුණාකර Ad පිටුවේ තත්පර 5ක් රැඳී සිටින්න.");
+      setTimeout(() => setErrorMsg(""), 4000);
       return;
     }
 
-    // 2. READY අවස්ථාවේදී: File Download හෝ Telegram Link එක Open කර තත්පර 3කින් Re-lock කිරීම
+    if (state === "downloading") return;
+
+    // 3. READY: Download ආරම්භ කර හරියටම තත්පර 3කින් Re-lock කිරීම
     if (state === "ready") {
       let finalUrl = downloadLink;
 
@@ -297,7 +303,6 @@ export function DownloadButton({
       if (finalUrl && isSafeUrl(finalUrl)) {
         setState("downloading");
 
-        // Action trigger කිරීම
         if (normalizedVariant === "telegram") {
           window.open(finalUrl.trim(), "_blank", "noopener,noreferrer");
         } else {
@@ -306,13 +311,13 @@ export function DownloadButton({
 
         logDownload(subtitleId, normalizedVariant);
 
-        // ⏱️ File එක download වී හරියටම තත්පර 3කින් නැවත Lock කිරීම
+        // ⏱️ හරියටම තත්පර 3කින් නැවත Lock වේ
         if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
         reLockTimerRef.current = setTimeout(() => {
           resetToLocked();
         }, RELOCK_DELAY_MS);
       } else {
-        setErrorMsg("මෙම උපසිරැසිය සඳහා download link එකක් තවමත් එක් කර නොමැත. කරුණාකර සුළු වේලාවකින් නැවත උත්සාහ කරන්න.");
+        setErrorMsg("මෙම උපසිරැසිය සඳහා download link එකක් තවමත් එක් කර නොමැත.");
         resetToLocked();
         setTimeout(() => setErrorMsg(""), 6000);
       }
@@ -337,7 +342,7 @@ export function DownloadButton({
         return (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>{remainingSec > 0 ? `⏳ Unlocking... ${remainingSec}s` : "Preparing Link..."}</span>
+            <span>{remainingSec > 0 ? `⏳ Ad Loading... (${remainingSec}s)` : "Checking Ad View..."}</span>
           </>
         );
 
@@ -371,7 +376,7 @@ export function DownloadButton({
           : `${base} bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95`;
 
       case "verifying":
-        return `${base} bg-indigo-600 text-white animate-pulse border border-indigo-400/30`;
+        return `${base} bg-amber-600 text-white animate-pulse border border-amber-400/40`;
 
       case "ready":
       case "downloading":
@@ -390,9 +395,11 @@ export function DownloadButton({
       >
         {getButtonContent()}
       </button>
+
+      {/* Warning හෝ Error Message එක පෙන්වීම */}
       {errorMsg && (
-        <div className="flex items-center gap-1.5 p-2 rounded-xl bg-destructive/15 text-destructive border border-destructive/30 text-xs font-semibold animate-shake">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="flex items-center gap-1.5 p-2.5 rounded-xl bg-destructive/15 text-destructive border border-destructive/30 text-xs font-semibold animate-shake">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
           <span>{errorMsg}</span>
         </div>
       )}
