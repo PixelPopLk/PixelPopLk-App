@@ -6,7 +6,7 @@ const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924ad
 const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
-const RELOCK_DELAY_MS = 8000; // File එක download වූ පසු නැවත Lock වීමට ගතවන කාලය (තත්පර 8)
+const RELOCK_DELAY_MS = 3000; // File එක download වූ පසු නැවත Lock වීමට ගතවන කාලය (තත්පර 8)
 const MAX_UNLOCK_VALIDITY_MS = 20 * 1000; // 🟢 Unlock කර තත්පර 20ක් ඇතුළත download නොකළහොත් නැවත auto-lock වේ
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
