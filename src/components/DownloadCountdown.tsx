@@ -6,8 +6,8 @@ const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924ad
 const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
-const RELOCK_DELAY_MS = 3000; // File එක download වූ පසු තත්පර 3කින් නැවත Lock වීම
-const MAX_UNLOCK_VALIDITY_MS = 10 * 60 * 1000; // Unlock කර විනාඩි 10ක් ඇතුළත download නොකළහොත් නැවත lock වීම
+const RELOCK_DELAY_MS = 8000; // File එක download වූ පසු නැවත Lock වීමට ගතවන කාලය (තත්පර 8)
+const MAX_UNLOCK_VALIDITY_MS = 20 * 1000; // 🟢 Unlock කර තත්පර 20ක් ඇතුළත download නොකළහොත් නැවත auto-lock වේ
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
@@ -105,18 +105,22 @@ export function DownloadButton({
   className,
   variant = "direct",
 }: DownloadButtonProps) {
-  // Direct සහ Telegram සම්පූර්ණයෙන්ම වෙන් කිරීම
   const normalizedVariant = variant === "telegram" ? "telegram" : "direct";
   
-  // අනෙකුත් Buttons සමඟ Storage Keys clash වීම වැළැක්වීමට unique id එකක් භාවිතය
   const autoId = useId().replace(/[^a-zA-Z0-9_-]/g, "_");
   const subId = subtitleId !== undefined && subtitleId !== null && String(subtitleId).trim() !== ""
     ? String(subtitleId).trim()
     : autoId;
 
-  // 🟢 Isolated Storage Keys (Direct සහ Telegram වලට වෙන වෙනම)
-  const timeStorageKey = `pxl_timer_${subId}_${normalizedVariant}`;
-  const lockExpiryKey = `pxl_relock_${subId}_${normalizedVariant}`;
+  // 🟢 Title Slug එකක් මඟින් Buttons වෙන් කර ගැනීම
+  const titleSlug = (title || "file")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_")
+    .slice(0, 30);
+
+  // 🟢 100% Isolated Storage Keys (Subtitle ID + Title + Variant)
+  const timeStorageKey = `pxl_timer_${subId}_${titleSlug}_${normalizedVariant}`;
+  const lockExpiryKey = `pxl_relock_${subId}_${titleSlug}_${normalizedVariant}`;
 
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
@@ -124,13 +128,13 @@ export function DownloadButton({
   const [errorMsg, setErrorMsg] = useState<string>("");
 
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 🟢 Database එකෙන් Link එක ලබාගැනීම
   const fetchLink = useCallback(async (): Promise<string | null> => {
     if (!subtitleId) return null;
     try {
-      // 1. මුලින් RPC එකෙන් උත්සාහ කිරීම
       const { data, error } = await supabase.rpc("get_single_download_link", {
         target_id: Number(subtitleId),
       });
@@ -140,7 +144,6 @@ export function DownloadButton({
         if (link) return String(link).trim();
       }
 
-      // 2. Direct Table Fallback
       const { data: directData } = await supabase
         .from(SUBTITLES_TABLE)
         .select("download_link, telegram_link")
@@ -157,7 +160,7 @@ export function DownloadButton({
     return null;
   }, [subtitleId, normalizedVariant]);
 
-  // Lock තත්ත්වයට reset කිරීම සහ storage clear කිරීම
+  // Lock තත්ත්වයට reset කිරීම
   const resetToLocked = useCallback(() => {
     setState("locked");
     setRemainingSec(REQUIRED_AD_SECONDS);
@@ -170,6 +173,10 @@ export function DownloadButton({
       clearTimeout(reLockTimerRef.current);
       reLockTimerRef.current = null;
     }
+    if (validityTimerRef.current) {
+      clearTimeout(validityTimerRef.current);
+      validityTimerRef.current = null;
+    }
     try {
       localStorage.removeItem(timeStorageKey);
       localStorage.removeItem(lockExpiryKey);
@@ -178,7 +185,7 @@ export function DownloadButton({
     }
   }, [timeStorageKey, lockExpiryKey]);
 
-  // 🟢 Live Ticker: Verifying අවස්ථාවේදී තත්පර 5 count-down වීම
+  // Live Ticker
   const startLiveCountdown = useCallback((startTime: number) => {
     if (tickerRef.current) clearInterval(tickerRef.current);
 
@@ -196,14 +203,20 @@ export function DownloadButton({
       if (leftSec <= 0) {
         if (tickerRef.current) clearInterval(tickerRef.current);
         setState("ready");
+
+        // ⏱️ Unlocked වූ පසු තත්පර 20ක Validity Timer එකක් ක්‍රියාත්මක වීම
+        if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
+        validityTimerRef.current = setTimeout(() => {
+          resetToLocked();
+        }, MAX_UNLOCK_VALIDITY_MS);
       }
     };
 
     tick();
     tickerRef.current = setInterval(tick, 300);
-  }, [fetchLink]);
+  }, [fetchLink, resetToLocked]);
 
-  // Timestamp අනුව Lock තත්ත්වය පරීක්ෂා කිරීම
+  // Ad Time Verify කිරීම
   const verifyAdTime = useCallback(async () => {
     try {
       const expireAtStr = localStorage.getItem(lockExpiryKey);
@@ -214,7 +227,6 @@ export function DownloadButton({
           resetToLocked();
           return;
         } else {
-          // Download වී තත්පර 3 ඉතිරි කාලය තුළ නැවත Lock වීමට timer එකක් සැකසීම
           if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
           reLockTimerRef.current = setTimeout(() => {
             resetToLocked();
@@ -228,7 +240,7 @@ export function DownloadButton({
       const startTime = parseInt(startTimeStr, 10);
       const elapsedMs = Date.now() - startTime;
 
-      // Unlock වී බොහෝ වේලාවක් ගතවී ඇත්නම් (max validity window) නැවත lock කිරීම
+      // ⏱️ තත්පර 20කට වඩා පරණ නම් නැවත Lock කිරීම
       if (elapsedMs > MAX_UNLOCK_VALIDITY_MS) {
         resetToLocked();
         return;
@@ -240,6 +252,13 @@ export function DownloadButton({
         if (link && isSafeUrl(link)) {
           setDownloadLink(link);
         }
+
+        // ඉතිරිව ඇති තත්පර ගණනට validity timer එක සැකසීම
+        const remainingValidity = MAX_UNLOCK_VALIDITY_MS - elapsedMs;
+        if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
+        validityTimerRef.current = setTimeout(() => {
+          resetToLocked();
+        }, remainingValidity);
       } else {
         setState("verifying");
         startLiveCountdown(startTime);
@@ -265,15 +284,14 @@ export function DownloadButton({
       window.removeEventListener("focus", handleActive);
       window.removeEventListener("pageshow", handleActive);
       if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
+      if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
       if (tickerRef.current) clearInterval(tickerRef.current);
     };
   }, [verifyAdTime]);
 
-  // Button Click Logic
   const handleButtonClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 1. LOCKED අවස්ථාවේදී: Ad එක Open කර තත්පර 5ක Timer එක ආරම්භ කිරීම
     if (state === "locked") {
       const now = Date.now();
       try {
@@ -299,7 +317,6 @@ export function DownloadButton({
       return;
     }
 
-    // 2. READY අවස්ථාවේදී: File Download හෝ Telegram Link එක Open කර තත්පර 3කින් Re-lock කිරීම
     if (state === "ready") {
       let finalUrl = downloadLink;
 
@@ -311,7 +328,6 @@ export function DownloadButton({
       if (finalUrl && isSafeUrl(finalUrl)) {
         setState("downloading");
 
-        // Action trigger කිරීම
         if (normalizedVariant === "telegram") {
           window.open(finalUrl.trim(), "_blank", "noopener,noreferrer");
         } else {
@@ -320,7 +336,7 @@ export function DownloadButton({
 
         logDownload(subtitleId, normalizedVariant);
 
-        // ⏱️ File එක download වී හරියටම තත්පර 3කින් නැවත Lock කිරීම (LocalStorage එකට දමා Reload bypass වැළැක්වීම)
+        // ⏱️ File එක download වී තත්පර 8කින් නැවත Lock කිරීම
         const expireAt = Date.now() + RELOCK_DELAY_MS;
         try {
           localStorage.setItem(lockExpiryKey, String(expireAt));
@@ -402,7 +418,6 @@ export function DownloadButton({
 
   return (
     <div className="flex flex-col items-center gap-1.5 w-full">
-      {/* 🟢 උඩින් පෙන්වන උපදෙස් පණිවිඩය (Helper Text) */}
       <span className="text-[11px] sm:text-xs text-muted-foreground/90 font-medium flex items-center justify-center gap-1.5 px-2 py-0.5 text-center select-none">
         <Info className="w-3.5 h-3.5 text-primary shrink-0" />
         Unlock ක්ලික් කර තත්පර 5ක් රැඳී සිට නැවත මෙහි එන්න (Back වෙන්න)
