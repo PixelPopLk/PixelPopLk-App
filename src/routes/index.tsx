@@ -18,6 +18,9 @@ import {
   Loader2,
   ShieldAlert,
   ChevronDown,
+  Bookmark,
+  BookmarkCheck,
+  History,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -133,6 +136,19 @@ type YearFilter = "All" | "2026" | "2025" | "2024" | "2023" | "Older";
 type RatingFilter = "All" | "8.0+" | "7.0+" | "6.0+";
 type SortFilter = "latest" | "alpha";
 
+const SAVED_SUBTITLES_KEY = "pixelpoplk_saved_subtitles";
+const RECENT_SUBTITLES_KEY = "pixelpoplk_recent_subtitles";
+const MAX_RECENT_ITEMS = 12;
+
+function readStoredIds(key: string): string[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function getItemYear(it: GridItem): number | null {
   if (it.kind === "movie") {
     const y = it.sub?.year;
@@ -180,6 +196,8 @@ function HomePage() {
   const [yearFilter, setYearFilter] = useState<YearFilter>("All");
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>("All");
   const [sortFilter, setSortFilter] = useState<SortFilter>("latest");
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
   // Monetag Timer States
   const [modalOpen, setModalOpen] = useState(false);
@@ -204,6 +222,28 @@ function HomePage() {
     }
   }, [q]);
 
+  // Keep a small on-device library so returning visitors can pick up where they left off.
+  useEffect(() => {
+    setSavedIds(readStoredIds(SAVED_SUBTITLES_KEY));
+    setRecentIds(readStoredIds(RECENT_SUBTITLES_KEY));
+  }, []);
+
+  const toggleSaved = (id: string) => {
+    setSavedIds((current) => {
+      const next = current.includes(id) ? current.filter((savedId) => savedId !== id) : [id, ...current];
+      localStorage.setItem(SAVED_SUBTITLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const recordRecent = (id: string) => {
+    setRecentIds((current) => {
+      const next = [id, ...current.filter((recentId) => recentId !== id)].slice(0, MAX_RECENT_ITEMS);
+      localStorage.setItem(RECENT_SUBTITLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const handleQueryChange = (val: string) => {
     const cleanVal = sanitizeInput(val);
     setQuery(cleanVal);
@@ -219,6 +259,14 @@ function HomePage() {
 
   const items = useMemo(() => buildGridItems(data ?? []), [data]);
   const featured = useMemo(() => items.slice(0, 6), [items]);
+  const savedItems = useMemo(
+    () => savedIds.map((id) => items.find((item) => String(item.id) === id)).filter((item): item is GridItem => Boolean(item)),
+    [items, savedIds],
+  );
+  const recentItems = useMemo(
+    () => recentIds.map((id) => items.find((item) => String(item.id) === id)).filter((item): item is GridItem => Boolean(item)),
+    [items, recentIds],
+  );
 
   useEffect(() => {
     if (featured.length < 2) return;
@@ -423,6 +471,26 @@ function HomePage() {
         onDownload={handleDownloadClick} 
       />
 
+      {(savedItems.length > 0 || recentItems.length > 0) && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8" aria-label="Your subtitle library">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 grid place-items-center text-primary">
+              <Bookmark className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Your Library</h2>
+              <p className="text-xs text-muted-foreground">Saved and recently viewed subtitles stay on this device.</p>
+            </div>
+          </div>
+          {savedItems.length > 0 && (
+            <Row title="Saved for later" icon={<BookmarkCheck className="w-4 h-4" />} items={savedItems} resetKey={`saved-${savedIds.join("|")}`} savedIds={savedIds} onToggleSaved={toggleSaved} onItemOpen={recordRecent} />
+          )}
+          {recentItems.length > 0 && (
+            <Row title="Recently viewed" icon={<History className="w-4 h-4" />} items={recentItems} resetKey={`recent-${recentIds.join("|")}`} savedIds={savedIds} onToggleSaved={toggleSaved} onItemOpen={recordRecent} />
+          )}
+        </section>
+      )}
+
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex items-end justify-between mb-4 flex-wrap gap-4">
           <div>
@@ -514,6 +582,9 @@ function HomePage() {
             icon={<Search className="w-4 h-4" />} 
             items={filtered} 
             resetKey={rowResetKey}
+            savedIds={savedIds}
+            onToggleSaved={toggleSaved}
+            onItemOpen={recordRecent}
           />
         ) : (
           <div className="mt-8 space-y-12">
@@ -523,6 +594,9 @@ function HomePage() {
                 icon={<Film className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "movie")}
                 resetKey={rowResetKey}
+                savedIds={savedIds}
+                onToggleSaved={toggleSaved}
+                onItemOpen={recordRecent}
               />
             )}
             {type !== "movie" && (
@@ -531,6 +605,9 @@ function HomePage() {
                 icon={<Tv className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "series")}
                 resetKey={rowResetKey}
+                savedIds={savedIds}
+                onToggleSaved={toggleSaved}
+                onItemOpen={recordRecent}
               />
             )}
           </div>
@@ -939,11 +1016,17 @@ function Row({
   icon, 
   items, 
   resetKey,
+  savedIds,
+  onToggleSaved,
+  onItemOpen,
 }: { 
   title: string; 
   icon?: React.ReactNode; 
   items: GridItem[]; 
   resetKey: string;
+  savedIds: string[];
+  onToggleSaved: (id: string) => void;
+  onItemOpen: (id: string) => void;
 }) {
   const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -994,7 +1077,7 @@ function Row({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 px-4 sm:px-6 lg:px-8 py-1 items-stretch">
           {visibleItems.map((it, i) => (
             <div key={it.key} className="h-full">
-              <SubtitleCard item={it} index={i} />
+              <SubtitleCard item={it} index={i} isSaved={savedIds.includes(String(it.id))} onToggleSaved={onToggleSaved} onItemOpen={onItemOpen} />
             </div>
           ))}
         </div>
@@ -1048,9 +1131,15 @@ function SkeletonRow() {
 function SubtitleCard({ 
   item, 
   index, 
+  isSaved,
+  onToggleSaved,
+  onItemOpen,
 }: { 
   item: GridItem; 
   index: number; 
+  isSaved: boolean;
+  onToggleSaved: (id: string) => void;
+  onItemOpen: (id: string) => void;
 }) {
   const tv = item.kind === "series";
   const title = itemTitle(item);
@@ -1059,7 +1148,7 @@ function SubtitleCard({
 
   return (
     <div
-      className="h-full"
+      className="h-full relative"
       style={{
         opacity: 0,
         animation: `fadeInUp 0.35s ease forwards`,
@@ -1069,6 +1158,7 @@ function SubtitleCard({
       <Link
         to="/content/$id"
         params={{ id: String(item.id) }}
+        onClick={() => onItemOpen(String(item.id))}
         className="group flex flex-col h-full text-left bg-card-elevated rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition shadow-card hover:shadow-glow w-full cursor-pointer"
       >
         <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden shrink-0">
@@ -1097,7 +1187,7 @@ function SubtitleCard({
             </span>
           </div>
           {tv && (
-            <div className="absolute top-2 right-2">
+            <div className="absolute top-2 right-11">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-bold uppercase tracking-wide">
                 {seasonCount} S · {item.episodes.length} EP
               </span>
@@ -1118,6 +1208,15 @@ function SubtitleCard({
           <p className="text-[11px] text-muted-foreground shrink-0">{formatDate(itemDate(item))}</p>
         </div>
       </Link>
+      <button
+        type="button"
+        onClick={() => onToggleSaved(String(item.id))}
+        aria-label={isSaved ? `Remove ${title} from saved subtitles` : `Save ${title} for later`}
+        aria-pressed={isSaved}
+        className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-background/85 backdrop-blur border border-border grid place-items-center text-foreground hover:text-primary hover:border-primary/50 transition cursor-pointer"
+      >
+        {isSaved ? <BookmarkCheck className="w-4 h-4 text-primary" /> : <Bookmark className="w-4 h-4" />}
+      </button>
     </div>
   );
 }
