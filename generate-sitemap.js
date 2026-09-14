@@ -82,6 +82,35 @@ const CORE_GENRES = [
   "thriller",
 ];
 
+async function fetchSubtitles() {
+  const endpoint = `${SUPABASE_URL}/rest/v1/subtitles?select=id,created_at,updated_at,title,genre,season,episode,image_url&order=created_at.desc`;
+  let lastError;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const res = await fetch(endpoint, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Failed to fetch subtitles: ${res.status} ${res.statusText}`);
+      return await res.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1) await new Promise((resolve) => setTimeout(resolve, 500));
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw lastError;
+}
+
 async function generateSitemap() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn("Warning: VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing in environment!");
@@ -92,21 +121,7 @@ async function generateSitemap() {
   try {
     console.log("Fetching latest subtitles from Supabase...");
 
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/subtitles?select=id,created_at,updated_at,title,genre,season,episode,image_url&order=created_at.desc`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-      }
-    );
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch subtitles: ${res.status} ${res.statusText}`);
-    }
-
-    const subtitles = await res.json();
+    const subtitles = await fetchSubtitles();
     console.log(`Found ${subtitles.length} subtitles in database.`);
 
     const today = new Date().toISOString().split("T")[0];
@@ -230,8 +245,10 @@ async function generateSitemap() {
     fs.writeFileSync(`${outDir}/sitemap.xml`, xml);
     console.log("✅ Sitemap generated successfully at ./public/sitemap.xml!");
   } catch (err) {
-    console.error("Failed to generate sitemap:", err);
-    process.exit(1);
+    // A temporary Supabase/DNS outage must not break a deployment. Keep the
+    // last successfully generated public sitemap in place and refresh it on
+    // the next successful build.
+    console.warn("Sitemap fetch failed; keeping the existing public/sitemap.xml:", err instanceof Error ? err.message : err);
   }
 }
 
