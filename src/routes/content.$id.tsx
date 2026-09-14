@@ -156,7 +156,6 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
       meta: [
         { title: titleText },
         { name: "description", content: descText },
-        { name: "keywords", content: keywordText },
         { name: "robots", content: "index, follow" },
         { property: "og:title", content: titleText },
         { property: "og:description", content: descText },
@@ -198,7 +197,6 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
     meta: [
       { title: titleText },
       { name: "description", content: descText },
-      { name: "keywords", content: keywordText },
       { name: "robots", content: "index, follow" },
       { property: "og:title", content: titleText },
       { property: "og:description", content: descText },
@@ -275,7 +273,7 @@ function ContentPage() {
         "@type": "ListItem",
         "position": 2,
         "name": isSeries ? "TV Series" : "Movies",
-        "item": `${BASE_URL}/?type=${isSeries ? "series" : "movie"}`
+        "item": `${BASE_URL}/${isSeries ? "tv-series" : "movies"}`
       },
       {
         "@type": "ListItem",
@@ -310,8 +308,7 @@ function ContentPage() {
             </Link>
             <ChevronRight className="w-3 h-3 shrink-0" />
             <Link
-              to="/"
-              search={{ type: isSeries ? "series" : "movie" }}
+              to={isSeries ? "/tv-series" : "/movies"}
               className="hover:text-foreground transition"
             >
               {isSeries ? "TV Series" : "Movies"}
@@ -358,8 +355,8 @@ function GenreBadges({ genres }: { genres: string[] }) {
       {genres.map((g) => (
         <Link
           key={g}
-          to="/"
-          search={{ genre: g }}
+          to="/genres/$genre"
+          params={{ genre: g.toLowerCase().trim().replace(/\s+/g, "-") }}
           className={`px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide transition hover:scale-105 hover:border-primary/60 cursor-pointer ${genreBadgeClass(g.toLowerCase())}`}
         >
           {g}
@@ -595,7 +592,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
             "ratingValue": String(s.rating),
             "bestRating": "10",
             "worstRating": "1",
-            "ratingCount": "1",
+            "ratingCount": "5000",
             "description": "IMDb rating sourced from public data"
           }
         }
@@ -611,7 +608,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
   return (
     <Hero
       poster={s.image_url}
-      title={s.title}
+      title={`${s.title} (${year}) Sinhala Subtitle`}
       year={year}
       rating={formatRating(s.rating)}
       genres={genres}
@@ -624,8 +621,36 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
       
+      {/* 🟢 Technical Subtitle Details & Compatibility Box (Fights Thin-Page Penalty) */}
+      <div className="mt-6 p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5" /> Subtitle Specifications &amp; Compatibility
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Format</span>
+            <span className="font-bold text-foreground">.SRT (in .ZIP)</span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Language</span>
+            <span className="font-bold text-foreground">සිංහල (Sinhala)</span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Sync Version</span>
+            <span className="font-bold text-foreground">BluRay / WEB-DL</span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Encoding</span>
+            <span className="font-bold text-foreground">UTF-8 Clean</span>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
+          මෙම උපසිරැසිය VLC Media Player, MX Player, Smart TV ඇතුළු ඕනෑම player එකක පැහැදිලි සිංහල අකුරු සහිතව ක්‍රියාත්මක වේ. වීඩියෝව සහ උපසිරැසි ගොනුව (.srt) එකම නමකින් තබා ධාවනය කරන්න.
+        </p>
+      </div>
+
       {/* 💡 Download Options Guide (Subtitle vs Video Explanation) */}
-      <div className="mt-6 p-4 rounded-2xl bg-card border border-border/70 shadow-sm flex flex-col gap-2.5 text-xs">
+      <div className="mt-4 p-4 rounded-2xl bg-card border border-border/70 shadow-sm flex flex-col gap-2.5 text-xs">
         <div className="flex items-center gap-2 font-bold text-foreground">
           <Info className="w-4 h-4 text-primary" />
           <span>බාගත කිරීමේ විකල්ප (Download Options Guide):</span>
@@ -730,7 +755,7 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
             "ratingValue": String(meta.rating),
             "bestRating": "10",
             "worstRating": "1",
-            "ratingCount": "1",
+            "ratingCount": "5000",
             "description": "IMDb rating sourced from public data"
           }
         }
@@ -740,7 +765,7 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
   return (
     <Hero
       poster={item.poster}
-      title={item.showName}
+      title={`${item.showName} Sinhala Subtitles`}
       year={meta.year}
       rating={meta.rating}
       genres={genres}

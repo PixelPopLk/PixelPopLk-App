@@ -114,6 +114,27 @@ export function Navbar({
               Pixel<span className="text-gradient">Pop</span>LK
             </span>
           </Link>
+
+          <nav className="hidden lg:flex items-center gap-1 ml-2" aria-label="Main Navigation">
+            <Link
+              to="/movies"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition"
+            >
+              Movies
+            </Link>
+            <Link
+              to="/tv-series"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition"
+            >
+              TV Series
+            </Link>
+            <Link
+              to="/latest"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition"
+            >
+              Latest
+            </Link>
+          </nav>
         </div>
 
         {/* Center: Search Bar with Auto Dropdown Popup */}

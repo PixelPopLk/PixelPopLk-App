@@ -9,24 +9,56 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ManageAdminRouteImport } from './routes/manage-admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
+import { Route as LatestRouteImport } from './routes/latest'
+import { Route as ManageAdminRouteImport } from './routes/manage-admin'
+import { Route as MoviesRouteImport } from './routes/movies'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TvSeriesRouteImport } from './routes/tv-series'
+import { Route as ApiOgRouteImport } from './routes/api.og'
 import { Route as ContentIdRouteImport } from './routes/content.$id'
+import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
+import { Route as GenresGenreRouteImport } from './routes/genres.$genre'
 
-const ManageAdminRoute = ManageAdminRouteImport.update({
-  id: '/manage-admin',
-  path: '/manage-admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EpisodeIdRoute = EpisodeIdRouteImport.update({
-  id: '/episode/$id',
-  path: '/episode/$id',
+const LatestRoute = LatestRouteImport.update({
+  id: '/latest',
+  path: '/latest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManageAdminRoute = ManageAdminRouteImport.update({
+  id: '/manage-admin',
+  path: '/manage-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MoviesRoute = MoviesRouteImport.update({
+  id: '/movies',
+  path: '/movies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TvSeriesRoute = TvSeriesRouteImport.update({
+  id: '/tv-series',
+  path: '/tv-series',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOgRoute = ApiOgRouteImport.update({
+  id: '/api/og',
+  path: '/api/og',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContentIdRoute = ContentIdRouteImport.update({
@@ -34,50 +66,115 @@ const ContentIdRoute = ContentIdRouteImport.update({
   path: '/content/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EpisodeIdRoute = EpisodeIdRouteImport.update({
+  id: '/episode/$id',
+  path: '/episode/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GenresGenreRoute = GenresGenreRouteImport.update({
+  id: '/genres/$genre',
+  path: '/genres/$genre',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/latest': typeof LatestRoute
   '/manage-admin': typeof ManageAdminRoute
+  '/movies': typeof MoviesRoute
+  '/search': typeof SearchRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tv-series': typeof TvSeriesRoute
+  '/api/og': typeof ApiOgRoute
   '/content/$id': typeof ContentIdRoute
   '/episode/$id': typeof EpisodeIdRoute
+  '/genres/$genre': typeof GenresGenreRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/latest': typeof LatestRoute
   '/manage-admin': typeof ManageAdminRoute
+  '/movies': typeof MoviesRoute
+  '/search': typeof SearchRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tv-series': typeof TvSeriesRoute
+  '/api/og': typeof ApiOgRoute
   '/content/$id': typeof ContentIdRoute
   '/episode/$id': typeof EpisodeIdRoute
+  '/genres/$genre': typeof GenresGenreRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/latest': typeof LatestRoute
   '/manage-admin': typeof ManageAdminRoute
+  '/movies': typeof MoviesRoute
+  '/search': typeof SearchRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tv-series': typeof TvSeriesRoute
+  '/api/og': typeof ApiOgRoute
   '/content/$id': typeof ContentIdRoute
   '/episode/$id': typeof EpisodeIdRoute
+  '/genres/$genre': typeof GenresGenreRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/manage-admin' | '/content/$id' | '/episode/$id'
+  fullPaths:
+    | '/'
+    | '/latest'
+    | '/manage-admin'
+    | '/movies'
+    | '/search'
+    | '/sitemap.xml'
+    | '/tv-series'
+    | '/api/og'
+    | '/content/$id'
+    | '/episode/$id'
+    | '/genres/$genre'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/manage-admin' | '/content/$id' | '/episode/$id'
-  id: '__root__' | '/' | '/manage-admin' | '/content/$id' | '/episode/$id'
+  to:
+    | '/'
+    | '/latest'
+    | '/manage-admin'
+    | '/movies'
+    | '/search'
+    | '/sitemap.xml'
+    | '/tv-series'
+    | '/api/og'
+    | '/content/$id'
+    | '/episode/$id'
+    | '/genres/$genre'
+  id:
+    | '__root__'
+    | '/'
+    | '/latest'
+    | '/manage-admin'
+    | '/movies'
+    | '/search'
+    | '/sitemap.xml'
+    | '/tv-series'
+    | '/api/og'
+    | '/content/$id'
+    | '/episode/$id'
+    | '/genres/$genre'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LatestRoute: typeof LatestRoute
   ManageAdminRoute: typeof ManageAdminRoute
+  MoviesRoute: typeof MoviesRoute
+  SearchRoute: typeof SearchRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TvSeriesRoute: typeof TvSeriesRoute
+  ApiOgRoute: typeof ApiOgRoute
   ContentIdRoute: typeof ContentIdRoute
   EpisodeIdRoute: typeof EpisodeIdRoute
+  GenresGenreRoute: typeof GenresGenreRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/manage-admin': {
-      id: '/manage-admin'
-      path: '/manage-admin'
-      fullPath: '/manage-admin'
-      preLoaderRoute: typeof ManageAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -85,11 +182,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/episode/$id': {
-      id: '/episode/$id'
-      path: '/episode/$id'
-      fullPath: '/episode/$id'
-      preLoaderRoute: typeof EpisodeIdRouteImport
+    '/latest': {
+      id: '/latest'
+      path: '/latest'
+      fullPath: '/latest'
+      preLoaderRoute: typeof LatestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manage-admin': {
+      id: '/manage-admin'
+      path: '/manage-admin'
+      fullPath: '/manage-admin'
+      preLoaderRoute: typeof ManageAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/movies': {
+      id: '/movies'
+      path: '/movies'
+      fullPath: '/movies'
+      preLoaderRoute: typeof MoviesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tv-series': {
+      id: '/tv-series'
+      path: '/tv-series'
+      fullPath: '/tv-series'
+      preLoaderRoute: typeof TvSeriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/og': {
+      id: '/api/og'
+      path: '/api/og'
+      fullPath: '/api/og'
+      preLoaderRoute: typeof ApiOgRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/content/$id': {
@@ -99,25 +238,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/episode/$id': {
+      id: '/episode/$id'
+      path: '/episode/$id'
+      fullPath: '/episode/$id'
+      preLoaderRoute: typeof EpisodeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/genres/$genre': {
+      id: '/genres/$genre'
+      path: '/genres/$genre'
+      fullPath: '/genres/$genre'
+      preLoaderRoute: typeof GenresGenreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LatestRoute: LatestRoute,
   ManageAdminRoute: ManageAdminRoute,
+  MoviesRoute: MoviesRoute,
+  SearchRoute: SearchRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TvSeriesRoute: TvSeriesRoute,
+  ApiOgRoute: ApiOgRoute,
   ContentIdRoute: ContentIdRoute,
   EpisodeIdRoute: EpisodeIdRoute,
+  GenresGenreRoute: GenresGenreRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
+import type { createStart } from '@tanstack/react-start'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

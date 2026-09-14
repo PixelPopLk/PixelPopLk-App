@@ -1,6 +1,5 @@
-// 🟢 Mirrors src/lib/subtitles.ts (parseTitle / isSeriesRow / buildGridItems)
-// just enough to group rows the same way the app does, so the sitemap lists
-// canonical URLs: one per movie, one per TV series "hub" page, plus one per individual episode.
+// 🟢 Cloudflare Pages Serverless Sitemap Function
+// Mirrors build-time sitemap generator so runtime requests always get accurate indexable URLs
 function cleanShowName(raw) {
   return (raw || "")
     .replace(/[._]+/g, " ")
@@ -64,36 +63,85 @@ function escapeXml(str) {
     .replace(/'/g, "&apos;");
 }
 
+const CORE_GENRES = [
+  "action",
+  "adventure",
+  "animation",
+  "comedy",
+  "crime",
+  "drama",
+  "horror",
+  "mystery",
+  "romance",
+  "sci-fi",
+  "thriller",
+];
+
 export async function onRequest(context) {
-  // Cloudflare Environment Variables වලින් Keys අදිනවා
   const SUPABASE_URL = context.env.VITE_SUPABASE_URL || context.env.SUPABASE_URL || "https://gilnzvsnkwrnfbwhobow.supabase.co";
   const SUPABASE_ANON_KEY = context.env.VITE_SUPABASE_ANON_KEY || context.env.SUPABASE_ANON_KEY || "sb_publishable_ZWL-aXdaOXfnYKKaTJO58w_FIya45KL";
+  const BASE_URL = context.env.VITE_SITE_URL || "https://pixelpoplk.pages.dev";
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return new Response("Missing Supabase credentials", { status: 500 });
   }
 
   try {
-    // Supabase REST API එකෙන් Subtitles වල Data අදිනවා
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/subtitles?select=id,created_at,updated_at,title,genre,season,episode,image_url&order=created_at.desc`,
       {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          Range: "0-99999",
         },
       }
     );
 
     if (!res.ok) {
-      throw new Error(`Supabase error: ${res.status}`);
+      return new Response(`Failed to fetch: ${res.status}`, { status: 502 });
     }
 
     const subtitles = await res.json();
-    const baseUrl = "https://pixelpoplk.pages.dev";
     const today = new Date().toISOString().split("T")[0];
 
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
+    xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
+
+    // 1. Static Core Landing Pages
+    const staticPages = [
+      { url: `${BASE_URL}/`, priority: "1.0", changefreq: "daily", title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series", image: `${BASE_URL}/og-banner.png` },
+      { url: `${BASE_URL}/movies`, priority: "0.9", changefreq: "daily", title: "Sinhala Subtitles for Movies — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+      { url: `${BASE_URL}/tv-series`, priority: "0.9", changefreq: "daily", title: "Sinhala Subtitles for TV Series — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+      { url: `${BASE_URL}/latest`, priority: "0.9", changefreq: "daily", title: "Latest Sinhala Subtitles — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+    ];
+
+    for (const p of staticPages) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${p.url}</loc>\n`;
+      xml += `    <lastmod>${today}</lastmod>\n`;
+      xml += `    <changefreq>${p.changefreq}</changefreq>\n`;
+      xml += `    <priority>${p.priority}</priority>\n`;
+      if (p.image) {
+        xml += `    <image:image>\n`;
+        xml += `      <image:loc>${p.image}</image:loc>\n`;
+        xml += `      <image:title>${escapeXml(p.title)}</image:title>\n`;
+        xml += `    </image:image>\n`;
+      }
+      xml += `  </url>\n`;
+    }
+
+    // 2. Genre Landing Pages
+    for (const g of CORE_GENRES) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${BASE_URL}/genres/${g}</loc>\n`;
+      xml += `    <lastmod>${today}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    // 3. Dynamic Subtitle Pages
     const showLatestMap = new Map();
     const episodeEntries = [];
     const movieEntries = [];
@@ -104,7 +152,7 @@ export async function onRequest(context) {
 
       if (isEp) {
         episodeEntries.push({
-          url: `${baseUrl}/episode/${sub.id}`,
+          url: `${BASE_URL}/episode/${sub.id}`,
           date,
           changefreq: "monthly",
           priority: "0.7",
@@ -119,7 +167,7 @@ export async function onRequest(context) {
         }
       } else {
         movieEntries.push({
-          url: `${baseUrl}/content/${sub.id}`,
+          url: `${BASE_URL}/content/${sub.id}`,
           date,
           changefreq: "weekly",
           priority: "0.9",
@@ -134,7 +182,7 @@ export async function onRequest(context) {
       const showName = cleanShowName(parseTitle(latestSub.title || "").showName);
       const date = safeDate(latestSub.updated_at || latestSub.created_at, today);
       seriesHubEntries.push({
-        url: `${baseUrl}/content/${latestSub.id}`,
+        url: `${BASE_URL}/content/${latestSub.id}`,
         date,
         changefreq: "weekly",
         priority: "0.9",
@@ -145,23 +193,6 @@ export async function onRequest(context) {
 
     const allItems = [...seriesHubEntries, ...movieEntries, ...episodeEntries];
 
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
-    xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
-
-    // 1. Home Page
-    xml += `  <url>\n`;
-    xml += `    <loc>${baseUrl}/</loc>\n`;
-    xml += `    <lastmod>${today}</lastmod>\n`;
-    xml += `    <changefreq>daily</changefreq>\n`;
-    xml += `    <priority>1.0</priority>\n`;
-    xml += `    <image:image>\n`;
-    xml += `      <image:loc>${baseUrl}/og-banner.png</image:loc>\n`;
-    xml += `      <image:title>PixelPopLK — Sinhala Subtitles for Movies &amp; TV Series</image:title>\n`;
-    xml += `    </image:image>\n`;
-    xml += `  </url>\n`;
-
-    // 2. Dynamic Items
     for (const item of allItems) {
       xml += `  <url>\n`;
       xml += `    <loc>${item.url}</loc>\n`;
@@ -181,11 +212,11 @@ export async function onRequest(context) {
 
     return new Response(xml, {
       headers: {
-        "Content-Type": "application/xml",
+        "Content-Type": "application/xml; charset=utf-8",
         "Cache-Control": "public, max-age=3600, s-maxage=3600",
       },
     });
   } catch (err) {
-    return new Response("Failed to generate sitemap", { status: 500 });
+    return new Response(`Error: ${err.message}`, { status: 500 });
   }
 }
