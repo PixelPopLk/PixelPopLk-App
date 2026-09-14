@@ -13,7 +13,7 @@ export default function AdBanner({
   width,
   height,
   type = "300x250",
-  delay = 150, // Popup එක Lag නොවී Instant Open වෙන්න 300ms Delay එකක්
+  delay = 0, // Start loading as soon as the ad slot is near the viewport.
 }: AdBannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
@@ -63,7 +63,7 @@ export default function AdBanner({
           observer.disconnect();
         }
       },
-      { rootMargin: "600px" }, // load well before it's actually visible — favors more counted impressions while still staying off the critical initial-paint path
+      { rootMargin: "1200px 0px" }, // Begin the external request early enough for the banner to be ready when reached.
     );
     observer.observe(el);
 
@@ -85,6 +85,8 @@ export default function AdBanner({
     iframe.style.border = "none";
     iframe.style.overflow = "hidden";
     iframe.scrolling = "no";
+    iframe.loading = "eager";
+    iframe.title = "Advertisement";
 
     containerRef.current.appendChild(iframe);
 

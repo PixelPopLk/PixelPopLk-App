@@ -12,7 +12,6 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AgeGate } from "../components/AgeGate";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 // 🟢 1. AntiAdBlock Component එක මෙතනින් Import කළා
 import { AntiAdBlock } from "../components/AntiAdBlock";
@@ -137,6 +136,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "/manifest.json",
       },
       {
+        rel: "preconnect",
+        href: "https://acorntar.com",
+      },
+      {
+        rel: "dns-prefetch",
+        href: "https://acorntar.com",
+      },
+      {
         rel: "stylesheet",
         href: appCss,
       },
@@ -257,12 +264,12 @@ function RootComponent() {
       const target = event.target as HTMLElement;
       if (!target) return;
 
-      // Popup, Dialog, Modal, AgeGate සම්පූර්ණයෙන්ම ignore කිරීම
+      // Popup and dialog interactions are excluded from advertising behavior.
       const isInsidePopup = target.closest(
         '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
         '.modal, .dialog, .popup, [data-radix-dialog-content], ' +
         '[data-sonner-toast], [data-toast], .toast, [role="alert"], ' +
-        '.age-gate, [data-age-gate], [class*="overlay"], [class*="backdrop"], [data-no-ad="true"]'
+        '[class*="overlay"], [class*="backdrop"], [data-no-ad="true"]'
       );
       if (isInsidePopup) return;
 
@@ -331,7 +338,6 @@ function RootComponent() {
       {/* 🟢 2. Admin Page එකේ නොවන විට පමණක් AntiAdBlock එක Run වීම */}
       {!isAdminPage && <AntiAdBlock />}
       
-      <AgeGate />
       <PwaInstallPrompt />
       <Outlet />
     </QueryClientProvider>

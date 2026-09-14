@@ -44,8 +44,11 @@ export const Route = createFileRoute("/sitemap.xml")({
           .select("id, created_at, updated_at, season, episode, genre, image_url, title")
           .order("created_at", { ascending: false });
 
+        // Always return a valid sitemap for crawlers. Dynamic subtitle URLs are
+        // omitted temporarily if Supabase is unavailable; static and genre URLs
+        // remain indexable instead of receiving a 500 response.
         if (error) {
-          return new Response("Error generating sitemap", { status: 500 });
+          console.error("Sitemap subtitle fetch failed:", error.message);
         }
 
         const today = new Date().toISOString().split("T")[0];
