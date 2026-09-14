@@ -101,7 +101,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
-      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
       { name: "author", content: "PixelPopLK" },
       { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },

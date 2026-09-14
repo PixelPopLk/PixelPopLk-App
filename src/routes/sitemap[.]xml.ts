@@ -21,6 +21,20 @@ const escapeXml = (str: string | null | undefined) => {
     .replace(/'/g, "&apos;");
 };
 
+const CORE_GENRES = [
+  "action",
+  "adventure",
+  "animation",
+  "comedy",
+  "crime",
+  "drama",
+  "horror",
+  "mystery",
+  "romance",
+  "sci-fi",
+  "thriller",
+];
+
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
@@ -94,23 +108,45 @@ export const Route = createFileRoute("/sitemap.xml")({
           });
         }
 
-        const allItems = [...seriesHubEntries, ...movieEntries, ...episodeEntries];
-
         let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
         xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
         xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
 
-        // Home Page
-        xml += `  <url>\n`;
-        xml += `    <loc>${BASE_URL}/</loc>\n`;
-        xml += `    <lastmod>${today}</lastmod>\n`;
-        xml += `    <changefreq>daily</changefreq>\n`;
-        xml += `    <priority>1.0</priority>\n`;
-        xml += `    <image:image>\n`;
-        xml += `      <image:loc>${BASE_URL}/og-banner.png</image:loc>\n`;
-        xml += `      <image:title>PixelPopLK — Sinhala Subtitles for Movies &amp; TV Series</image:title>\n`;
-        xml += `    </image:image>\n`;
-        xml += `  </url>\n`;
+        // 1. Core Top-Level Pages
+        const staticPages = [
+          { url: `${BASE_URL}/`, priority: "1.0", changefreq: "daily", title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series", image: `${BASE_URL}/og-banner.png` },
+          { url: `${BASE_URL}/movies`, priority: "0.9", changefreq: "daily", title: "Sinhala Subtitles for Movies — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+          { url: `${BASE_URL}/tv-series`, priority: "0.9", changefreq: "daily", title: "Sinhala Subtitles for TV Series — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+          { url: `${BASE_URL}/latest`, priority: "0.9", changefreq: "daily", title: "Latest Sinhala Subtitles — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+        ];
+
+        for (const p of staticPages) {
+          xml += `  <url>\n`;
+          xml += `    <loc>${p.url}</loc>\n`;
+          xml += `    <lastmod>${today}</lastmod>\n`;
+          xml += `    <changefreq>${p.changefreq}</changefreq>\n`;
+          xml += `    <priority>${p.priority}</priority>\n`;
+          if (p.image) {
+            xml += `    <image:image>\n`;
+            xml += `      <image:loc>${p.image}</image:loc>\n`;
+            xml += `      <image:title>${escapeXml(p.title)}</image:title>\n`;
+            xml += `    </image:image>\n`;
+          }
+          xml += `  </url>\n`;
+        }
+
+        // 2. Genre Pages
+        for (const g of CORE_GENRES) {
+          xml += `  <url>\n`;
+          xml += `    <loc>${BASE_URL}/genres/${g}</loc>\n`;
+          xml += `    <lastmod>${today}</lastmod>\n`;
+          xml += `    <changefreq>weekly</changefreq>\n`;
+          xml += `    <priority>0.8</priority>\n`;
+          xml += `  </url>\n`;
+        }
+
+        // 3. Dynamic Entries
+        const allItems = [...seriesHubEntries, ...movieEntries, ...episodeEntries];
 
         for (const item of allItems) {
           xml += `  <url>\n`;

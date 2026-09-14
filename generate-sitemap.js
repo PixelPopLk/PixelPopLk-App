@@ -68,6 +68,20 @@ const safeDate = (value, fallback) => {
   }
 };
 
+const CORE_GENRES = [
+  "action",
+  "adventure",
+  "animation",
+  "comedy",
+  "crime",
+  "drama",
+  "horror",
+  "mystery",
+  "romance",
+  "sci-fi",
+  "thriller",
+];
+
 async function generateSitemap() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn("Warning: VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing in environment!");
@@ -78,20 +92,18 @@ async function generateSitemap() {
   try {
     console.log("Fetching latest subtitles from Supabase...");
 
-    // Supabase REST API එකෙන් සියලුම සබ්ටයිටල් ලබා ගැනීම (Range 0-99999 දමා 1000 Limit එක Bypass කර ඇත)
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/subtitles?select=id,title,created_at,updated_at,season,episode,genre,image_url&order=created_at.desc`,
+      `${SUPABASE_URL}/rest/v1/subtitles?select=id,created_at,updated_at,title,genre,season,episode,image_url&order=created_at.desc`,
       {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          Range: "0-99999",
         },
       }
     );
 
     if (!res.ok) {
-      throw new Error(`Supabase returned status: ${res.status}`);
+      throw new Error(`Failed to fetch subtitles: ${res.status} ${res.statusText}`);
     }
 
     const subtitles = await res.json();
@@ -103,19 +115,40 @@ async function generateSitemap() {
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
     xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
 
-    // 1. Home Page එක සිතියමට එකතු කිරීම
-    xml += `  <url>\n`;
-    xml += `    <loc>${BASE_URL}/</loc>\n`;
-    xml += `    <lastmod>${today}</lastmod>\n`;
-    xml += `    <changefreq>daily</changefreq>\n`;
-    xml += `    <priority>1.0</priority>\n`;
-    xml += `    <image:image>\n`;
-    xml += `      <image:loc>${BASE_URL}/og-banner.png</image:loc>\n`;
-    xml += `      <image:title>PixelPopLK — Sinhala Subtitles for Movies &amp; TV Series</image:title>\n`;
-    xml += `    </image:image>\n`;
-    xml += `  </url>\n`;
+    // 1. Core Top-Level Indexable Pages
+    const staticPages = [
+      { url: `${BASE_URL}/`, priority: "1.0", changefreq: "daily", title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series", image: `${BASE_URL}/og-banner.png` },
+      { url: `${BASE_URL}/movies`, priority: "0.9", changefreq: "daily", title: "Sinhala Subtitles for Movies — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+      { url: `${BASE_URL}/tv-series`, priority: "0.9", changefreq: "daily", title: "Sinhala Subtitles for TV Series — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+      { url: `${BASE_URL}/latest`, priority: "0.9", changefreq: "daily", title: "Latest Sinhala Subtitles — PixelPopLK", image: `${BASE_URL}/og-banner.png` },
+    ];
 
-    // 2. Subtitles වර්ගීකරණය: Movies, Series Hubs සහ Episodes
+    for (const p of staticPages) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${p.url}</loc>\n`;
+      xml += `    <lastmod>${today}</lastmod>\n`;
+      xml += `    <changefreq>${p.changefreq}</changefreq>\n`;
+      xml += `    <priority>${p.priority}</priority>\n`;
+      if (p.image) {
+        xml += `    <image:image>\n`;
+        xml += `      <image:loc>${p.image}</image:loc>\n`;
+        xml += `      <image:title>${escapeXml(p.title)}</image:title>\n`;
+        xml += `    </image:image>\n`;
+      }
+      xml += `  </url>\n`;
+    }
+
+    // 2. Dedicated Genre Landing Pages
+    for (const g of CORE_GENRES) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${BASE_URL}/genres/${g}</loc>\n`;
+      xml += `    <lastmod>${today}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    // 3. Subtitles Breakdown
     const showLatestMap = new Map();
     const episodeEntries = [];
     const movieEntries = [];
@@ -125,7 +158,6 @@ async function generateSitemap() {
       const date = safeDate(sub.updated_at || sub.created_at, today);
 
       if (isEp) {
-        // Individual Episode entry
         episodeEntries.push({
           url: `${BASE_URL}/episode/${sub.id}`,
           date,
@@ -135,14 +167,12 @@ async function generateSitemap() {
           image_url: sub.image_url,
         });
 
-        // TV Series Hub එක සඳහා Show name අනුව latest row එක track කිරීම
         const showKey = cleanShowName(parseTitle(sub.title || "").showName).toLowerCase() || `id:${sub.id}`;
         const existing = showLatestMap.get(showKey);
         if (!existing || new Date(sub.created_at) > new Date(existing.created_at)) {
           showLatestMap.set(showKey, sub);
         }
       } else {
-        // Movie entry
         movieEntries.push({
           url: `${BASE_URL}/content/${sub.id}`,
           date,
@@ -154,7 +184,7 @@ async function generateSitemap() {
       }
     }
 
-    // 3. Series Hub Pages (/content/:id)
+    // 4. Series Hub Pages (/content/:id)
     const seriesHubEntries = [];
     for (const latestSub of showLatestMap.values()) {
       const showName = cleanShowName(parseTitle(latestSub.title || "").showName);
@@ -173,7 +203,6 @@ async function generateSitemap() {
       `Sitemap Breakdown: Movies: ${movieEntries.length}, Series Hubs: ${seriesHubEntries.length}, Episodes: ${episodeEntries.length}`
     );
 
-    // XML එකට සියලු entries එක් කිරීම
     const allItems = [...seriesHubEntries, ...movieEntries, ...episodeEntries];
 
     for (const item of allItems) {

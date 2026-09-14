@@ -63,7 +63,6 @@ export const Route = createFileRoute("/")({
         content:
           "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK.",
       },
-      { name: "keywords", content: "Sinhala Subtitles, Download Movie Subtitles, PixelPopLK, Sinhala Subtitles TV Series, subtitle download, sri lanka subtitles" },
       { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
       { property: "og:type", content: "website" },
@@ -797,9 +796,9 @@ function Hero({
                     {tv ? <Tv className="w-3 h-3 text-primary" /> : <Film className="w-3 h-3 text-primary" />}
                     {tv ? "TV Series" : "Movie"}
                   </span>
-                  <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white drop-shadow-md">
+                  <h1 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white drop-shadow-md">
                     {itemTitle(current)}
-                  </h2>
+                  </h1>
                   <p className="mt-2 text-sm text-zinc-300 flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5 text-primary" />
                     {tv
@@ -1059,11 +1058,13 @@ function SubtitleCard({
   const seasonCount = tv ? new Set(item.episodes.map((e) => e.season)).size : 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.3) }}
+    <div
       className="h-full"
+      style={{
+        opacity: 0,
+        animation: `fadeInUp 0.35s ease forwards`,
+        animationDelay: `${Math.min(index * 0.02, 0.3)}s`,
+      }}
     >
       <Link
         to="/content/$id"
@@ -1074,7 +1075,7 @@ function SubtitleCard({
           {poster ? (
             <img
               src={poster}
-              alt={title}
+              alt={`${title} Sinhala Subtitle`}
               width={300}
               height={450}
               loading="lazy"
@@ -1117,7 +1118,7 @@ function SubtitleCard({
           <p className="text-[11px] text-muted-foreground shrink-0">{formatDate(itemDate(item))}</p>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 

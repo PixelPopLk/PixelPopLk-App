@@ -48,18 +48,22 @@ interface SidebarProps {
 export function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate();
 
-  const handleCategoryClick = (type: "movie" | "series", genre: string) => {
+  const handleCategoryClick = (genre: string) => {
     // 🎯 Genre එකක් click කරපු ගමන් Ad එක Trigger වේ (Cooldown පරීක්ෂා කර)
     triggerAdWithCooldown();
 
     navigate({
-      to: "/",
-      search: {
-        type,
-        genre,
-        q: undefined, // Clear search term when browsing category
+      to: "/genres/$genre",
+      params: {
+        genre: genre.toLowerCase().trim().replace(/\s+/g, "-"),
       },
     });
+    onClose();
+  };
+
+  const handleRouteClick = (toPath: string) => {
+    triggerAdWithCooldown();
+    navigate({ to: toPath as any });
     onClose();
   };
 
@@ -95,26 +99,40 @@ export function Sidebar({ onClose }: SidebarProps) {
         <nav className="flex flex-col gap-1">
           <button
             onClick={handleHomeClick}
-            className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-200"
+            className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-200 cursor-pointer"
           >
             <Home className="w-4 h-4 text-primary" />
             <span className="font-semibold text-sm">HOME</span>
           </button>
 
+          <button
+            onClick={() => handleRouteClick("/latest")}
+            className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-200 cursor-pointer"
+          >
+            <Subtitles className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">LATEST RELEASES</span>
+          </button>
+
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="movies" className="border-none">
-              <AccordionTrigger className="flex items-center justify-between w-full px-3 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 hover:no-underline transition duration-200 cursor-pointer">
+              <AccordionTrigger className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 hover:no-underline transition duration-200 cursor-pointer">
                 <div className="flex items-center gap-3">
                   <Film className="w-4 h-4 text-primary" />
                   <span className="font-semibold text-sm">MOVIES</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pb-2 pt-1 pl-10 flex flex-col gap-1 border-none">
+                <button
+                  onClick={() => handleRouteClick("/movies")}
+                  className="w-full text-left py-1.5 px-3 rounded-lg text-xs font-bold text-primary hover:bg-muted/20 transition cursor-pointer"
+                >
+                  Browse All Movies →
+                </button>
                 {MOVIE_GENRES.map((genre) => (
                   <button
                     key={genre}
-                    onClick={() => handleCategoryClick("movie", genre)}
-                    className="w-full text-left py-2 px-3 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/20 transition duration-150 cursor-pointer"
+                    onClick={() => handleCategoryClick(genre)}
+                    className="w-full text-left py-1.5 px-3 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition duration-150 cursor-pointer"
                   >
                     {genre}
                   </button>
@@ -123,18 +141,24 @@ export function Sidebar({ onClose }: SidebarProps) {
             </AccordionItem>
 
             <AccordionItem value="tv-series" className="border-none">
-              <AccordionTrigger className="flex items-center justify-between w-full px-3 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 hover:no-underline transition duration-200 cursor-pointer">
+              <AccordionTrigger className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/40 hover:no-underline transition duration-200 cursor-pointer">
                 <div className="flex items-center gap-3">
                   <Tv className="w-4 h-4 text-primary" />
                   <span className="font-semibold text-sm">TV SERIES</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pb-2 pt-1 pl-10 flex flex-col gap-1 border-none">
+                <button
+                  onClick={() => handleRouteClick("/tv-series")}
+                  className="w-full text-left py-1.5 px-3 rounded-lg text-xs font-bold text-primary hover:bg-muted/20 transition cursor-pointer"
+                >
+                  Browse All TV Series →
+                </button>
                 {TV_GENRES.map((genre) => (
                   <button
                     key={genre}
-                    onClick={() => handleCategoryClick("series", genre)}
-                    className="w-full text-left py-2 px-3 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/20 transition duration-150 cursor-pointer"
+                    onClick={() => handleCategoryClick(genre)}
+                    className="w-full text-left py-1.5 px-3 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition duration-150 cursor-pointer"
                   >
                     {genre}
                   </button>
