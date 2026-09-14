@@ -22,7 +22,7 @@ export type Subtitle = {
   telegram_downloads?: number | null;
   metatags?: string | null;
   has_telegram?: boolean | null;
-  // SEO fields (added by the SEO content migration)
+  // SEO fields (populated after the SEO migration is applied)
   slug?: string | null;
   seo_title?: string | null;
   seo_description?: string | null;
