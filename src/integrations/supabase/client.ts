@@ -22,7 +22,7 @@ export type Subtitle = {
   telegram_downloads?: number | null;
   metatags?: string | null;
   has_telegram?: boolean | null;
-  // SEO fields (populated after the SEO migration is applied)
+  // SEO fields are optional until the SEO database migration is applied.
   slug?: string | null;
   seo_title?: string | null;
   seo_description?: string | null;
@@ -40,11 +40,13 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 
 export const SUBTITLES_TABLE = "subtitles";
 
+// Keep these queries compatible with the current live schema.
+// SEO columns are intentionally not selected until the SQL migration is applied.
 export const SUBTITLE_COLUMNS =
-  "id, created_at, updated_at, title, download_link, telegram_link, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, slug, seo_title, seo_description, canonical_url, content_type, language, release_date, imdb_id, indexable";
+  "id, created_at, updated_at, title, download_link, telegram_link, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads";
 
 export const SAFE_SUBTITLE_COLUMNS =
-  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, slug, seo_title, seo_description, canonical_url, content_type, language, release_date, imdb_id, indexable";
+  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads";
 
 export function logDownload(subtitleId: number | string | null | undefined, variant: string = "direct") {
   if (subtitleId == null) return;
