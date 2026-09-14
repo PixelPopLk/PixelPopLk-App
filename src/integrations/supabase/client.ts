@@ -22,23 +22,30 @@ export type Subtitle = {
   telegram_downloads?: number | null;
   metatags?: string | null;
   has_telegram?: boolean | null;
+  // SEO fields (added by the SEO content migration)
+  slug?: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  canonical_url?: string | null;
+  content_type?: "movie" | "series" | string | null;
+  language?: string | null;
+  release_date?: string | null;
+  imdb_id?: string | null;
+  indexable?: boolean | null;
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true }, // 🟢 Admin Dashboard එකෙන් Logout නොවී රැඳී සිටීමට persistSession සක්‍රීය කර ඇත
+  auth: { persistSession: true, autoRefreshToken: true },
 });
 
 export const SUBTITLES_TABLE = "subtitles";
 
-// 🟢 අලුත් direct_downloads සහ telegram_downloads columns මෙයට ඇතුළත් කර ඇත
 export const SUBTITLE_COLUMNS =
-  "id, created_at, updated_at, title, download_link, telegram_link, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads";
+  "id, created_at, updated_at, title, download_link, telegram_link, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, slug, seo_title, seo_description, canonical_url, content_type, language, release_date, imdb_id, indexable";
 
-// 🟢 Client-facing catalog queries වලට download_link සහ telegram_link සඟවා ආරක්ෂිතව columns පමණක් ලබා දේ
 export const SAFE_SUBTITLE_COLUMNS =
-  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads";
+  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, slug, seo_title, seo_description, canonical_url, content_type, language, release_date, imdb_id, indexable";
 
-// 🟢 Download analytics — logs one event + bumps direct vs telegram counters via atomic RPC
 export function logDownload(subtitleId: number | string | null | undefined, variant: string = "direct") {
   if (subtitleId == null) return;
   const idNum = typeof subtitleId === "number" ? subtitleId : Number(subtitleId);
