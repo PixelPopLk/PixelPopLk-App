@@ -43,6 +43,7 @@ import {
   ChevronUp,
   Settings,
   Eye,
+  EyeOff,
   RotateCcw,
   FastForward,
 } from "lucide-react";
@@ -483,6 +484,8 @@ function Dashboard() {
 
   // Collapsible drawers
   const [showTgSettings, setShowTgSettings] = useState(false);
+  const [showTmdbSettings, setShowTmdbSettings] = useState(false);
+  const [showTmdbKey, setShowTmdbKey] = useState(false);
   const [showCsvUploader, setShowCsvUploader] = useState(false);
 
   // Analytics sub-tab & search
@@ -515,7 +518,7 @@ function Dashboard() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: activeTab === "requests",
+    enabled: true,
   });
 
   // Download Events Query
@@ -532,11 +535,25 @@ function Dashboard() {
       if (error) throw error;
       return (data ?? []) as { subtitle_id: number; variant?: string; downloaded_at: string }[];
     },
-    enabled: activeTab === "analytics",
+    enabled: true,
   });
 
   const editing = form.id !== null;
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Keep dashboard data current when another admin or visitor changes it.
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-dashboard-live-data")
+      .on("postgres_changes", { event: "*", schema: "public", table: SUBTITLES_TABLE }, () => qc.invalidateQueries({ queryKey: ["subtitles"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "subtitle_requests" }, () => qc.invalidateQueries({ queryKey: ["subtitle_requests"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "download_events" }, () => qc.invalidateQueries({ queryKey: ["download_events"] }))
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   // When editing, default postToTelegram to false (to prevent accidental spam)
   useEffect(() => {
@@ -1211,6 +1228,21 @@ function Dashboard() {
 
                 <button
                   type="button"
+                  onClick={() => setShowTmdbSettings((p) => !p)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer font-medium ${
+                    showTmdbSettings
+                      ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                      : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  TMDB API Settings
+                  {tmdbKey && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                  {showTmdbSettings ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowCsvUploader((p) => !p)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer font-medium ${
                     showCsvUploader
@@ -1233,6 +1265,53 @@ function Dashboard() {
                 </div>
               )}
             </div>
+
+            {/* TMDB key is masked by default and used only by this signed-in browser. */}
+            <AnimatePresence>
+              {showTmdbSettings && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="bg-card-elevated rounded-2xl border border-amber-500/20 p-5 shadow-card space-y-3 overflow-hidden"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 shrink-0 rounded-xl bg-amber-500/15 grid place-items-center">
+                      <Settings className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase text-amber-400">TMDB API configuration</h4>
+                      <p className="mt-1 text-xs text-muted-foreground">Add your TMDB v3 API key to enable poster and metadata auto-fill. The field is masked by default and saved only in this browser.</p>
+                    </div>
+                  </div>
+                  <label className="block">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">TMDB API Key</span>
+                    <div className="relative mt-1.5">
+                      <input
+                        type={showTmdbKey ? "text" : "password"}
+                        value={tmdbKey}
+                        onChange={(e) => {
+                          setTmdbKey(e.target.value);
+                          localStorage.setItem("pixelpop_tmdb_key", e.target.value);
+                        }}
+                        autoComplete="off"
+                        placeholder="Paste your TMDB v3 API key"
+                        className="w-full px-4 py-2.5 pr-12 rounded-xl bg-muted/60 border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTmdbKey((visible) => !visible)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition cursor-pointer"
+                        aria-label={showTmdbKey ? "Hide TMDB API key" : "Show TMDB API key"}
+                        title={showTmdbKey ? "Hide key" : "Show key"}
+                      >
+                        {showTmdbKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </label>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Collapsible Telegram Settings Drawer */}
             <AnimatePresence>

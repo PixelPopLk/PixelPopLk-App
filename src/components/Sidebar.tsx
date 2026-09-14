@@ -90,7 +90,7 @@ export function Sidebar({ onClose }: SidebarProps) {
             <div className="w-9 h-9 rounded-xl bg-gradient-primary grid place-items-center shadow-glow">
               <Subtitles className="w-5 h-5 text-primary-foreground" />
             </div>
-            <SheetTitle className="font-extrabold text-lg sm:text-xl tracking-tight text-white">
+            <SheetTitle className="font-extrabold text-lg sm:text-xl tracking-tight text-foreground">
               Pixel<span className="text-gradient">Pop</span>LK
             </SheetTitle>
           </Link>
@@ -132,7 +132,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                   <button
                     key={genre}
                     onClick={() => handleCategoryClick(genre)}
-                    className="w-full text-left py-1.5 px-3 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition duration-150 cursor-pointer"
+                    className="w-full text-left py-1.5 px-3 rounded-lg text-xs font-medium text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-150 cursor-pointer"
                   >
                     {genre}
                   </button>
@@ -158,7 +158,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                   <button
                     key={genre}
                     onClick={() => handleCategoryClick(genre)}
-                    className="w-full text-left py-1.5 px-3 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition duration-150 cursor-pointer"
+                    className="w-full text-left py-1.5 px-3 rounded-lg text-xs font-medium text-foreground/80 hover:text-foreground hover:bg-muted/40 transition duration-150 cursor-pointer"
                   >
                     {genre}
                   </button>
@@ -175,7 +175,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           href="https://t.me/Pixel_Pop_Lk"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-[#229ED9]/30 bg-[#229ED9]/10 text-white hover:bg-[#229ED9]/25 hover:border-[#229ED9]/50 transition duration-200 text-xs font-bold"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-[#229ED9]/30 bg-[#229ED9]/10 text-foreground hover:bg-[#229ED9]/25 hover:border-[#229ED9]/50 transition duration-200 text-xs font-bold"
         >
           <TelegramIcon className="w-4 h-4 text-[#229ED9]" />
           Join Telegram Channel
@@ -184,7 +184,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           href="https://www.facebook.com/share/1Ec2mYq4aa/"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-[#1877F2]/30 bg-[#1877F2]/10 text-white hover:bg-[#1877F2]/25 hover:border-[#1877F2]/50 transition duration-200 text-xs font-bold"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-[#1877F2]/30 bg-[#1877F2]/10 text-foreground hover:bg-[#1877F2]/25 hover:border-[#1877F2]/50 transition duration-200 text-xs font-bold"
         >
           <FacebookIcon className="w-4 h-4 text-[#1877F2]" />
           Follow Facebook Page
