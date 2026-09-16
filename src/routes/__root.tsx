@@ -110,8 +110,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
-      { property: "og:locale", content: "en_US" },
-      { property: "og:locale:alternate", content: "si_LK" },
+      { property: "og:locale", content: "si_LK" },
+      { property: "og:locale:alternate", content: "en_US" },
+      { name: "robots", content: "index, follow" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Premium Sinhala subtitles for movies and TV series." },
@@ -174,7 +175,7 @@ function RootShell({ children }: { children: ReactNode }) {
   const isAdminPage = location.pathname.startsWith("/manage-admin");
 
   return (
-    <html lang="en" className="dark">
+    <html lang="si" className="dark">
       <head>
         {/* 🌓 Pre-hydration Theme Script (Prevents FOUC Light/Dark Flash) */}
         <script
