@@ -6,10 +6,7 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-export default defineConfig({
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
-    server: { entry: "server" },
-  },
-});
+// Use Lovable's TanStack Start defaults. In particular, do not override the
+// server entry: this project has no custom `src/server.ts`, and the default
+// entry is what enables Nitro to render the route tree on the server.
+export default defineConfig({});

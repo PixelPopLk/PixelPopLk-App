@@ -30,9 +30,6 @@ update/
 │   │   ├── episode.$id.tsx        <-- Episode H1, Subtitle specs/sync guide, genre links fix
 │   │   └── sitemap[.]xml.ts       <-- Consolidated Server Sitemap Route
 │   └── styles.css                 <-- Smooth fadeInUp CSS animation
-├── functions/
-│   └── sitemap.xml.js             <-- Cloudflare Pages Runtime Sitemap (All landing pages included)
-├── generate-sitemap.js            <-- Build-time XML Sitemap Generator
 ├── public/
 │   └── robots.txt                 <-- Clean robots.txt (Disallows admin & search query duplication)
 └── README.md
@@ -71,7 +68,7 @@ update/
    - Navbar එකට Movies, TV Series, Latest සෘජු links එකතු කරන ලදී.
    - Breadcrumbs සහ Genre badges සියල්ල generic query strings වෙනුවට dedicated landing pages වලට සම්බන්ධ කර ඇත.
 9. **Sitemap Consolidate කිරීම**:
-   - `generate-sitemap.js`, `functions/sitemap.xml.js`, සහ `sitemap[.]xml.ts` යන තුනම සමපාත කර `/movies`, `/tv-series`, `/latest`, `/genres/*` සියලුම URLs ඇතුළත් කර ඇත.
+   - `src/routes/sitemap[.]xml.ts` TanStack Start server route එක පමණක් `/sitemap.xml` සඳහා authoritative implementation එකයි. එයට canonical landing, movie, series hub, episode, සහ valid genre URLs පමණක් ඇතුළත් වන අතර future-dated `lastmod` values ඉවත් කරයි.
 
 ### 🟣 Priority 4 — Performance & Core Web Vitals
 10. **Framer Motion බර අඩු කර Pure CSS Animations භාවිතය**:
@@ -88,7 +85,7 @@ update/
    - ඔබගේ **Supabase Dashboard** -> **SQL Editor** වෙත ගොස් paste කර **RUN** කරන්න. (පැරණි දත්ත කිසිවක් මැකෙන්නේ නැත).
 
 2. **Files Replace කිරීම**:
-   - `update/` ෆෝල්ඩරය ඇතුළේ ඇති `src`, `public`, `functions`, `generate-sitemap.js` ඔබගේ ප්‍රධාන GitHub repository එකේ අදාළ තැන් වලට copy/paste (replace) කරන්න.
+   - `update/` ෆෝල්ඩරය ඇතුළේ ඇති `src` සහ `public` ඔබගේ ප්‍රධාන GitHub repository එකේ අදාළ තැන් වලට copy/paste (replace) කරන්න.
 
 3. **Git Commit & Push**:
    ```bash

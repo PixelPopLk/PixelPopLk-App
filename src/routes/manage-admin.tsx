@@ -489,8 +489,9 @@ function Dashboard() {
   const [showCsvUploader, setShowCsvUploader] = useState(false);
 
   // Analytics sub-tab & search
-  const [analyticsTab, setAnalyticsTab] = useState<"all" | "movies" | "series" | "episodes" | "genres">("all");
+  const [analyticsTab, setAnalyticsTab] = useState<"all" | "trending" | "movies" | "series" | "episodes" | "genres">("all");
   const [analyticsSearch, setAnalyticsSearch] = useState("");
+  const [trendingPeriod, setTrendingPeriod] = useState<"today" | "week" | "month">("today");
 
   // Next Episode focus ref
   const downloadInputRef = useRef<HTMLInputElement | null>(null);
@@ -1129,6 +1130,84 @@ function Dashboard() {
       recentFeed,
     };
   }, [rows, downloadEvents]);
+
+  // Rankings are based on individual download events rather than lifetime
+  // counters, so the selected period always reflects real recent activity.
+  const trending = useMemo(() => {
+    const allRows = rows ?? [];
+    const now = new Date();
+    const periodStart = new Date(now);
+    if (trendingPeriod === "today") {
+      periodStart.setHours(0, 0, 0, 0);
+    } else if (trendingPeriod === "week") {
+      periodStart.setDate(periodStart.getDate() - 6);
+      periodStart.setHours(0, 0, 0, 0);
+    } else {
+      periodStart.setDate(periodStart.getDate() - 29);
+      periodStart.setHours(0, 0, 0, 0);
+    }
+
+    const rowsById = new Map(allRows.map((row) => [String(row.id), row]));
+    const seriesByEpisodeId = new Map<string, { id: string | number; showName: string; episodesCount: number }>();
+    for (const item of buildGridItems(allRows as any)) {
+      if (item.kind !== "series") continue;
+      for (const episode of item.episodes) {
+        seriesByEpisodeId.set(String(episode.id), {
+          id: item.id,
+          showName: item.showName,
+          episodesCount: item.episodes.length,
+        });
+      }
+    }
+
+    type TrendCount = { direct: number; telegram: number };
+    const countsBySubtitle = new Map<string, TrendCount>();
+    for (const event of downloadEvents ?? []) {
+      const downloadedAt = new Date(event.downloaded_at);
+      if (Number.isNaN(downloadedAt.getTime()) || downloadedAt < periodStart || downloadedAt > now) continue;
+
+      const id = String(event.subtitle_id);
+      const counts = countsBySubtitle.get(id) ?? { direct: 0, telegram: 0 };
+      if (event.variant === "telegram") counts.telegram += 1;
+      else counts.direct += 1;
+      countsBySubtitle.set(id, counts);
+    }
+
+    const withTotal = <T extends TrendCount>(entry: T) => ({ ...entry, total: entry.direct + entry.telegram });
+    const movies = Array.from(countsBySubtitle.entries())
+      .map(([id, counts]) => {
+        const row = rowsById.get(id);
+        if (!row || row.season != null || row.episode != null) return null;
+        return withTotal({ id: row.id, title: row.title || `Movie #${id}`, ...counts });
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => b.total - a.total);
+
+    const episodes = Array.from(countsBySubtitle.entries())
+      .map(([id, counts]) => {
+        const row = rowsById.get(id);
+        if (!row || (row.season == null && row.episode == null)) return null;
+        return withTotal({ id: row.id, title: row.title || `Episode #${id}`, season: row.season, episode: row.episode, ...counts });
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => b.total - a.total);
+
+    const seriesCounts = new Map<string, TrendCount & { id: string | number; showName: string; episodesCount: number }>();
+    for (const [episodeId, counts] of countsBySubtitle) {
+      const series = seriesByEpisodeId.get(episodeId);
+      if (!series) continue;
+      const current = seriesCounts.get(String(series.id)) ?? { ...series, direct: 0, telegram: 0 };
+      current.direct += counts.direct;
+      current.telegram += counts.telegram;
+      seriesCounts.set(String(series.id), current);
+    }
+
+    const series = Array.from(seriesCounts.values())
+      .map(withTotal)
+      .sort((a, b) => b.total - a.total);
+
+    return { periodStart, movies, episodes, series };
+  }, [downloadEvents, rows, trendingPeriod]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -1919,6 +1998,14 @@ function Dashboard() {
                   🌐 Overview
                 </button>
                 <button
+                  onClick={() => setAnalyticsTab("trending")}
+                  className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
+                    analyticsTab === "trending" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  🔥 Trending
+                </button>
+                <button
                   onClick={() => setAnalyticsTab("movies")}
                   className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
                     analyticsTab === "movies" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -1957,6 +2044,101 @@ function Dashboard() {
               <p className="text-xs text-muted-foreground flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-primary" /> Syncing live download telemetry…
               </p>
+            )}
+
+            {/* Period-based leaderboard: all rankings use download_events, not lifetime totals. */}
+            {analyticsTab === "trending" && (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-amber-500/25 bg-amber-500/5 p-5 shadow-card">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-lg font-black text-foreground">
+                        <Flame className="h-5 w-5 text-amber-400" /> Trending Downloads
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Counts include direct and Telegram downloads from {trending.periodStart.toLocaleDateString()} until now.
+                      </p>
+                    </div>
+                    <div className="inline-flex w-fit rounded-xl border border-border bg-muted/60 p-1 text-xs font-bold">
+                      {[
+                        ["today", "Today"],
+                        ["week", "Past Week"],
+                        ["month", "Past Month"],
+                      ].map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setTrendingPeriod(value as "today" | "week" | "month")}
+                          className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                            trendingPeriod === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-3">
+                  <div className="rounded-3xl border border-border bg-card/40 p-5 shadow-card">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase text-primary">
+                      <Film className="h-4 w-4" /> Trending Movies ({trending.movies.length})
+                    </h3>
+                    <div className="max-h-[28rem] overflow-auto rounded-xl border border-border">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-muted text-left text-[10px] uppercase text-muted-foreground">
+                          <tr><th className="px-3 py-2">Movie</th><th className="px-3 py-2 text-right">Direct</th><th className="px-3 py-2 text-right">TG</th><th className="px-3 py-2 text-right">Total</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {trending.movies.map((movie: any) => (
+                            <tr key={movie.id}><td className="max-w-[12rem] truncate px-3 py-2 font-semibold"><Link to="/content/$id" params={{ id: String(movie.id) }} target="_blank" className="hover:text-primary">{movie.title}</Link></td><td className="px-3 py-2 text-right text-emerald-400">{movie.direct}</td><td className="px-3 py-2 text-right text-sky-400">{movie.telegram}</td><td className="px-3 py-2 text-right font-black text-primary">{movie.total}</td></tr>
+                          ))}
+                          {trending.movies.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-muted-foreground">No movie downloads in this period.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-border bg-card/40 p-5 shadow-card">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase text-sky-400">
+                      <Tv className="h-4 w-4" /> Trending TV Series ({trending.series.length})
+                    </h3>
+                    <div className="max-h-[28rem] overflow-auto rounded-xl border border-border">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-muted text-left text-[10px] uppercase text-muted-foreground">
+                          <tr><th className="px-3 py-2">Series</th><th className="px-3 py-2 text-right">Direct</th><th className="px-3 py-2 text-right">TG</th><th className="px-3 py-2 text-right">Total</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {trending.series.map((series: any) => (
+                            <tr key={series.id}><td className="max-w-[12rem] truncate px-3 py-2 font-semibold"><Link to="/content/$id" params={{ id: String(series.id) }} target="_blank" className="hover:text-primary">{series.showName}</Link><span className="ml-1 text-[10px] text-muted-foreground">({series.episodesCount} eps)</span></td><td className="px-3 py-2 text-right text-emerald-400">{series.direct}</td><td className="px-3 py-2 text-right text-sky-400">{series.telegram}</td><td className="px-3 py-2 text-right font-black text-primary">{series.total}</td></tr>
+                          ))}
+                          {trending.series.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-muted-foreground">No TV series downloads in this period.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-border bg-card/40 p-5 shadow-card">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase text-amber-400">
+                      <Flame className="h-4 w-4" /> Trending Episodes ({trending.episodes.length})
+                    </h3>
+                    <div className="max-h-[28rem] overflow-auto rounded-xl border border-border">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-muted text-left text-[10px] uppercase text-muted-foreground">
+                          <tr><th className="px-3 py-2">Episode</th><th className="px-3 py-2 text-right">Direct</th><th className="px-3 py-2 text-right">TG</th><th className="px-3 py-2 text-right">Total</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {trending.episodes.map((episode: any) => (
+                            <tr key={episode.id}><td className="max-w-[12rem] truncate px-3 py-2 font-semibold"><Link to="/episode/$id" params={{ id: String(episode.id) }} target="_blank" className="hover:text-primary">{episode.title}</Link><span className="ml-1 text-[10px] text-muted-foreground">S{episode.season} E{episode.episode}</span></td><td className="px-3 py-2 text-right text-emerald-400">{episode.direct}</td><td className="px-3 py-2 text-right text-sky-400">{episode.telegram}</td><td className="px-3 py-2 text-right font-black text-primary">{episode.total}</td></tr>
+                          ))}
+                          {trending.episodes.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-muted-foreground">No episode downloads in this period.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* TAB 1: 🌐 OVERVIEW */}
