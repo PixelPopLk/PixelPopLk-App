@@ -1,9 +1,19 @@
 import React, { useEffect, useRef, useState, useCallback, useId } from "react";
-import { Download, Lock, CheckCircle2, Loader2, Send, AlertCircle, Info } from "lucide-react";
-import { supabase, SUBTITLES_TABLE, logDownload } from "@/integrations/supabase/client";
+import {
+  Download,
+  Lock,
+  CheckCircle2,
+  Loader2,
+  Send,
+  AlertCircle,
+  Info,
+} from "lucide-react";
+import { logDownload } from "@/integrations/supabase/client";
 
-const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
-const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+const MONETAG_URL =
+  "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
+const ADSTERRA_URL =
+  "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
 const RELOCK_DELAY_MS = 4000; // File එක download වූ පසු නැවත Lock වීමට ගතවන කාලය (තත්පර 8)
@@ -24,8 +34,10 @@ export function isSafeUrl(url: string | null | undefined): boolean {
   }
 }
 
-// 🚀 Fast Native Download: Tab එක Redirect නොවී කෙලින්ම Device එකට Download කිරීම
-async function triggerFastNativeDownload(rawUrl: string, title?: string) {
+// Chrome වල download එක browser එකටම handle කිරීමට දෙන්න. කලින් තිබූ fetch → Blob
+// ක්‍රමය large files සඳහා memory භාවිතා කර, CORS/network request එක ප්‍රමාද වූ විට
+// Chrome download එක ආරම්භ නොවන ලෙස පෙනෙන්නට හේතු විය.
+function triggerBrowserDownload(rawUrl: string, title?: string) {
   const fullUrl = rawUrl.trim();
   const rawTitle = title || "Subtitle";
   const invalidChars = ["\\", "/", ":", "*", "?", '"', "<", ">", "|"];
@@ -43,7 +55,10 @@ async function triggerFastNativeDownload(rawUrl: string, title?: string) {
     const fileName = `${safeTitle} Sinhala Sub - PixelPopLK.${extension}`;
 
     // Cloud Hosters (Google Drive, Mediafire, Mega, Dropbox, PixelDrain) -> New Tab එකක open කිරීම
-    const isCloudHost = /drive\.google\.com|mediafire\.com|mega\.nz|dropbox\.com|pixeldrain\.com|1drv\.ms/i.test(urlObj.hostname);
+    const isCloudHost =
+      /drive\.google\.com|mediafire\.com|mega\.nz|dropbox\.com|pixeldrain\.com|1drv\.ms/i.test(
+        urlObj.hostname,
+      );
     if (isCloudHost) {
       window.open(fullUrl, "_blank", "noopener,noreferrer");
       return;
@@ -55,31 +70,12 @@ async function triggerFastNativeDownload(rawUrl: string, title?: string) {
     }
     const downloadUrl = urlObj.toString();
 
-    // 1. Blob Download ක්‍රමය (Page navigation එක සම්පූර්ණයෙන්ම වළක්වයි)
-    try {
-      const res = await fetch(downloadUrl);
-      if (res.ok) {
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        return;
-      }
-    } catch {
-      // CORS Error ආවොත් Fallback Anchor එකට යයි
-    }
-
-    // 2. Fallback Anchor Download
+    // මෙය click handler එක තුළ synchronousව run වන නිසා Chrome මෙය user-initiated
+    // download එකක් ලෙස හඳුනාගනී. Supabase signed URL එකට download parameter එක
+    // තිබෙන විට Content-Disposition header එක මඟින් filename එකත් ලැබේ.
     const a = document.createElement("a");
     a.href = downloadUrl;
     a.setAttribute("download", fileName);
-    a.setAttribute("target", "_blank");
-    a.setAttribute("rel", "noopener noreferrer");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -106,11 +102,14 @@ export function DownloadButton({
   variant = "direct",
 }: DownloadButtonProps) {
   const normalizedVariant = variant === "telegram" ? "telegram" : "direct";
-  
+
   const autoId = useId().replace(/[^a-zA-Z0-9_-]/g, "_");
-  const subId = subtitleId !== undefined && subtitleId !== null && String(subtitleId).trim() !== ""
-    ? String(subtitleId).trim()
-    : autoId;
+  const subId =
+    subtitleId !== undefined &&
+    subtitleId !== null &&
+    String(subtitleId).trim() !== ""
+      ? String(subtitleId).trim()
+      : autoId;
 
   // 🟢 Title Slug එකක් මඟින් Buttons වෙන් කර ගැනීම
   const titleSlug = (title || "file")
@@ -131,28 +130,24 @@ export function DownloadButton({
   const validityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 🟢 Database එකෙන් Link එක ලබාගැනීම
+  // Link එක public Supabase client එකෙන් නොගෙන, server endpoint එකෙන් පමණක් ගනී.
+  // Service-role key එක browser bundle එකට යන්නේ නැත.
   const fetchLink = useCallback(async (): Promise<string | null> => {
     if (!subtitleId) return null;
     try {
-      const { data, error } = await supabase.rpc("get_single_download_link", {
-        target_id: Number(subtitleId),
+      const response = await fetch("/api/download-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subtitleId: Number(subtitleId),
+          variant: normalizedVariant,
+        }),
       });
-      if (!error && data) {
-        const item = Array.isArray(data) ? data[0] : data;
-        const link = normalizedVariant === "telegram" ? item?.telegram_link : item?.download_link;
-        if (link) return String(link).trim();
-      }
 
-      const { data: directData } = await supabase
-        .from(SUBTITLES_TABLE)
-        .select("download_link, telegram_link")
-        .eq("id", Number(subtitleId))
-        .maybeSingle();
-
-      if (directData) {
-        const link = normalizedVariant === "telegram" ? directData.telegram_link : directData.download_link;
-        if (link) return String(link).trim();
+      if (!response.ok) return null;
+      const data = (await response.json()) as { link?: unknown };
+      if (typeof data.link === "string" && data.link.trim()) {
+        return data.link.trim();
       }
     } catch {
       /* noop */
@@ -186,35 +181,49 @@ export function DownloadButton({
   }, [timeStorageKey, lockExpiryKey]);
 
   // Live Ticker
-  const startLiveCountdown = useCallback((startTime: number) => {
-    if (tickerRef.current) clearInterval(tickerRef.current);
+  const startLiveCountdown = useCallback(
+    (startTime: number) => {
+      if (tickerRef.current) clearInterval(tickerRef.current);
 
-    fetchLink().then((link) => {
-      if (link && isSafeUrl(link)) {
-        setDownloadLink(link);
-      }
-    });
+      const tick = () => {
+        const elapsedMs = Date.now() - startTime;
+        const leftSec = Math.max(
+          0,
+          Math.ceil((REQUIRED_AD_SECONDS * 1000 - elapsedMs) / 1000),
+        );
+        setRemainingSec(leftSec);
 
-    const tick = () => {
-      const elapsedMs = Date.now() - startTime;
-      const leftSec = Math.max(0, Math.ceil((REQUIRED_AD_SECONDS * 1000 - elapsedMs) / 1000));
-      setRemainingSec(leftSec);
+        if (leftSec <= 0) {
+          if (tickerRef.current) clearInterval(tickerRef.current);
+          // Link එක countdown ආරම්භ වන විට fetch නොකර මෙතැනදී පමණක් ඉල්ලයි.
+          // එම නිසා network tab එකකින් ad timer එක අතරතුර link එක ලබාගත නොහැක.
+          void fetchLink().then((link) => {
+            if (!link || !isSafeUrl(link)) {
+              setErrorMsg(
+                "Download link එක සූදානම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+              );
+              resetToLocked();
+              setTimeout(() => setErrorMsg(""), 6000);
+              return;
+            }
 
-      if (leftSec <= 0) {
-        if (tickerRef.current) clearInterval(tickerRef.current);
-        setState("ready");
+            setDownloadLink(link);
+            setState("ready");
+            if (validityTimerRef.current)
+              clearTimeout(validityTimerRef.current);
+            validityTimerRef.current = setTimeout(
+              resetToLocked,
+              MAX_UNLOCK_VALIDITY_MS,
+            );
+          });
+        }
+      };
 
-        // ⏱️ Unlocked වූ පසු තත්පර 20ක Validity Timer එකක් ක්‍රියාත්මක වීම
-        if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
-        validityTimerRef.current = setTimeout(() => {
-          resetToLocked();
-        }, MAX_UNLOCK_VALIDITY_MS);
-      }
-    };
-
-    tick();
-    tickerRef.current = setInterval(tick, 300);
-  }, [fetchLink, resetToLocked]);
+      tick();
+      tickerRef.current = setInterval(tick, 300);
+    },
+    [fetchLink, resetToLocked],
+  );
 
   // Ad Time Verify කිරීම
   const verifyAdTime = useCallback(async () => {
@@ -266,7 +275,13 @@ export function DownloadButton({
     } catch {
       /* noop */
     }
-  }, [lockExpiryKey, timeStorageKey, resetToLocked, fetchLink, startLiveCountdown]);
+  }, [
+    lockExpiryKey,
+    timeStorageKey,
+    resetToLocked,
+    fetchLink,
+    startLiveCountdown,
+  ]);
 
   useEffect(() => {
     verifyAdTime();
@@ -318,12 +333,7 @@ export function DownloadButton({
     }
 
     if (state === "ready") {
-      let finalUrl = downloadLink;
-
-      if (!finalUrl) {
-        setState("downloading");
-        finalUrl = (await fetchLink()) || "";
-      }
+      const finalUrl = downloadLink;
 
       if (finalUrl && isSafeUrl(finalUrl)) {
         setState("downloading");
@@ -331,7 +341,7 @@ export function DownloadButton({
         if (normalizedVariant === "telegram") {
           window.open(finalUrl.trim(), "_blank", "noopener,noreferrer");
         } else {
-          await triggerFastNativeDownload(finalUrl, title);
+          triggerBrowserDownload(finalUrl, title);
         }
 
         logDownload(subtitleId, normalizedVariant);
@@ -349,7 +359,9 @@ export function DownloadButton({
           resetToLocked();
         }, RELOCK_DELAY_MS);
       } else {
-        setErrorMsg("මෙම උපසිරැසිය සඳහා download link එකක් තවමත් එක් කර නොමැත. කරුණාකර සුළු වේලාවකින් නැවත උත්සාහ කරන්න.");
+        setErrorMsg(
+          "මෙම උපසිරැසිය සඳහා download link එකක් තවමත් එක් කර නොමැත. කරුණාකර සුළු වේලාවකින් නැවත උත්සාහ කරන්න.",
+        );
         resetToLocked();
         setTimeout(() => setErrorMsg(""), 6000);
       }
@@ -374,16 +386,27 @@ export function DownloadButton({
         return (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>{remainingSec > 0 ? `⏳ Unlocking... ${remainingSec}s` : "Preparing Link..."}</span>
+            <span>
+              {remainingSec > 0
+                ? `⏳ Unlocking... ${remainingSec}s`
+                : "Preparing Link..."}
+            </span>
           </>
         );
 
       case "ready":
         return (
           <>
-            {normalizedVariant === "telegram" ? <Send className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+            {normalizedVariant === "telegram" ? (
+              <Send className="w-4 h-4" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
             <span className="font-extrabold">
-              {label || (normalizedVariant === "telegram" ? "Get Video File (Telegram)" : "Download Subtitle (.zip)")}
+              {label ||
+                (normalizedVariant === "telegram"
+                  ? "Get Video File (Telegram)"
+                  : "Download Subtitle (.zip)")}
             </span>
           </>
         );
@@ -399,7 +422,8 @@ export function DownloadButton({
   };
 
   const getButtonClass = () => {
-    const base = "inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-bold text-sm transition-all duration-300 cursor-pointer shadow-lg active:scale-95 select-none";
+    const base =
+      "inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-bold text-sm transition-all duration-300 cursor-pointer shadow-lg active:scale-95 select-none";
 
     switch (state) {
       case "locked":
@@ -428,7 +452,9 @@ export function DownloadButton({
         data-no-ad="true"
         data-download="true"
         onClick={handleButtonClick}
-        className={className ? `${className} ${getButtonClass()}` : getButtonClass()}
+        className={
+          className ? `${className} ${getButtonClass()}` : getButtonClass()
+        }
       >
         {getButtonContent()}
       </button>
