@@ -16,6 +16,7 @@ import { Route as MoviesRouteImport } from './routes/movies'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TvSeriesRouteImport } from './routes/tv-series'
+import { Route as ApiDownloadLinkRouteImport } from './routes/api.download-link'
 import { Route as ApiOgRouteImport } from './routes/api.og'
 import { Route as ContentIdRouteImport } from './routes/content.$id'
 import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
@@ -56,6 +57,11 @@ const TvSeriesRoute = TvSeriesRouteImport.update({
   path: '/tv-series',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDownloadLinkRoute = ApiDownloadLinkRouteImport.update({
+  id: '/api/download-link',
+  path: '/api/download-link',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOgRoute = ApiOgRouteImport.update({
   id: '/api/og',
   path: '/api/og',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tv-series': typeof TvSeriesRoute
+  '/api/download-link': typeof ApiDownloadLinkRoute
   '/api/og': typeof ApiOgRoute
   '/content/$id': typeof ContentIdRoute
   '/episode/$id': typeof EpisodeIdRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tv-series': typeof TvSeriesRoute
+  '/api/download-link': typeof ApiDownloadLinkRoute
   '/api/og': typeof ApiOgRoute
   '/content/$id': typeof ContentIdRoute
   '/episode/$id': typeof EpisodeIdRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tv-series': typeof TvSeriesRoute
+  '/api/download-link': typeof ApiDownloadLinkRoute
   '/api/og': typeof ApiOgRoute
   '/content/$id': typeof ContentIdRoute
   '/episode/$id': typeof EpisodeIdRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/sitemap.xml'
     | '/tv-series'
+    | '/api/download-link'
     | '/api/og'
     | '/content/$id'
     | '/episode/$id'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/sitemap.xml'
     | '/tv-series'
+    | '/api/download-link'
     | '/api/og'
     | '/content/$id'
     | '/episode/$id'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/sitemap.xml'
     | '/tv-series'
+    | '/api/download-link'
     | '/api/og'
     | '/content/$id'
     | '/episode/$id'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TvSeriesRoute: typeof TvSeriesRoute
+  ApiDownloadLinkRoute: typeof ApiDownloadLinkRoute
   ApiOgRoute: typeof ApiOgRoute
   ContentIdRoute: typeof ContentIdRoute
   EpisodeIdRoute: typeof EpisodeIdRoute
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TvSeriesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/download-link': {
+      id: '/api/download-link'
+      path: '/api/download-link'
+      fullPath: '/api/download-link'
+      preLoaderRoute: typeof ApiDownloadLinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/og': {
       id: '/api/og'
       path: '/api/og'
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TvSeriesRoute: TvSeriesRoute,
+  ApiDownloadLinkRoute: ApiDownloadLinkRoute,
   ApiOgRoute: ApiOgRoute,
   ContentIdRoute: ContentIdRoute,
   EpisodeIdRoute: EpisodeIdRoute,

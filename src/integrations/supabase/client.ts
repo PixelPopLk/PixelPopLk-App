@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://gilnzvsnkwrnfbwhobow.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ZWL-aXdaOXfnYKKaTJO58w_FIya45KL";
+const SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_ZWL-aXdaOXfnYKKaTJO58w_FIya45KL";
 
 export type Subtitle = {
   id: number | string;
@@ -36,18 +37,25 @@ export const SUBTITLE_COLUMNS =
 
 // 🟢 Client-facing catalog queries වලට download_link සහ telegram_link සඟවා ආරක්ෂිතව columns පමණක් ලබා දේ
 export const SAFE_SUBTITLE_COLUMNS =
-  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads";
+  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, has_telegram";
 
 // 🟢 Download analytics — logs one event + bumps direct vs telegram counters via atomic RPC
-export function logDownload(subtitleId: number | string | null | undefined, variant: string = "direct") {
+export function logDownload(
+  subtitleId: number | string | null | undefined,
+  variant: string = "direct",
+) {
   if (subtitleId == null) return;
-  const idNum = typeof subtitleId === "number" ? subtitleId : Number(subtitleId);
+  const idNum =
+    typeof subtitleId === "number" ? subtitleId : Number(subtitleId);
   if (Number.isNaN(idNum)) return;
 
   const normalizedVariant = variant === "telegram" ? "telegram" : "direct";
 
   supabase
-    .rpc("log_subtitle_download", { p_subtitle_id: idNum, p_variant: normalizedVariant })
+    .rpc("log_subtitle_download", {
+      p_subtitle_id: idNum,
+      p_variant: normalizedVariant,
+    })
     .then(({ error }) => {
       if (error) console.warn("logDownload failed:", error.message);
     });

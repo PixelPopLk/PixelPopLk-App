@@ -31,7 +31,11 @@ import { ShareCardModal } from "@/components/ShareCardModal";
 import { DmcaModal } from "@/components/DmcaModal";
 import { FacebookIcon, TelegramIcon } from "@/components/SocialIcons";
 
-import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
+import {
+  supabase,
+  SUBTITLES_TABLE,
+  type Subtitle,
+} from "@/integrations/supabase/client";
 import {
   buildGridItems,
   formatRating,
@@ -50,7 +54,8 @@ import { DownloadButton } from "@/components/DownloadCountdown";
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
-const SAFE_COLUMNS = "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at";
+const SAFE_COLUMNS =
+  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, has_telegram";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
@@ -89,34 +94,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
     if (secondError) throw secondError;
     const episodes = (allEpisodes ?? []) as Subtitle[];
 
-    // 🟢 ආරක්ෂාව: telegram_link raw URL එක මෙහි select නොකර id පමණක් පරීක්ෂා කර has_telegram සකසයි
-    const { data: tgCheck } = await supabase
-      .from(SUBTITLES_TABLE)
-      .select("id")
-      .ilike("title", `${safeShowPrefix}%`)
-      .not("telegram_link", "is", null)
-      .neq("telegram_link", "");
-
-    const tgSet = new Set((tgCheck ?? []).map((e) => e.id));
-    for (const ep of episodes) {
-      if (tgSet.has(ep.id)) {
-        ep.has_telegram = true;
-      }
-    }
     return episodes;
-  }
-
-  // 🟢 ආරක්ෂාව: Movie සඳහා telegram_link raw URL එක මෙහි select නොකර id පමණක් පරීක්ෂා කර has_telegram සකසයි
-  const { data: tgCheck } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select("id")
-    .eq("id", Number(id) as any)
-    .not("telegram_link", "is", null)
-    .neq("telegram_link", "")
-    .maybeSingle();
-
-  if (tgCheck) {
-    (targetItem as Subtitle).has_telegram = true;
   }
 
   return [targetItem] as Subtitle[];
@@ -127,21 +105,36 @@ function findItem(data: Subtitle[], id: string): GridItem | null {
   const direct = items.find((it) => String(it.id) === id);
   if (direct) return direct;
   for (const it of items) {
-    if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id)) return it;
+    if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id))
+      return it;
   }
   return null;
 }
 
-function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; params: { id: string } }) {
+function buildContentHead({
+  loaderData,
+  params,
+}: {
+  loaderData?: Subtitle[];
+  params: { id: string };
+}) {
   const item = findItem(loaderData ?? [], params.id);
 
   if (!item) {
-    return { meta: [{ title: "Subtitle — PixelPopLK" }, { name: "robots", content: "noindex" }] };
+    return {
+      meta: [
+        { title: "Subtitle — PixelPopLK" },
+        { name: "robots", content: "noindex" },
+      ],
+    };
   }
 
   if (item.kind === "movie") {
     const s = item.sub;
-    const year = s.year != null && s.year !== "" ? String(s.year) : new Date(s.created_at).getFullYear().toString();
+    const year =
+      s.year != null && s.year !== ""
+        ? String(s.year)
+        : new Date(s.created_at).getFullYear().toString();
     const titleText = `${s.title} (${year}) Sinhala Subtitle | Download Movie Subtitles | PixelPopLK`;
     const descText = s.description
       ? s.description.slice(0, 160)
@@ -164,20 +157,32 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
         { property: "og:site_name", content: "PixelPopLK" },
         { property: "og:locale", content: "si_LK" },
         { property: "og:locale:alternate", content: "en_US" },
-        ...(s.image_url ? [{ property: "og:image", content: s.image_url }] : []),
-        ...(s.image_url ? [{ property: "og:image:alt", content: titleText }] : []),
+        ...(s.image_url
+          ? [{ property: "og:image", content: s.image_url }]
+          : []),
+        ...(s.image_url
+          ? [{ property: "og:image:alt", content: titleText }]
+          : []),
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: titleText },
         { name: "twitter:description", content: descText },
-        ...(s.image_url ? [{ name: "twitter:image", content: s.image_url }] : []),
-        ...(s.image_url ? [{ name: "twitter:image:alt", content: titleText }] : []),
+        ...(s.image_url
+          ? [{ name: "twitter:image", content: s.image_url }]
+          : []),
+        ...(s.image_url
+          ? [{ name: "twitter:image:alt", content: titleText }]
+          : []),
       ],
       links: [{ rel: "canonical", href: canonicalUrl }],
     };
   }
 
-  const s1e1 = item.episodes.find((e) => e.season === 1 && e.episode === 1) || item.episodes[0];
-  const withYear = item.episodes.find((e) => e.year != null && e.year !== "") ?? item.episodes[0];
+  const s1e1 =
+    item.episodes.find((e) => e.season === 1 && e.episode === 1) ||
+    item.episodes[0];
+  const withYear =
+    item.episodes.find((e) => e.year != null && e.year !== "") ??
+    item.episodes[0];
   const year =
     withYear?.year != null && withYear.year !== ""
       ? String(withYear.year)
@@ -187,7 +192,9 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
   const descText = description
     ? description.slice(0, 160)
     : `Download Sinhala subtitles for TV Series ${item.showName} (${year}). Latest seasons and episodes available on PixelPopLK.`;
-  const customMeta = item.episodes.map((e) => (e as any).metatags).find(Boolean);
+  const customMeta = item.episodes
+    .map((e) => (e as any).metatags)
+    .find(Boolean);
   const keywordText = customMeta
     ? `${item.showName} Sinhala Subtitles, ${customMeta}`
     : `${item.showName} Sinhala Subtitles, Sinhala Subtitles TV Series, ${item.showName} Sinhala Subtitles TV Series, PixelPopLK`;
@@ -206,12 +213,16 @@ function buildContentHead({ loaderData, params }: { loaderData?: Subtitle[]; par
       { property: "og:locale", content: "si_LK" },
       { property: "og:locale:alternate", content: "en_US" },
       ...(item.poster ? [{ property: "og:image", content: item.poster }] : []),
-      ...(item.poster ? [{ property: "og:image:alt", content: titleText }] : []),
+      ...(item.poster
+        ? [{ property: "og:image:alt", content: titleText }]
+        : []),
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: titleText },
       { name: "twitter:description", content: descText },
       ...(item.poster ? [{ name: "twitter:image", content: item.poster }] : []),
-      ...(item.poster ? [{ name: "twitter:image:alt", content: titleText }] : []),
+      ...(item.poster
+        ? [{ name: "twitter:image:alt", content: titleText }]
+        : []),
     ],
     links: [{ rel: "canonical", href: canonicalUrl }],
   };
@@ -249,40 +260,47 @@ function ContentPage() {
     const direct = items.find((it) => String(it.id) === id);
     if (direct) return direct;
     for (const it of items) {
-      if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id)) return it;
+      if (it.kind === "series" && it.episodes.some((e) => String(e.id) === id))
+        return it;
     }
     return null;
   }, [data, id]);
 
-  const titleName = item ? (item.kind === "movie" ? item.sub.title : item.showName) : "";
+  const titleName = item
+    ? item.kind === "movie"
+      ? item.sub.title
+      : item.showName
+    : "";
   const yearVal = item ? (item.kind === "movie" ? item.sub.year : "") : "";
   const isSeries = item?.kind === "series";
 
   // 🟢 Google Breadcrumb Schema
-  const breadcrumbSchema = item ? {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "Home",
-        "item": BASE_URL
-      },
-      {
-        "@type": "ListItem",
-        "position": 2,
-        "name": isSeries ? "TV Series" : "Movies",
-        "item": `${BASE_URL}/${isSeries ? "tv-series" : "movies"}`
-      },
-      {
-        "@type": "ListItem",
-        "position": 3,
-        "name": titleName,
-        "item": `${BASE_URL}/content/${item.id}`
+  const breadcrumbSchema = item
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: BASE_URL,
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: isSeries ? "TV Series" : "Movies",
+            item: `${BASE_URL}/${isSeries ? "tv-series" : "movies"}`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: titleName,
+            item: `${BASE_URL}/content/${item.id}`,
+          },
+        ],
       }
-    ]
-  } : null;
+    : null;
 
   return (
     <Shell>
@@ -298,12 +316,17 @@ function ContentPage() {
       ) : !data ? (
         <p>Loading…</p>
       ) : !item ? (
-        <div className="p-10 text-center text-destructive">Content not found</div>
+        <div className="p-10 text-center text-destructive">
+          Content not found
+        </div>
       ) : (
         <>
           {/* 🟢 Breadcrumb Navigation UI */}
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4 overflow-x-auto scrollbar-hide py-1">
-            <Link to="/" className="hover:text-foreground transition flex items-center gap-1">
+            <Link
+              to="/"
+              className="hover:text-foreground transition flex items-center gap-1"
+            >
               <Home className="w-3.5 h-3.5" /> Home
             </Link>
             <ChevronRight className="w-3 h-3 shrink-0" />
@@ -329,8 +352,12 @@ function ContentPage() {
           <RelatedContentSection currentItem={item} />
 
           {/* 🟢 SEO Tags Cloud */}
-          <SeoTagsCloud title={titleName} year={yearVal ? String(yearVal) : undefined} isSeries={isSeries} />
-          
+          <SeoTagsCloud
+            title={titleName}
+            year={yearVal ? String(yearVal) : undefined}
+            isSeries={isSeries}
+          />
+
           <CommentsSection key={`comments-${id}`} subtitleId={id} />
         </>
       )}
@@ -342,7 +369,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden w-full">
       <Navbar showBack backTo="/" backText="Back" />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 w-full min-w-0">{children}</main>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 w-full min-w-0">
+        {children}
+      </main>
     </div>
   );
 }
@@ -392,8 +421,13 @@ function ShareBar({
     }
   };
 
-  const shareUrl = typeof window !== "undefined" ? encodeURIComponent(window.location.href) : "";
-  const shareText = encodeURIComponent(`${title} Sinhala Subtitle | PixelPopLK`);
+  const shareUrl =
+    typeof window !== "undefined"
+      ? encodeURIComponent(window.location.href)
+      : "";
+  const shareText = encodeURIComponent(
+    `${title} Sinhala Subtitle | PixelPopLK`,
+  );
 
   return (
     <>
@@ -401,7 +435,7 @@ function ShareBar({
         <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mr-2">
           <Share2 className="w-3.5 h-3.5" /> Share:
         </span>
-        
+
         {/* 🎨 1-Click Social Media Card Generator Modal Trigger */}
         <button
           onClick={() => setShowCardModal(true)}
@@ -526,7 +560,9 @@ function Hero({
             </span>
             <GenreBadges genres={genres} />
           </div>
-          <h1 className="mt-4 text-2xl sm:text-4xl font-extrabold leading-[1.1] tracking-tight break-words">{title}</h1>
+          <h1 className="mt-4 text-2xl sm:text-4xl font-extrabold leading-[1.1] tracking-tight break-words">
+            {title}
+          </h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
             {year && (
               <span className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -542,11 +578,15 @@ function Hero({
               </span>
             )}
           </div>
-          
+
           {description ? (
             <div className="mt-6 min-w-0">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">Overview</h3>
-              <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line break-words">{description}</p>
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
+                Overview
+              </h3>
+              <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line break-words">
+                {description}
+              </p>
             </div>
           ) : null}
 
@@ -574,35 +614,38 @@ function Hero({
 function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
   const [dmcaOpen, setDmcaOpen] = useState(false);
   const s = item.sub;
-  const year = s.year != null && s.year !== "" ? String(s.year) : new Date(s.created_at).getFullYear().toString();
+  const year =
+    s.year != null && s.year !== ""
+      ? String(s.year)
+      : new Date(s.created_at).getFullYear().toString();
   const genres = splitGenres(s.genre);
 
   const movieSchema = {
     "@context": "https://schema.org",
     "@type": "Movie",
-    "name": s.title,
-    "image": s.image_url,
-    "genre": genres,
-    "description": s.description || `Download Sinhala Subtitle for ${s.title}`,
-    "datePublished": s.year || year,
+    name: s.title,
+    image: s.image_url,
+    genre: genres,
+    description: s.description || `Download Sinhala Subtitle for ${s.title}`,
+    datePublished: s.year || year,
     ...(s.rating
       ? {
-          "aggregateRating": {
+          aggregateRating: {
             "@type": "AggregateRating",
-            "ratingValue": String(s.rating),
-            "bestRating": "10",
-            "worstRating": "1",
-            "ratingCount": "5000",
-            "description": "IMDb rating sourced from public data"
-          }
+            ratingValue: String(s.rating),
+            bestRating: "10",
+            worstRating: "1",
+            ratingCount: "5000",
+            description: "IMDb rating sourced from public data",
+          },
         }
       : {}),
-    "workFeaturedBy": {
+    workFeaturedBy: {
       "@type": "DataDownload",
-      "name": `${s.title} Sinhala Subtitle`,
-      "encodingFormat": "application/zip",
-      "description": `Download Sinhala Subtitle (.zip) for ${s.title}`
-    }
+      name: `${s.title} Sinhala Subtitle`,
+      encodingFormat: "application/zip",
+      description: `Download Sinhala Subtitle (.zip) for ${s.title}`,
+    },
   };
 
   return (
@@ -620,32 +663,43 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
-      
+
       {/* 🟢 Technical Subtitle Details & Compatibility Box (Fights Thin-Page Penalty) */}
       <div className="mt-6 p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" /> Subtitle Specifications &amp; Compatibility
+          <Sparkles className="w-3.5 h-3.5" /> Subtitle Specifications &amp;
+          Compatibility
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
           <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Format</span>
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
+              Format
+            </span>
             <span className="font-bold text-foreground">.SRT (in .ZIP)</span>
           </div>
           <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Language</span>
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
+              Language
+            </span>
             <span className="font-bold text-foreground">සිංහල (Sinhala)</span>
           </div>
           <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Sync Version</span>
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
+              Sync Version
+            </span>
             <span className="font-bold text-foreground">BluRay / WEB-DL</span>
           </div>
           <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">Encoding</span>
+            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
+              Encoding
+            </span>
             <span className="font-bold text-foreground">UTF-8 Clean</span>
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
-          මෙම උපසිරැසිය VLC Media Player, MX Player, Smart TV ඇතුළු ඕනෑම player එකක පැහැදිලි සිංහල අකුරු සහිතව ක්‍රියාත්මක වේ. වීඩියෝව සහ උපසිරැසි ගොනුව (.srt) එකම නමකින් තබා ධාවනය කරන්න.
+          මෙම උපසිරැසිය VLC Media Player, MX Player, Smart TV ඇතුළු ඕනෑම player
+          එකක පැහැදිලි සිංහල අකුරු සහිතව ක්‍රියාත්මක වේ. වීඩියෝව සහ උපසිරැසි
+          ගොනුව (.srt) එකම නමකින් තබා ධාවනය කරන්න.
         </p>
       </div>
 
@@ -659,23 +713,40 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
             <FileArchive className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-foreground block">1. Direct Download (.zip)</span>
-              <span className="text-[11px] leading-relaxed">චිත්‍රපටයේ <b>සිංහල උපසිරැසි ගොනුව පමණක්</b> (.zip) බාගත වේ. (Subtitle File Only)</span>
+              <span className="font-bold text-foreground block">
+                1. Direct Download (.zip)
+              </span>
+              <span className="text-[11px] leading-relaxed">
+                චිත්‍රපටයේ <b>සිංහල උපසිරැසි ගොනුව පමණක්</b> (.zip) බාගත වේ.
+                (Subtitle File Only)
+              </span>
             </div>
           </div>
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/40">
             <Video className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-foreground block">2. Telegram Download</span>
-              <span className="text-[11px] leading-relaxed">චිත්‍රපටයේ <b>සම්පූර්ණ වීඩියෝව (Full Movie Video)</b> Telegram හරහා ලබාගත හැක. (Video File)</span>
+              <span className="font-bold text-foreground block">
+                2. Telegram Download
+              </span>
+              <span className="text-[11px] leading-relaxed">
+                චිත්‍රපටයේ <b>සම්පූර්ණ වීඩියෝව (Full Movie Video)</b> Telegram
+                හරහා ලබාගත හැක. (Video File)
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
-      <div className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0" data-download-zone="true">
-        <DownloadButton subtitleId={s.id} title={s.title} label="Direct Download (.zip)" />
+      <div
+        className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0"
+        data-download-zone="true"
+      >
+        <DownloadButton
+          subtitleId={s.id}
+          title={s.title}
+          label="Direct Download (.zip)"
+        />
         {Boolean((s as any).has_telegram || (s as any).telegram_link) && (
           <DownloadButton
             subtitleId={s.id}
@@ -687,7 +758,10 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       </div>
 
       <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
-        <span>⚡ Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK ❤</span>
+        <span>
+          ⚡ Fast Sinhala Subtitle Download. Thank you for supporting PixelPopLK
+          ❤
+        </span>
         <button
           type="button"
           onClick={() => setDmcaOpen(true)}
@@ -709,9 +783,15 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
 
 function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
   const meta = useMemo(() => {
-    const s1e1 = item.episodes.find((e) => e.season === 1 && e.episode === 1) || item.episodes[0];
-    const withRating = item.episodes.find((e) => e.rating != null && e.rating !== "") ?? item.episodes[0];
-    const withYear = item.episodes.find((e) => e.year != null && e.year !== "") ?? item.episodes[0];
+    const s1e1 =
+      item.episodes.find((e) => e.season === 1 && e.episode === 1) ||
+      item.episodes[0];
+    const withRating =
+      item.episodes.find((e) => e.rating != null && e.rating !== "") ??
+      item.episodes[0];
+    const withYear =
+      item.episodes.find((e) => e.year != null && e.year !== "") ??
+      item.episodes[0];
     return {
       description: s1e1?.description ?? null,
       rating: formatRating(withRating?.rating),
@@ -724,7 +804,9 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
 
   const genres = useMemo(() => {
     const set = new Set<string>();
-    item.episodes.forEach((e) => splitGenres(e.genre).forEach((g) => set.add(g.toUpperCase())));
+    item.episodes.forEach((e) =>
+      splitGenres(e.genre).forEach((g) => set.add(g.toUpperCase())),
+    );
     return Array.from(set);
   }, [item]);
 
@@ -735,31 +817,36 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
 
   const [season, setSeason] = useState<number>(seasons[0] ?? 1);
   const seasonEpisodes = useMemo(
-    () => item.episodes.filter((e) => e.season === season).sort((a, b) => a.episode - b.episode),
+    () =>
+      item.episodes
+        .filter((e) => e.season === season)
+        .sort((a, b) => a.episode - b.episode),
     [item, season],
   );
 
   const seriesSchema = {
     "@context": "https://schema.org",
     "@type": "TVSeries",
-    "name": item.showName,
-    "image": item.poster,
-    "genre": genres,
-    "description": meta.description || `Download Sinhala Subtitles for TV Series ${item.showName}`,
-    "numberOfEpisodes": item.episodes.length,
-    "numberOfSeasons": seasons.length,
+    name: item.showName,
+    image: item.poster,
+    genre: genres,
+    description:
+      meta.description ||
+      `Download Sinhala Subtitles for TV Series ${item.showName}`,
+    numberOfEpisodes: item.episodes.length,
+    numberOfSeasons: seasons.length,
     ...(meta.rating
       ? {
-          "aggregateRating": {
+          aggregateRating: {
             "@type": "AggregateRating",
-            "ratingValue": String(meta.rating),
-            "bestRating": "10",
-            "worstRating": "1",
-            "ratingCount": "5000",
-            "description": "IMDb rating sourced from public data"
-          }
+            ratingValue: String(meta.rating),
+            bestRating: "10",
+            worstRating: "1",
+            ratingCount: "5000",
+            description: "IMDb rating sourced from public data",
+          },
         }
-      : {})
+      : {}),
   };
 
   return (
@@ -778,7 +865,8 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(seriesSchema) }}
       />
       <p className="mt-4 text-xs text-muted-foreground">
-        {item.episodes.length} episode{item.episodes.length === 1 ? "" : "s"} across {seasons.length} season
+        {item.episodes.length} episode{item.episodes.length === 1 ? "" : "s"}{" "}
+        across {seasons.length} season
         {seasons.length === 1 ? "" : "s"}
       </p>
 
@@ -817,9 +905,16 @@ function SeriesView({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-semibold truncate group-hover:text-primary transition">
                   Episode {String(ep.episode).padStart(2, "0")}
-                  {ep.epTitle ? <span className="text-muted-foreground font-normal"> — {ep.epTitle}</span> : null}
+                  {ep.epTitle ? (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      — {ep.epTitle}
+                    </span>
+                  ) : null}
                 </p>
-                <p className="text-[11px] text-muted-foreground truncate">{ep.title}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {ep.title}
+                </p>
               </div>
               <span className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white text-[11px] sm:text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] group-hover:shadow-[0_0_20px_rgba(16,185,129,0.55)] group-hover:scale-105 transition-all duration-300 shrink-0">
                 Open
@@ -859,7 +954,9 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
       if (error) throw error;
 
       const items = buildGridItems(data ?? []);
-      return items.filter((it) => String(it.id) !== String(currentItem.id)).slice(0, 6);
+      return items
+        .filter((it) => String(it.id) !== String(currentItem.id))
+        .slice(0, 6);
     },
   });
 
@@ -869,10 +966,17 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
     <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-4 sm:p-8 space-y-4 min-w-0 w-full">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
-          {isMovie ? <Film className="w-5 h-5 text-primary" /> : <Tv className="w-5 h-5 text-primary" />}
+          {isMovie ? (
+            <Film className="w-5 h-5 text-primary" />
+          ) : (
+            <Tv className="w-5 h-5 text-primary" />
+          )}
           {isMovie ? "More Movies You May Like" : "More TV Series You May Like"}
         </h3>
-        <Link to="/" className="text-xs text-primary hover:underline font-semibold">
+        <Link
+          to="/"
+          className="text-xs text-primary hover:underline font-semibold"
+        >
           View All →
         </Link>
       </div>
@@ -896,11 +1000,15 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
               <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/95 via-black/60 to-transparent">
-                <p className="text-[11px] font-bold text-white truncate">{itemTitle(it)}</p>
+                <p className="text-[11px] font-bold text-white truncate">
+                  {itemTitle(it)}
+                </p>
               </div>
             </div>
             <div className="p-2.5">
-              <p className="text-[10px] text-muted-foreground">{formatDate(itemDate(it))}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {formatDate(itemDate(it))}
+              </p>
             </div>
           </Link>
         ))}
@@ -910,7 +1018,15 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
 }
 
 // 🟢 Auto-Generated Main SEO Tags Cloud
-function SeoTagsCloud({ title, year, isSeries }: { title: string; year?: string; isSeries?: boolean }) {
+function SeoTagsCloud({
+  title,
+  year,
+  isSeries,
+}: {
+  title: string;
+  year?: string;
+  isSeries?: boolean;
+}) {
   if (!title) return null;
 
   const cleanTitle = title.trim();
@@ -920,10 +1036,21 @@ function SeoTagsCloud({ title, year, isSeries }: { title: string; year?: string;
     `${cleanTitle} Sinhala Subtitle Download`,
     `${cleanTitle} Subtitles SRT`,
     `${cleanTitle} Sinhala Sub File`,
-    ...(year ? [`${cleanTitle} (${year}) Sinhala Sub`, `${cleanTitle} ${year} Subtitle Download`] : []),
+    ...(year
+      ? [
+          `${cleanTitle} (${year}) Sinhala Sub`,
+          `${cleanTitle} ${year} Subtitle Download`,
+        ]
+      : []),
     ...(isSeries
-      ? [`${cleanTitle} TV Series Sinhala Sub`, `${cleanTitle} All Episodes Sinhala Subtitles`]
-      : [`${cleanTitle} Movie Sinhala Subtitle`, `Download ${cleanTitle} Sinhala Sub`]),
+      ? [
+          `${cleanTitle} TV Series Sinhala Sub`,
+          `${cleanTitle} All Episodes Sinhala Subtitles`,
+        ]
+      : [
+          `${cleanTitle} Movie Sinhala Subtitle`,
+          `Download ${cleanTitle} Sinhala Sub`,
+        ]),
   ];
 
   return (
@@ -952,7 +1079,10 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [toastMsg, setToastMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [toastMsg, setToastMsg] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const { data: comments, refetch } = useQuery({
     queryKey: ["comments", subtitleId],
@@ -988,7 +1118,10 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
     const lastSubmit = localStorage.getItem("last_comment_submit_time");
     const now = Date.now();
     if (lastSubmit && now - parseInt(lastSubmit, 10) < 15000) {
-      showToast("Please wait 15 seconds before posting another comment!", "error");
+      showToast(
+        "Please wait 15 seconds before posting another comment!",
+        "error",
+      );
       return;
     }
 
@@ -1013,7 +1146,10 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
   };
 
   const handleDeleteComment = async (id: string) => {
-    const { error } = await supabase.from("subtitle_comments").delete().eq("id", id);
+    const { error } = await supabase
+      .from("subtitle_comments")
+      .delete()
+      .eq("id", id);
     if (error) showToast(error.message, "error");
     else {
       showToast("Comment deleted", "success");
@@ -1022,10 +1158,16 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
   };
 
   return (
-    <div className="bg-card-elevated rounded-3xl border border-border shadow-card p-4 sm:p-8 space-y-6 min-w-0 w-full" data-no-ad="true">
+    <div
+      className="bg-card-elevated rounded-3xl border border-border shadow-card p-4 sm:p-8 space-y-6 min-w-0 w-full"
+      data-no-ad="true"
+    >
       <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
         <MessageSquare className="w-5 h-5 text-primary" />
-        Feedback & Comments <span className="text-xs font-normal text-muted-foreground">({comments?.length ?? 0})</span>
+        Feedback & Comments{" "}
+        <span className="text-xs font-normal text-muted-foreground">
+          ({comments?.length ?? 0})
+        </span>
       </h3>
 
       {toastMsg && (
@@ -1078,28 +1220,40 @@ function CommentsSection({ subtitleId }: { subtitleId: string }) {
 
       <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-hide pt-2 min-w-0">
         {comments?.map((comment: any) => {
-          const initials = comment.author_name ? comment.author_name.charAt(0).toUpperCase() : "?";
-          
-          const formattedDate = new Date(comment.created_at).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-          });
+          const initials = comment.author_name
+            ? comment.author_name.charAt(0).toUpperCase()
+            : "?";
+
+          const formattedDate = new Date(comment.created_at).toLocaleDateString(
+            undefined,
+            {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            },
+          );
 
           return (
-            <div key={comment.id} className="flex gap-3 items-start p-3.5 rounded-2xl bg-muted/30 border border-border/50 group/comment min-w-0">
+            <div
+              key={comment.id}
+              className="flex gap-3 items-start p-3.5 rounded-2xl bg-muted/30 border border-border/50 group/comment min-w-0"
+            >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold text-xs grid place-items-center shrink-0">
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs font-bold text-foreground/90 truncate">{comment.author_name}</span>
+                  <span className="text-xs font-bold text-foreground/90 truncate">
+                    {comment.author_name}
+                  </span>
                   <span className="text-[10px] text-muted-foreground shrink-0">
                     {formattedDate}
                   </span>
                 </div>
-                <p className="text-sm text-foreground/80 mt-1 leading-relaxed whitespace-pre-line break-words">{comment.comment_text}</p>
+                <p className="text-sm text-foreground/80 mt-1 leading-relaxed whitespace-pre-line break-words">
+                  {comment.comment_text}
+                </p>
               </div>
 
               {isAdmin && (
