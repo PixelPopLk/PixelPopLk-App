@@ -93,6 +93,7 @@ interface DownloadButtonProps {
 }
 
 type ButtonState = "locked" | "verifying" | "ready" | "downloading";
+type DownloadLinkResult = { link: string | null; error?: string };
 
 export function DownloadButton({
   subtitleId,
@@ -132,8 +133,8 @@ export function DownloadButton({
 
   // Link එක public Supabase client එකෙන් නොගෙන, server endpoint එකෙන් පමණක් ගනී.
   // Service-role key එක browser bundle එකට යන්නේ නැත.
-  const fetchLink = useCallback(async (): Promise<string | null> => {
-    if (!subtitleId) return null;
+  const fetchLink = useCallback(async (): Promise<DownloadLinkResult> => {
+    if (!subtitleId) return { link: null };
     try {
       const response = await fetch("/api/download-link", {
         method: "POST",
@@ -144,15 +145,26 @@ export function DownloadButton({
         }),
       });
 
-      if (!response.ok) return null;
-      const data = (await response.json()) as { link?: unknown };
+      const data = (await response.json()) as {
+        link?: unknown;
+        error?: unknown;
+      };
+      if (!response.ok) {
+        return {
+          link: null,
+          error:
+            typeof data.error === "string"
+              ? data.error
+              : "Download service එක තාවකාලිකව සූදානම් නැහැ.",
+        };
+      }
       if (typeof data.link === "string" && data.link.trim()) {
-        return data.link.trim();
+        return { link: data.link.trim() };
       }
     } catch {
       /* noop */
     }
-    return null;
+    return { link: null };
   }, [subtitleId, normalizedVariant]);
 
   // Lock තත්ත්වයට reset කිරීම
@@ -197,10 +209,11 @@ export function DownloadButton({
           if (tickerRef.current) clearInterval(tickerRef.current);
           // Link එක countdown ආරම්භ වන විට fetch නොකර මෙතැනදී පමණක් ඉල්ලයි.
           // එම නිසා network tab එකකින් ad timer එක අතරතුර link එක ලබාගත නොහැක.
-          void fetchLink().then((link) => {
+          void fetchLink().then(({ link, error }) => {
             if (!link || !isSafeUrl(link)) {
               setErrorMsg(
-                "Download link එක සූදානම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+                error ||
+                  "Download link එක සූදානම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
               );
               resetToLocked();
               setTimeout(() => setErrorMsg(""), 6000);
