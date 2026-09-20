@@ -18,8 +18,12 @@ REVOKE ALL ON TABLE public.subtitles FROM anon;
 GRANT SELECT (
   id, created_at, updated_at, title, image_url, genre, description, rating,
   year, season, episode, download_count, direct_downloads, telegram_downloads,
-  has_telegram
+  metatags, has_telegram
 ) ON TABLE public.subtitles TO anon;
+
+-- Repairs deployments that applied the older column-level grant before
+-- `metatags` became available for public SEO metadata.
+GRANT SELECT (metatags) ON TABLE public.subtitles TO anon;
 
 DROP POLICY IF EXISTS "public subtitle catalogue" ON public.subtitles;
 CREATE POLICY "public subtitle catalogue"

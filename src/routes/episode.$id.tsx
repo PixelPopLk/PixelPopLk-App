@@ -41,19 +41,26 @@ import {
 import { Navbar } from "@/components/Navbar";
 import AdBanner from "@/components/AdBanner";
 import { DownloadButton } from "@/components/DownloadCountdown";
+import { buildSeoDescription, queryWithMetaFallback } from "@/lib/seo";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
 const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, has_telegram";
+const SEO_SAFE_COLUMNS = `${SAFE_COLUMNS}, metatags`;
 
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
-  const { data: targetItem, error: firstError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .eq("id", Number(id) as any)
-    .maybeSingle();
+  const { data: targetItem, error: firstError } = await queryWithMetaFallback(
+    (columns) =>
+      supabase
+        .from(SUBTITLES_TABLE)
+        .select(columns)
+        .eq("id", Number(id) as any)
+        .maybeSingle(),
+    SEO_SAFE_COLUMNS,
+    SAFE_COLUMNS,
+  );
 
   if (firstError) throw firstError;
   if (!targetItem) return [] as Subtitle[];
@@ -62,11 +69,16 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const safeShowPrefix = (parsed.showName || targetItem.title || "")
     .replace(/[%_\\]/g, "\\$&")
     .trim();
-  const { data: allEpisodes, error: secondError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .ilike("title", `${safeShowPrefix}%`)
-    .order("created_at", { ascending: false });
+  const { data: allEpisodes, error: secondError } = await queryWithMetaFallback(
+    (columns) =>
+      supabase
+        .from(SUBTITLES_TABLE)
+        .select(columns)
+        .ilike("title", `${safeShowPrefix}%`)
+        .order("created_at", { ascending: false }),
+    SEO_SAFE_COLUMNS,
+    SAFE_COLUMNS,
+  );
 
   if (secondError) throw secondError;
   const episodes = (allEpisodes ?? []) as Subtitle[];
@@ -108,8 +120,17 @@ function buildEpisodeHead({
   const episodeTitle =
     ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`;
   const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${episodeTitle} | PixelPopLK`;
-  const descText = `Download Sinhala subtitle for ${series.showName} S${ep.season}E${ep.episode} (${episodeTitle}). High-quality Sinhala sub file synced on PixelPopLK.`;
-  const keywordText = `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle, ${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Subtitle, Sinhala Subtitles TV Series, PixelPopLK, Sinhala Subtitles`;
+  const descText = buildSeoDescription({
+    metatags: ep.metatags,
+    description: ep.description,
+    title: ep.title,
+    genres: splitGenres(ep.genre),
+    kind: "episode",
+    showName: series.showName,
+    season: ep.season,
+    episode: ep.episode,
+    episodeTitle,
+  });
   const canonicalUrl = `${BASE_URL}/episode/${ep.id}`;
 
   return {
@@ -334,18 +355,6 @@ function EpisodePage() {
           description:
             ep.description ||
             `Sinhala subtitle for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
-          ...(rating
-            ? {
-                aggregateRating: {
-                  "@type": "AggregateRating",
-                  ratingValue: String(rating),
-                  bestRating: "10",
-                  worstRating: "1",
-                  ratingCount: "5000",
-                  description: "IMDb rating sourced from public data",
-                },
-              }
-            : {}),
           workFeaturedBy: {
             "@type": "DataDownload",
             name: `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle`,

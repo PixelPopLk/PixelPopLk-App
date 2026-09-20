@@ -16,6 +16,20 @@ import { useMemo } from "react";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
+const ALL_GENRES = [
+  "action",
+  "adventure",
+  "animation",
+  "comedy",
+  "crime",
+  "drama",
+  "horror",
+  "mystery",
+  "romance",
+  "sci-fi",
+  "thriller",
+];
+
 async function fetchGenreContent(genreParam: string): Promise<Subtitle[]> {
   const cleanGenre = genreParam.replace(/-/g, " ").trim();
   
@@ -33,7 +47,9 @@ async function fetchGenreContent(genreParam: string): Promise<Subtitle[]> {
 
 export const Route = createFileRoute("/genres/$genre")({
   loader: async ({ params }) => {
+    if (!ALL_GENRES.includes(params.genre.toLowerCase())) throw notFound();
     const data = await fetchGenreContent(params.genre);
+    if (data.length === 0) throw notFound();
     return { data, genre: params.genre };
   },
   head: ({ params }) => {
@@ -63,20 +79,6 @@ export const Route = createFileRoute("/genres/$genre")({
   },
   component: GenrePage,
 });
-
-const ALL_GENRES = [
-  "Action",
-  "Adventure",
-  "Animation",
-  "Comedy",
-  "Crime",
-  "Drama",
-  "Horror",
-  "Mystery",
-  "Romance",
-  "Sci-Fi",
-  "Thriller",
-];
 
 function GenrePage() {
   const { data, genre } = Route.useLoaderData();

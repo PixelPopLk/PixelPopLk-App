@@ -162,6 +162,13 @@ export const Route = createFileRoute("/sitemap.xml")({
             title: "Sinhala Subtitles for TV Series — PixelPopLK",
             image: `${BASE_URL}/og-banner.png`,
           },
+          {
+            url: `${BASE_URL}/latest`,
+            priority: "0.8",
+            changefreq: "daily",
+            title: "Latest Sinhala Subtitles — PixelPopLK",
+            image: `${BASE_URL}/og-banner.png`,
+          },
         ];
 
         for (const p of staticPages) {
