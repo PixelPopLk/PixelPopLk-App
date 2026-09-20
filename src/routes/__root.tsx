@@ -13,8 +13,6 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
-// 🟢 1. AntiAdBlock Component එක මෙතනින් Import කළා
-import { AntiAdBlock } from "../components/AntiAdBlock";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
 const COOLDOWN_TIME = 3000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
@@ -99,25 +97,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
-      { name: "description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
-      { name: "author", content: "PixelPopLK" },
-      { property: "og:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
-      { property: "og:description", content: "Premium Sinhala subtitles for movies and TV series. Curated, fast, and secure downloads." },
-      { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "PixelPopLK" },
-      { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
-      { property: "og:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
-      { property: "og:locale", content: "si_LK" },
-      { property: "og:locale:alternate", content: "en_US" },
-      { name: "robots", content: "index, follow" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
-      { name: "twitter:description", content: "Premium Sinhala subtitles for movies and TV series." },
-      { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
-      { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "theme-color", content: "#0e0e12" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
@@ -336,9 +315,6 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* 🟢 2. Admin Page එකේ නොවන විට පමණක් AntiAdBlock එක Run වීම */}
-      {!isAdminPage && <AntiAdBlock />}
-      
       <PwaInstallPrompt />
       <Outlet />
     </QueryClientProvider>

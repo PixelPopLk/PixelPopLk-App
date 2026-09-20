@@ -246,7 +246,7 @@ export function Navbar({
                 href="https://t.me/Pixel_Pop_Lk"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#229ED9]/30 bg-[#229ED9]/10 text-white hover:bg-[#229ED9]/25 hover:border-[#229ED9]/50 transition duration-300 text-xs font-bold"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#229ED9]/30 bg-[#229ED9]/10 text-foreground hover:bg-[#229ED9]/25 hover:border-[#229ED9]/50 transition duration-300 text-xs font-bold"
               >
                 <TelegramIcon className="w-3.5 h-3.5 text-[#229ED9]" />
                 Join Telegram
@@ -255,7 +255,7 @@ export function Navbar({
                 href="https://www.facebook.com/share/1Ec2mYq4aa/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#1877F2]/30 bg-[#1877F2]/10 text-white hover:bg-[#1877F2]/25 hover:border-[#1877F2]/50 transition duration-300 text-xs font-bold"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#1877F2]/30 bg-[#1877F2]/10 text-foreground hover:bg-[#1877F2]/25 hover:border-[#1877F2]/50 transition duration-300 text-xs font-bold"
               >
                 <FacebookIcon className="w-3.5 h-3.5 text-[#1877F2]" />
                 Follow Facebook
