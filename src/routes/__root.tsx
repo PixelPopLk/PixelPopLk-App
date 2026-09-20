@@ -172,7 +172,6 @@ function RootShell({ children }: { children: ReactNode }) {
           }}
         />
         <HeadContent />
-        <meta name="google-site-verification" content="VoErL02EHeHtDv46aBcjIEm5DpUTnJRhPF89ewoK-M4" />
         
         {/* 🚀 Chunk / Unexpected Token Error ආවොත් Auto-Reload කරවන ආරක්ෂිත Script එක */}
         <script
