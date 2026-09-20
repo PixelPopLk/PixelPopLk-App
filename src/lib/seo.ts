@@ -13,27 +13,6 @@ type SeoDescriptionInput = {
 
 const MAX_DESCRIPTION_LENGTH = 160;
 
-type MetadataQueryResult<T> = {
-  data: T;
-  error: { code?: string } | null;
-};
-
-/**
- * Old deployments can have column-level anonymous SELECT grants that omit
- * `metatags`. Keep content pages available while the accompanying SQL grant
- * is being applied, then automatically use the editor metadata afterwards.
- */
-export async function queryWithMetaFallback<T>(
-  request: (columns: string) => PromiseLike<MetadataQueryResult<T>>,
-  metadataColumns: string,
-  fallbackColumns: string,
-) {
-  const metadataResult = await request(metadataColumns);
-  if (metadataResult.error?.code !== "42501") return metadataResult;
-
-  return request(fallbackColumns);
-}
-
 function cleanText(value?: string | null) {
   return (value ?? "")
     .replace(/<[^>]*>/g, " ")

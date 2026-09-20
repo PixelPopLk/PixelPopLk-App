@@ -50,14 +50,13 @@ import {
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
 import { DownloadButton } from "@/components/DownloadCountdown";
-import { buildSeoDescription, queryWithMetaFallback } from "@/lib/seo";
+import { buildSeoDescription } from "@/lib/seo";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
 const SAFE_COLUMNS =
-  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, has_telegram";
-const SEO_SAFE_COLUMNS = `${SAFE_COLUMNS}, metatags`;
+  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await queryWithMetaFallback(
