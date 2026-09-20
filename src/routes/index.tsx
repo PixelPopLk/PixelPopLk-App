@@ -837,6 +837,7 @@ function Hero({
 
   return (
     <section className="bg-hero">
+      <h1 className="sr-only">Sinhala subtitles for movies and TV series</h1>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-12">
         <div className="flex items-center gap-2 mb-5">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold">
@@ -874,9 +875,9 @@ function Hero({
                     {tv ? <Tv className="w-3 h-3 text-primary" /> : <Film className="w-3 h-3 text-primary" />}
                     {tv ? "TV Series" : "Movie"}
                   </span>
-                  <h1 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white drop-shadow-md">
+                  <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white drop-shadow-md">
                     {itemTitle(current)}
-                  </h1>
+                  </h2>
                   <p className="mt-2 text-sm text-zinc-300 flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5 text-primary" />
                     {tv

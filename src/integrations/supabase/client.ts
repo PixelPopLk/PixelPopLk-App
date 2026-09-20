@@ -37,7 +37,7 @@ export const SUBTITLE_COLUMNS =
 
 // 🟢 Client-facing catalog queries වලට download_link සහ telegram_link සඟවා ආරක්ෂිතව columns පමණක් ලබා දේ
 export const SAFE_SUBTITLE_COLUMNS =
-  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, has_telegram";
+  "id, created_at, updated_at, title, image_url, genre, description, rating, year, season, episode, download_count, direct_downloads, telegram_downloads, metatags, has_telegram";
 
 // 🟢 Download analytics — logs one event + bumps direct vs telegram counters via atomic RPC
 export function logDownload(

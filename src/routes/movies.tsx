@@ -180,10 +180,14 @@ function MoviesPage() {
           })}
         </div>
 
-        {/* Ad Placement: High CTR 300x250 */}
-        <div className="my-6">
+        {/* Two existing ad slots are kept together so both are visible before browsing. */}
+        <section
+          aria-label="Sponsored content"
+          className="my-7 grid items-center justify-items-center gap-5 rounded-3xl border border-border/70 bg-card/50 px-3 py-2 sm:px-5 lg:grid-cols-2"
+        >
           <AdBanner type="300x250" />
-        </div>
+          <AdBanner type="160x300" />
+        </section>
 
         {/* Movie Grid */}
         {filteredMovies.length === 0 ? (
@@ -204,11 +208,6 @@ function MoviesPage() {
             ))}
           </div>
         )}
-
-        {/* Bottom Ad */}
-        <div className="mt-10 flex justify-center">
-          <AdBanner type="160x300" />
-        </div>
 
         {/* Rich SEO Content / Helpful Guide */}
         <section className="mt-14 p-6 sm:p-8 rounded-3xl bg-card border border-border/70 space-y-4">
