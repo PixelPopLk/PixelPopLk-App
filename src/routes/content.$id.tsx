@@ -50,12 +50,13 @@ import {
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
 import { DownloadButton } from "@/components/DownloadCountdown";
+import { buildSeoDescription } from "@/lib/seo";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
 const SAFE_COLUMNS =
-  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, has_telegram";
+  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
@@ -136,13 +137,14 @@ function buildContentHead({
         ? String(s.year)
         : new Date(s.created_at).getFullYear().toString();
     const titleText = `${s.title} (${year}) Sinhala Subtitle | Download Movie Subtitles | PixelPopLK`;
-    const descText = s.description
-      ? s.description.slice(0, 160)
-      : `Download Sinhala subtitles for ${s.title} (${year}). High-quality Sinhala sub file synced for official release. Fast & secure on PixelPopLK.`;
-    const customMeta = (s as any).metatags;
-    const keywordText = customMeta
-      ? `${s.title} Sinhala Subtitle, ${customMeta}`
-      : `${s.title} Sinhala Subtitle, Download ${s.title} Subtitle, PixelPopLK, Sinhala Subtitles, Movie Subtitles`;
+    const descText = buildSeoDescription({
+      metatags: s.metatags,
+      description: s.description,
+      title: s.title,
+      year,
+      genres: splitGenres(s.genre),
+      kind: "movie",
+    });
     const canonicalUrl = `${BASE_URL}/content/${s.id}`;
 
     return {
@@ -189,15 +191,14 @@ function buildContentHead({
       : new Date(item.latestDate).getFullYear().toString();
   const description = s1e1?.description ?? null;
   const titleText = `${item.showName} Sinhala Subtitles | TV Series Download | PixelPopLK`;
-  const descText = description
-    ? description.slice(0, 160)
-    : `Download Sinhala subtitles for TV Series ${item.showName} (${year}). Latest seasons and episodes available on PixelPopLK.`;
-  const customMeta = item.episodes
-    .map((e) => (e as any).metatags)
-    .find(Boolean);
-  const keywordText = customMeta
-    ? `${item.showName} Sinhala Subtitles, ${customMeta}`
-    : `${item.showName} Sinhala Subtitles, Sinhala Subtitles TV Series, ${item.showName} Sinhala Subtitles TV Series, PixelPopLK`;
+  const descText = buildSeoDescription({
+    metatags: item.episodes.map((episode) => episode.metatags).find(Boolean),
+    description,
+    title: item.showName,
+    year,
+    genres: splitGenres(s1e1?.genre),
+    kind: "series",
+  });
   const canonicalUrl = `${BASE_URL}/content/${item.id}`;
 
   return {

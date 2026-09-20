@@ -41,12 +41,13 @@ import {
 import { Navbar } from "@/components/Navbar";
 import AdBanner from "@/components/AdBanner";
 import { DownloadButton } from "@/components/DownloadCountdown";
+import { buildSeoDescription } from "@/lib/seo";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
 const SAFE_COLUMNS =
-  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, has_telegram";
+  "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const { data: targetItem, error: firstError } = await supabase
@@ -108,8 +109,17 @@ function buildEpisodeHead({
   const episodeTitle =
     ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`;
   const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${episodeTitle} | PixelPopLK`;
-  const descText = `Download Sinhala subtitle for ${series.showName} S${ep.season}E${ep.episode} (${episodeTitle}). High-quality Sinhala sub file synced on PixelPopLK.`;
-  const keywordText = `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle, ${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Subtitle, Sinhala Subtitles TV Series, PixelPopLK, Sinhala Subtitles`;
+  const descText = buildSeoDescription({
+    metatags: ep.metatags,
+    description: ep.description,
+    title: ep.title,
+    genres: splitGenres(ep.genre),
+    kind: "episode",
+    showName: series.showName,
+    season: ep.season,
+    episode: ep.episode,
+    episodeTitle,
+  });
   const canonicalUrl = `${BASE_URL}/episode/${ep.id}`;
 
   return {
@@ -334,18 +344,6 @@ function EpisodePage() {
           description:
             ep.description ||
             `Sinhala subtitle for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
-          ...(rating
-            ? {
-                aggregateRating: {
-                  "@type": "AggregateRating",
-                  ratingValue: String(rating),
-                  bestRating: "10",
-                  worstRating: "1",
-                  ratingCount: "5000",
-                  description: "IMDb rating sourced from public data",
-                },
-              }
-            : {}),
           workFeaturedBy: {
             "@type": "DataDownload",
             name: `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle`,
