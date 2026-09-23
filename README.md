@@ -39,6 +39,32 @@ update/
 
 ## 🛠️ සිදුකරන ලද ප්‍රධාන SEO වෙනස්කම් (Summary of SEO Fixes)
 
+### ✅ Server-Side Rendering (SSR) සහ Google Indexing
+
+මෙම project එක TanStack Start + Nitro මත run වන නිසා production build එකේදී
+HTML එක server-side render වෙයි. ඒ නිසා Googlebot එකට JavaScript run වීමට පෙරම
+page title, meta description, canonical URL, structured data, headings, සහ
+subtitle catalog content ඇතුළත් HTML response එක ලැබේ.
+
+- Public pages edge cache එකේ මිනිත්තු 10ක් cache වන අතර stale response එකක්
+  තිබේ නම් එය background එකේ refresh වේ. මෙය crawlers සහ visitors සඳහා fast
+  SSR response එකක් ලබා දෙයි.
+- `/manage-admin`, `/search`, සහ `/api/*` cache නොවන නිසා user-specific හෝ
+  non-indexable response එකක් public cache එකක share නොවේ.
+- Deploy කිරීමේදී `bun run build` භාවිතා කරන්න. Build output එකේ Nitro
+  Cloudflare worker එක generate වන අතර static-only hosting එකකට `public/`
+  folder එක පමණක් upload නොකළ යුතුය; එසේ කළොත් SSR නැති වේ.
+
+SSR response එක verify කිරීමට deploy වූ site එකේ පහත command එක run කර බලන්න:
+
+```bash
+curl -s https://pixelpoplk.pages.dev/content/CONTENT_ID | grep -E '<title>|<h1|application/ld\+json'
+```
+
+HTML එකේ actual title, heading, සහ JSON-LD පෙනෙන්නේ නම් Googlebot එකටත්
+JavaScript rendering එකක් බලා නොසිට index කළ හැකි server-rendered content එක
+ලැබෙන බව තහවුරු වේ.
+
 ### 🔴 Priority 1 — URL & Routing Architecture
 1. **Dedicated Indexable Routes**:
    - `/movies` : සියලුම චිත්‍රපට උපසිරැසි සඳහා သီးသန့် landing page එකක්.
