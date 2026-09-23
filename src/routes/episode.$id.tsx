@@ -44,6 +44,7 @@ import { DownloadButton } from "@/components/DownloadCountdown";
 import { buildSeoDescription } from "@/lib/seo";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
+const DEFAULT_SHARE_IMAGE = `${BASE_URL}/og-banner.png`;
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
 const SAFE_COLUMNS =
@@ -86,6 +87,10 @@ function findEpisode(data: Subtitle[], id: string) {
   return null;
 }
 
+function shareImage(imageUrl?: string | null) {
+  return imageUrl?.trim() || DEFAULT_SHARE_IMAGE;
+}
+
 function buildEpisodeHead({
   loaderData,
   params,
@@ -105,10 +110,11 @@ function buildEpisodeHead({
   }
 
   const { series, ep } = found;
-  const poster = ep.image_url || series.poster || "";
+  const poster = shareImage(ep.image_url || series.poster);
   const episodeTitle =
     ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`;
-  const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${episodeTitle} | PixelPopLK`;
+  const telegramTitleSuffix = ep.has_telegram ? " | Telegram Link" : "";
+  const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitles${telegramTitleSuffix} | ${episodeTitle} | PixelPopLK`;
   const descText = buildSeoDescription({
     metatags: ep.metatags,
     description: ep.description,
@@ -134,13 +140,14 @@ function buildEpisodeHead({
       { property: "og:site_name", content: "PixelPopLK" },
       { property: "og:locale", content: "si_LK" },
       { property: "og:locale:alternate", content: "en_US" },
-      ...(poster ? [{ property: "og:image", content: poster }] : []),
-      ...(poster ? [{ property: "og:image:alt", content: titleText }] : []),
+      { property: "og:image", content: poster },
+      { property: "og:image:secure_url", content: poster },
+      { property: "og:image:alt", content: `${series.showName} ${episodeTitle} cover image` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: titleText },
       { name: "twitter:description", content: descText },
-      ...(poster ? [{ name: "twitter:image", content: poster }] : []),
-      ...(poster ? [{ name: "twitter:image:alt", content: titleText }] : []),
+      { name: "twitter:image", content: poster },
+      { name: "twitter:image:alt", content: `${series.showName} ${episodeTitle} cover image` },
     ],
     links: [{ rel: "canonical", href: canonicalUrl }],
   };

@@ -92,6 +92,23 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // TanStack Start renders this route tree on the server. Cache only public
+  // HTML at the edge so crawlers receive complete, fresh HTML without every
+  // bot request having to wait for the catalog query again. Private, search,
+  // and API responses must never share a cached response.
+  headers: ({ matches }) => {
+    const pathname = matches.at(-1)?.pathname ?? "/";
+    const isPrivateOrDynamic =
+      pathname.startsWith("/manage-admin") ||
+      pathname.startsWith("/search") ||
+      pathname.startsWith("/api/");
+
+    return {
+      "Cache-Control": isPrivateOrDynamic
+        ? "no-store"
+        : "public, max-age=0, s-maxage=600, stale-while-revalidate=86400",
+    };
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

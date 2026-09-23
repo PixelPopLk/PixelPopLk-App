@@ -53,6 +53,7 @@ import { DownloadButton } from "@/components/DownloadCountdown";
 import { buildSeoDescription } from "@/lib/seo";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
+const DEFAULT_SHARE_IMAGE = `${BASE_URL}/og-banner.png`;
 
 // 🟢 ආරක්ෂාව: download_link සහ telegram_link මෙතනින් select කරන්නේ නෑ (Bulk Scraping වැළැක්වීමට)
 const SAFE_COLUMNS =
@@ -112,6 +113,10 @@ function findItem(data: Subtitle[], id: string): GridItem | null {
   return null;
 }
 
+function shareImage(imageUrl?: string | null) {
+  return imageUrl?.trim() || DEFAULT_SHARE_IMAGE;
+}
+
 function buildContentHead({
   loaderData,
   params,
@@ -136,7 +141,8 @@ function buildContentHead({
       s.year != null && s.year !== ""
         ? String(s.year)
         : new Date(s.created_at).getFullYear().toString();
-    const titleText = `${s.title} (${year}) Sinhala Subtitle | Download Movie Subtitles | PixelPopLK`;
+    const telegramTitleSuffix = s.has_telegram ? " | Telegram Link" : "";
+    const titleText = `${s.title} (${year}) Sinhala Subtitles${telegramTitleSuffix} | PixelPopLK`;
     const descText = buildSeoDescription({
       metatags: s.metatags,
       description: s.description,
@@ -146,6 +152,7 @@ function buildContentHead({
       kind: "movie",
     });
     const canonicalUrl = `${BASE_URL}/content/${s.id}`;
+    const imageUrl = shareImage(s.image_url);
 
     return {
       meta: [
@@ -159,21 +166,14 @@ function buildContentHead({
         { property: "og:site_name", content: "PixelPopLK" },
         { property: "og:locale", content: "si_LK" },
         { property: "og:locale:alternate", content: "en_US" },
-        ...(s.image_url
-          ? [{ property: "og:image", content: s.image_url }]
-          : []),
-        ...(s.image_url
-          ? [{ property: "og:image:alt", content: titleText }]
-          : []),
+        { property: "og:image", content: imageUrl },
+        { property: "og:image:secure_url", content: imageUrl },
+        { property: "og:image:alt", content: `${s.title} (${year}) cover image` },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: titleText },
         { name: "twitter:description", content: descText },
-        ...(s.image_url
-          ? [{ name: "twitter:image", content: s.image_url }]
-          : []),
-        ...(s.image_url
-          ? [{ name: "twitter:image:alt", content: titleText }]
-          : []),
+        { name: "twitter:image", content: imageUrl },
+        { name: "twitter:image:alt", content: `${s.title} (${year}) cover image` },
       ],
       links: [{ rel: "canonical", href: canonicalUrl }],
     };
@@ -200,6 +200,7 @@ function buildContentHead({
     kind: "series",
   });
   const canonicalUrl = `${BASE_URL}/content/${item.id}`;
+  const imageUrl = shareImage(item.poster);
 
   return {
     meta: [
@@ -213,17 +214,14 @@ function buildContentHead({
       { property: "og:site_name", content: "PixelPopLK" },
       { property: "og:locale", content: "si_LK" },
       { property: "og:locale:alternate", content: "en_US" },
-      ...(item.poster ? [{ property: "og:image", content: item.poster }] : []),
-      ...(item.poster
-        ? [{ property: "og:image:alt", content: titleText }]
-        : []),
+      { property: "og:image", content: imageUrl },
+      { property: "og:image:secure_url", content: imageUrl },
+      { property: "og:image:alt", content: `${item.showName} cover image` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: titleText },
       { name: "twitter:description", content: descText },
-      ...(item.poster ? [{ name: "twitter:image", content: item.poster }] : []),
-      ...(item.poster
-        ? [{ name: "twitter:image:alt", content: titleText }]
-        : []),
+      { name: "twitter:image", content: imageUrl },
+      { name: "twitter:image:alt", content: `${item.showName} cover image` },
     ],
     links: [{ rel: "canonical", href: canonicalUrl }],
   };

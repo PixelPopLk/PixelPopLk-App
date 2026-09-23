@@ -11,6 +11,7 @@ type SeoDescriptionInput = {
   episodeTitle?: string;
 };
 
+const MIN_DESCRIPTION_LENGTH = 150;
 const MAX_DESCRIPTION_LENGTH = 160;
 
 function cleanText(value?: string | null) {
@@ -28,32 +29,44 @@ function truncateDescription(value: string) {
   return `${(lastSpace > 80 ? truncated.slice(0, lastSpace) : truncated).trim()}…`;
 }
 
+function addContext(value: string, context: string) {
+  const withContext = `${value} ${context}`.trim();
+  if (withContext.length >= MIN_DESCRIPTION_LENGTH) return withContext;
+  return `${withContext} නවතම චිත්‍රපට සහ TV series උපසිරැසි සඳහා PixelPopLK වෙත අදම පිවිසෙන්න.`;
+}
+
 /** Uses the editor-controlled Supabase `metatags` field before fallbacks. */
 export function buildSeoDescription(input: SeoDescriptionInput) {
   const editorDescription = cleanText(input.metatags);
-  if (editorDescription) return truncateDescription(editorDescription);
-
   const contentDescription = cleanText(input.description);
-  if (contentDescription) return truncateDescription(contentDescription);
-
   const genreText = input.genres?.filter(Boolean).slice(0, 2).join(" and ");
   const yearText = input.year ? ` (${input.year})` : "";
+
+  const seoContext =
+    "PixelPopLK වෙතින් Sinhala subtitles සහ Telegram download link ලබාගන්න.";
+  const sourceDescription = editorDescription || contentDescription;
+
+  // Preserve the editor's story summary from Supabase, then add a short
+  // Sinhala SEO context when it needs more detail for a search snippet.
+  if (sourceDescription) {
+    return truncateDescription(addContext(sourceDescription, seoContext));
+  }
 
   if (input.kind === "episode") {
     const episodeCode = `Season ${input.season} Episode ${input.episode}`;
     const episodeName = input.episodeTitle ? `, ${input.episodeTitle}` : "";
     return truncateDescription(
-      `Download the Sinhala subtitle for ${input.showName} ${episodeCode}${episodeName}. Synced subtitle file for this episode on PixelPopLK.`,
+      `${input.showName} ${episodeCode}${episodeName} සඳහා සිංහල උපසිරැසි ලබාගන්න. මෙම episode එකට ගැළපෙන Sinhala subtitle සහ Telegram download link PixelPopLK වෙතින් ලබාගත හැක.`,
     );
   }
 
   if (input.kind === "series") {
     return truncateDescription(
-      `Browse Sinhala subtitles for ${input.title}${yearText}, including available seasons and episodes${genreText ? ` in ${genreText}` : ""}, on PixelPopLK.`,
+      `${input.title}${yearText} TV Series සඳහා සිංහල උපසිරැසි බලන්න. සියලු seasons සහ episodes${genreText ? ` (${genreText})` : ""} සඳහා Sinhala subtitles සහ Telegram download links PixelPopLK වෙතින් ලබාගන්න.`,
     );
   }
 
   return truncateDescription(
-    `Download the Sinhala subtitle for ${input.title}${yearText}${genreText ? `, a ${genreText} movie` : ""}. Find a synced subtitle file on PixelPopLK.`,
+    `${input.title}${yearText}${genreText ? ` ${genreText} චිත්‍රපටය සඳහා` : " සඳහා"} සිංහල උපසිරැසි ලබාගන්න. ගැළපෙන Sinhala subtitle සහ Telegram download link PixelPopLK වෙතින් පහසුවෙන් බාගත කරන්න, නවතම updates සමඟ.`,
   );
 }
