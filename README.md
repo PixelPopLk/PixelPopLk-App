@@ -109,6 +109,7 @@ JavaScript rendering එකක් බලා නොසිට index කළ හැ�
 1. **Database Update (Supabase)**:
    - `update/sql/schema_update.sql` ගොනුවේ අන්තර්ගතය copy කරගන්න.
    - ඔබගේ **Supabase Dashboard** -> **SQL Editor** වෙත ගොස් paste කර **RUN** කරන්න. (පැරණි දත්ත කිසිවක් මැකෙන්නේ නැත).
+   - SEO `metatags` භාවිතා කරන deployment එකක් නම්, `sql/seo_metadata_permissions.sql` ද SQL Editor එකේ run කරන්න. මෙය `metatags` field එක පමණක් public SEO reads සඳහා grant කරන අතර download links expose කරන්නේ නැත.
 
 2. **Files Replace කිරීම**:
    - `update/` ෆෝල්ඩරය ඇතුළේ ඇති `src` සහ `public` ඔබගේ ප්‍රධාන GitHub repository එකේ අදාළ තැන් වලට copy/paste (replace) කරන්න.
