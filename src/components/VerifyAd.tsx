@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 // 👇 1. මෙතනට ඔයාගේ Adsterra Direct Link / Smart Link එක Paste කරන්න
-const ADSTERRA_SMART_LINK = "https://www.profitablecpmrate.com/xxxxxxxxxxxx"; 
+const ADSTERRA_SMART_LINK = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9"; 
 
 // 👇 2. Cloudflare Worker එක හැදුවම ඒකෙ URL එක මෙතනට දෙන්න
 const WORKER_URL = "https://your-bot-name.workers.dev";
