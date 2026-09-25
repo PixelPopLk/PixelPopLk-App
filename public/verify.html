@@ -1,32 +1,8 @@
 <!DOCTYPE html>
-<html lang="si" class="dark">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verifying...</title>
-  <style>
-    body {
-      margin: 0; padding: 0;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      min-height: 100vh; background-color: #0e0e12; color: #ffffff;
-      font-family: system-ui, -apple-system, sans-serif; text-align: center;
-    }
-    .spinner {
-      width: 48px; height: 48px;
-      border: 4px solid #1e1e24; border-top: 4px solid #38bdf8;
-      border-radius: 50%; animation: spin 1s linear infinite;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    h3 { margin-top: 20px; font-size: 18px; }
-    p { color: #94a3b8; font-size: 14px; }
-  </style>
-</head>
-<body>
-
-  <div class="spinner" id="spinner"></div>
-  <h3 id="title">Verifying link...</h3>
-  <p id="desc">Connecting to bot server...</p>
-
+  <title>Redirecting...</title>
   <script>
     const AD_URL = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9";
     const WORKER_URL = "https://pixelbot.pasindumadusanka348.workers.dev";
@@ -34,33 +10,18 @@
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('a');
 
-    if (!userId) {
-      document.getElementById('title').innerText = "Redirecting to Sponsor...";
-      window.location.replace(AD_URL);
-    } else {
-      // 1. Worker එකට Signal එක යැවීම
-      fetch(`${WORKER_URL}/verify?a=${userId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === "success" || data.verified === true) {
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('title').style.color = '#22c55e';
-            document.getElementById('title').innerText = "✅ Verified Successfully!";
-            document.getElementById('desc').innerText = "Opening sponsor ad in 1s...";
-            setTimeout(() => {
-              window.location.replace(AD_URL);
-            }, 1000);
-          } else {
-            throw new Error("Verification failed");
-          }
-        })
-        .catch(err => {
-          document.getElementById('spinner').style.display = 'none';
-          document.getElementById('title').style.color = '#ef4444';
-          document.getElementById('title').innerText = "❌ Verification Connection Failed!";
-          document.getElementById('desc').innerText = "Please check internet or try again from Telegram.";
-        });
+    if (userId) {
+      // Background එකෙන් Worker එකට වෙලාව සටහන් කිරීමට Signal එක යවයි (Zero Delay)
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(`${WORKER_URL}/ad_started?a=${userId}`);
+      } else {
+        fetch(`${WORKER_URL}/ad_started?a=${userId}`, { keepalive: true }).catch(() => {});
+      }
     }
+
+    // ඇසිපිය ගහන සැනින් (Instant 0.05s) Ad එකට Redirect වීම!
+    window.location.replace(AD_URL);
   </script>
-</body>
+</head>
+<body style="background:#0e0e12;margin:0;"></body>
 </html>
