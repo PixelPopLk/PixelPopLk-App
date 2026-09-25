@@ -1,129 +1,67 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 
-// 👇 1. මෙතනට ඔයාගේ Adsterra Direct Link / Smart Link එක Paste කරන්න
-const ADSTERRA_SMART_LINK = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9"; 
+// 👇 1. ඔයාගේ Adsterra Smart Link / Direct Link එක මෙතනට දාන්න
+const ADSTERRA_SMART_LINK = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9";
 
-// 👇 2. Cloudflare Worker එක හැදුවම ඒකෙ URL එක මෙතනට දෙන්න
+// 👇 2. Cloudflare Worker එකේ URL එක
 const WORKER_URL = "https://your-bot-name.workers.dev";
 
 const VerifyAd: React.FC = () => {
-  const [adClicked, setAdClicked] = useState<boolean>(false);
-  const [timeLeft, setTimeLeft] = useState<number>(5);
-  const [isVerified, setIsVerified] = useState<boolean>(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get('a');
-    if (id) setUserId(id);
+    const userId = urlParams.get('a');
+
+    // User ID එකක් නැත්නම් කෙලින්ම Ad එකට redirect කරනවා
+    if (!userId) {
+      window.location.replace(ADSTERRA_SMART_LINK);
+      return;
+    }
+
+    // 1. Worker එකට User verify උනා කියලා Signal එක යවනවා
+    fetch(`${WORKER_URL}/verify?a=${userId}`, { keepalive: true })
+      .catch((err) => console.error("Verify error:", err))
+      .finally(() => {
+        // 2. Request එක ගිය ගමන් කෙලින්ම Adsterra Ad Link එකට Redirect වෙනවා
+        // (තත්පර 1ක පොඩි delay එකක් තියෙන්නේ Network request එක හරියටම වැදෙන්න)
+        setTimeout(() => {
+          window.location.replace(ADSTERRA_SMART_LINK);
+        }, 800);
+      });
   }, []);
 
-  // User "Watch Ad" බටන් එක click කළ විට
-  const handleWatchAd = () => {
-    // A. අලුත් Tab එකකින් Adsterra Smart Link එක open වෙනවා
-    window.open(ADSTERRA_SMART_LINK, '_blank');
-    setAdClicked(true);
-
-    // B. තත්පර 5ක Countdown Timer එක පටන් ගන්නවා
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-
-          // C. Worker එකට Verification Signal එක යැවීම
-          if (userId) {
-            fetch(`${WORKER_URL}/verify?a=${userId}`)
-              .then((res) => res.json())
-              .then(() => setIsVerified(true))
-              .catch(() => setIsVerified(true)); // Testing සඳහා
-          } else {
-            setIsVerified(true);
-          }
-
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2>File Verification</h2>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '90vh',
+      backgroundColor: '#0f172a',
+      color: '#ffffff',
+      fontFamily: 'sans-serif',
+      textAlign: 'center',
+      padding: '20px'
+    }}>
+      {/* Loading Spinner එකක් */}
+      <div style={{
+        width: '50px',
+        height: '50px',
+        border: '5px solid #1e293b',
+        borderTop: '5px solid #38bdf8',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite'
+      }} />
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
 
-        {!isVerified ? (
-          <div>
-            {!adClicked ? (
-              <div>
-                <p style={{ color: '#94a3b8', marginBottom: '20px' }}>
-                  Click the button below to watch the sponsor ad and unlock your Telegram files.
-                </p>
-                {/* User click කරන ප්‍රධාන Button එක */}
-                <button onClick={handleWatchAd} style={styles.adButton}>
-                  🎬 Click to Watch Ad & Verify
-                </button>
-              </div>
-            ) : (
-              <div>
-                <p>Verifying ad... Please wait</p>
-                <div style={styles.timer}>{timeLeft}s</div>
-                <p style={{ fontSize: '13px', color: '#64748b' }}>
-                  (Ad එක අලුත් tab එකකින් open වී ඇත)
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ color: '#22c55e' }}>
-            <h3 style={{ fontSize: '22px' }}>✅ Verification Successful!</h3>
-            <p style={{ color: '#cbd5e1', marginTop: '10px' }}>
-              දැන් Telegram වෙත ගොස් <b>'I have clicked ads ⁉️'</b> ඔබන්න.
-            </p>
-          </div>
-        )}
-      </div>
+      <h3 style={{ marginTop: '20px', fontWeight: '500' }}>Redirecting to Sponsor Ad...</h3>
+      <p style={{ color: '#64748b', fontSize: '14px' }}>Please wait, you will be redirected automatically.</p>
     </div>
   );
-};
-
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '85vh',
-    backgroundColor: '#0f172a',
-    color: '#ffffff',
-    fontFamily: 'sans-serif',
-  },
-  card: {
-    maxWidth: '420px',
-    width: '90%',
-    backgroundColor: '#1e293b',
-    borderRadius: '16px',
-    padding: '35px 20px',
-    textAlign: 'center',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-  },
-  adButton: {
-    backgroundColor: '#22c55e',
-    color: '#ffffff',
-    border: 'none',
-    padding: '14px 24px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    width: '100%',
-    transition: '0.2s',
-  },
-  timer: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: '#38bdf8',
-    margin: '15px 0',
-  }
 };
 
 export default VerifyAd;
