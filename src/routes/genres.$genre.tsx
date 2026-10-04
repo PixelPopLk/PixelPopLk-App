@@ -32,8 +32,22 @@ const ALL_GENRES = [
 
 async function fetchGenreContent(genreParam: string): Promise<Subtitle[]> {
   const cleanGenre = genreParam.replace(/-/g, " ").trim();
-  
-  // Query items whose genre column contains the keyword
+
+  const rpc = await supabase.rpc("search_homepage_subtitles", {
+    p_query: null,
+    p_type: "all",
+    p_genre: cleanGenre,
+    p_year: null,
+    p_rating: null,
+    p_movie_limit: 48,
+    p_series_limit: 24,
+  });
+
+  if (!rpc.error) {
+    return (rpc.data ?? []) as Subtitle[];
+  }
+
+  // Fallback until the search RPC migration is applied in Supabase.
   const { data, error } = await supabase
     .from(SUBTITLES_TABLE)
     .select(SAFE_SUBTITLE_COLUMNS)
