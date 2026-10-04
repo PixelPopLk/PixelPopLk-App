@@ -227,6 +227,19 @@ function getItemRating(it: GridItem): number | null {
 
 function matchesYear(it: GridItem, yf: YearFilter): boolean {
   if (yf === "All") return true;
+
+  if (it.kind === "series") {
+    return it.episodes.some((episode) => {
+      const rawYear = episode.year;
+      const year = rawYear !== undefined && rawYear !== null && String(rawYear).trim() !== ""
+        ? Number.parseInt(String(rawYear), 10)
+        : null;
+      if (year == null || Number.isNaN(year)) return false;
+      if (yf === "Older") return year <= 2022;
+      return year === Number.parseInt(yf, 10);
+    });
+  }
+
   const y = getItemYear(it);
   if (y == null) return false;
   if (yf === "Older") return y <= 2022;
@@ -235,6 +248,17 @@ function matchesYear(it: GridItem, yf: YearFilter): boolean {
 
 function matchesRating(it: GridItem, rf: RatingFilter): boolean {
   if (rf === "All") return true;
+
+  if (it.kind === "series") {
+    const min = parseFloat(rf);
+    return it.episodes.some((episode) => {
+      const raw = episode.rating;
+      if (raw === undefined || raw === null || String(raw).trim() === "") return false;
+      const rating = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
+      return !Number.isNaN(rating) && rating >= min;
+    });
+  }
+
   const r = getItemRating(it);
   if (r == null) return false;
   const min = parseFloat(rf);
