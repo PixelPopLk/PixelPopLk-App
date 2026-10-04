@@ -41,7 +41,6 @@ const CORE_GENRES = [
   "thriller",
 ];
 
-/** Return a sitemap-safe date only when it is a real, non-future timestamp. */
 function sitemapDate(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
 
@@ -50,6 +49,25 @@ function sitemapDate(value: string | null | undefined): string | undefined {
     return undefined;
 
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Pick one stable canonical URL for each TV show.
+ * Prefer S01E01 because using the latest episode made the series URL change
+ * every time a new episode was added, which is a poor canonical signal.
+ * If S01E01 is unavailable, fall back to the oldest episode.
+ */
+function pickCanonicalSeriesRow(episodes: any[]) {
+  return (
+    episodes.find(
+      (episode) =>
+        Number(episode.season) === 1 && Number(episode.episode) === 1,
+    ) ??
+    [...episodes].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    )[0]
+  );
 }
 
 export const Route = createFileRoute("/sitemap.xml")({
@@ -63,14 +81,13 @@ export const Route = createFileRoute("/sitemap.xml")({
           )
           .order("created_at", { ascending: false });
 
-        // Always return a valid sitemap for crawlers. Dynamic subtitle URLs are
-        // omitted temporarily if Supabase is unavailable; static and genre URLs
-        // remain indexable instead of receiving a 500 response.
+        // Keep the sitemap valid even if the dynamic catalog query temporarily
+        // fails. Static URLs remain available for crawlers instead of returning 5xx.
         if (error) {
           console.error("Sitemap subtitle fetch failed:", error.message);
         }
 
-        const showLatestMap = new Map<string, any>();
+        const showEpisodesMap = new Map<string, any[]>();
         const episodeEntries: any[] = [];
         const movieEntries: any[] = [];
 
@@ -90,16 +107,11 @@ export const Route = createFileRoute("/sitemap.xml")({
             });
 
             const showKey =
-              cleanShowName(
-                parseTitle(sub.title || "").showName,
-              ).toLowerCase() || `id:${sub.id}`;
-            const existing = showLatestMap.get(showKey);
-            if (
-              !existing ||
-              new Date(sub.created_at) > new Date(existing.created_at)
-            ) {
-              showLatestMap.set(showKey, sub);
-            }
+              cleanShowName(parseTitle(sub.title || "").showName).toLowerCase() ||
+              `id:${sub.id}`;
+            const group = showEpisodesMap.get(showKey) ?? [];
+            group.push(sub);
+            showEpisodesMap.set(showKey, group);
           } else {
             movieEntries.push({
               url: `${BASE_URL}/content/${sub.id}`,
@@ -113,21 +125,24 @@ export const Route = createFileRoute("/sitemap.xml")({
         }
 
         const seriesHubEntries: any[] = [];
-        for (const latestSub of showLatestMap.values()) {
+        for (const episodes of showEpisodesMap.values()) {
+          const canonicalRow = pickCanonicalSeriesRow(episodes);
+          if (!canonicalRow) continue;
+
           const showName = cleanShowName(
-            parseTitle(latestSub.title || "").showName,
+            parseTitle(canonicalRow.title || "").showName,
           );
           const date =
-            sitemapDate(latestSub.updated_at) ??
-            sitemapDate(latestSub.created_at);
+            sitemapDate(canonicalRow.updated_at) ??
+            sitemapDate(canonicalRow.created_at);
 
           seriesHubEntries.push({
-            url: `${BASE_URL}/content/${latestSub.id}`,
+            url: `${BASE_URL}/content/${canonicalRow.id}`,
             date,
             changefreq: "weekly",
             priority: "0.9",
             title: escapeXml(`${showName} Sinhala Subtitles`),
-            image_url: latestSub.image_url,
+            image_url: canonicalRow.image_url,
           });
         }
 
@@ -135,11 +150,6 @@ export const Route = createFileRoute("/sitemap.xml")({
         xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
         xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
 
-        // This TanStack Start server route is the sole authoritative producer
-        // of /sitemap.xml. Keep only canonical, indexable landing and content URLs.
-        // Static pages intentionally omit lastmod because there is no source
-        // record from which to derive a trustworthy modification date.
-        // 1. Core Top-Level Pages
         const staticPages = [
           {
             url: `${BASE_URL}/`,
@@ -185,7 +195,6 @@ export const Route = createFileRoute("/sitemap.xml")({
           xml += `  </url>\n`;
         }
 
-        // 2. Genre Pages
         for (const g of CORE_GENRES) {
           xml += `  <url>\n`;
           xml += `    <loc>${BASE_URL}/genres/${g}</loc>\n`;
@@ -194,7 +203,8 @@ export const Route = createFileRoute("/sitemap.xml")({
           xml += `  </url>\n`;
         }
 
-        // 3. Dynamic Entries
+        // Sitemap contains only canonical landing URLs plus unique episode URLs.
+        const seenUrls = new Set<string>();
         const allItems = [
           ...seriesHubEntries,
           ...movieEntries,
@@ -202,6 +212,9 @@ export const Route = createFileRoute("/sitemap.xml")({
         ];
 
         for (const item of allItems) {
+          if (seenUrls.has(item.url)) continue;
+          seenUrls.add(item.url);
+
           xml += `  <url>\n`;
           xml += `    <loc>${item.url}</loc>\n`;
           if (item.date) xml += `    <lastmod>${item.date}</lastmod>\n`;
