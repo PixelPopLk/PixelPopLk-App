@@ -15,7 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 3000; // තත්පර 20ක Cooldown එකක් (Ad Revenue එක ඉහළ නැංවීමට)
+const COOLDOWN_TIME = 3000;
 
 function NotFoundComponent() {
   return (
@@ -39,15 +39,13 @@ function NotFoundComponent() {
   );
 }
 
-// 🟢 Chunk Error එකක් ආවොත් Auto-Recover වෙන Error Component එක
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error }: { error: Error; reset: () => void }) {
   console.error(error);
-  const router = useRouter();
+  useRouter();
 
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
 
-    // Unexpected Token හෝ Module Error එකක් ආවොත් Infinite Loop නොවී එක්වරක් Reload කිරීම
     if (
       error?.message?.includes("dynamically imported module") ||
       error?.message?.includes("Unexpected token")
@@ -72,9 +70,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => {
-              window.location.reload();
-            }}
+            onClick={() => window.location.reload()}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
           >
             Refresh Page
@@ -92,10 +88,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  // TanStack Start renders this route tree on the server. Cache only public
-  // HTML at the edge so crawlers receive complete, fresh HTML without every
-  // bot request having to wait for the catalog query again. Private, search,
-  // and API responses must never share a cached response.
+  // Cache public SSR HTML at the edge. Private/admin/search/API responses are
+  // explicitly excluded so user-specific data is never shared.
   headers: ({ matches }) => {
     const pathname = matches.at(-1)?.pathname ?? "/";
     const isPrivateOrDynamic =
@@ -103,10 +97,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       pathname.startsWith("/search") ||
       pathname.startsWith("/api/");
 
+    if (isPrivateOrDynamic) {
+      return {
+        "Cache-Control": "no-store",
+        "CDN-Cache-Control": "no-store",
+      };
+    }
+
     return {
-      "Cache-Control": isPrivateOrDynamic
-        ? "no-store"
-        : "public, max-age=0, s-maxage=600, stale-while-revalidate=86400",
+      "Cache-Control":
+        "public, max-age=60, stale-while-revalidate=86400, stale-if-error=86400",
+      "CDN-Cache-Control":
+        "public, max-age=600, stale-while-revalidate=86400, stale-if-error=86400",
     };
   },
   head: () => ({
@@ -119,31 +121,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [
-      {
-        rel: "icon",
-        href: "/logo.png",
-        type: "image/png",
-      },
-      {
-        rel: "apple-touch-icon",
-        href: "/logo.png",
-      },
-      {
-        rel: "manifest",
-        href: "/manifest.json",
-      },
-      {
-        rel: "preconnect",
-        href: "https://acorntar.com",
-      },
-      {
-        rel: "dns-prefetch",
-        href: "https://acorntar.com",
-      },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "icon", href: "/logo.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/logo.png" },
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "stylesheet", href: appCss },
     ],
   }),
   shellComponent: RootShell,
@@ -162,8 +143,8 @@ const websiteSchema = {
   "potentialAction": {
     "@type": "SearchAction",
     "target": "https://pixelpoplk.pages.dev/?q={search_term_string}",
-    "query-input": "required name=search_term_string"
-  }
+    "query-input": "required name=search_term_string",
+  },
 };
 
 function RootShell({ children }: { children: ReactNode }) {
@@ -173,7 +154,6 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="si" className="dark">
       <head>
-        {/* 🌓 Pre-hydration Theme Script (Prevents FOUC Light/Dark Flash) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -189,8 +169,7 @@ function RootShell({ children }: { children: ReactNode }) {
           }}
         />
         <HeadContent />
-        
-        {/* 🚀 Chunk / Unexpected Token Error ආවොත් Auto-Reload කරවන ආරක්ෂිත Script එක */}
+
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -221,7 +200,6 @@ function RootShell({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
         />
 
-        {/* 📱 PWA Service Worker Registration */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -239,7 +217,27 @@ function RootShell({ children }: { children: ReactNode }) {
         <Scripts />
 
         {!isAdminPage && (
-          <script async src="https://acorntar.com/f9/ab/d2/f9abd27b8744d3a0411d6b53882e464a.js" />
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  var loadAd = function() {
+                    if (window.__pixelpop_ad_loaded) return;
+                    window.__pixelpop_ad_loaded = true;
+                    var s = document.createElement('script');
+                    s.async = true;
+                    s.src = 'https://acorntar.com/f9/ab/d2/f9abd27b8744d3a0411d6b53882e464a.js';
+                    document.body.appendChild(s);
+                  };
+                  if ('requestIdleCallback' in window) {
+                    window.requestIdleCallback(loadAd, { timeout: 2500 });
+                  } else {
+                    window.setTimeout(loadAd, 1500);
+                  }
+                })();
+              `,
+            }}
+          />
         )}
       </body>
     </html>
@@ -260,7 +258,6 @@ function RootComponent() {
       const target = event.target as HTMLElement;
       if (!target) return;
 
-      // Popup and dialog interactions are excluded from advertising behavior.
       const isInsidePopup = target.closest(
         '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
         '.modal, .dialog, .popup, [data-radix-dialog-content], ' +
@@ -275,7 +272,6 @@ function RootComponent() {
       const linkElement = clickable.closest("a") as HTMLAnchorElement | null;
       const targetUrl = linkElement ? linkElement.href : null;
 
-      // Download Buttons ignore කිරීම
       const isDownloadButton =
         clickable.hasAttribute("download") ||
         Boolean(clickable.closest("[download], [data-download], [data-no-ad]")) ||
@@ -284,24 +280,17 @@ function RootComponent() {
         (clickable.textContent && /download|බාගන්න/i.test(clickable.textContent)) ||
         (targetUrl && (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) || /download/i.test(targetUrl)));
 
-      // Telegram Buttons ignore කිරීම
       const isTelegramButton =
         Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
         Boolean(clickable.textContent && /telegram|ටෙලිග්‍රෑම්/i.test(clickable.textContent)) ||
         (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
         (clickable.id && /telegram/i.test(clickable.id));
 
-      if (isDownloadButton || isTelegramButton) {
-        return;
-      }
+      if (isDownloadButton || isTelegramButton) return;
 
       const now = Date.now();
       const lastGlobalAdTime = Number(sessionStorage.getItem("last_global_ad_time") || 0);
-
-      // තත්පර 35ක් යනතුරු නැවත Popunder Ads open නොකර සයිට් එක smooth ව තබාගැනීම
-      if (now - lastGlobalAdTime < COOLDOWN_TIME) {
-        return;
-      }
+      if (now - lastGlobalAdTime < COOLDOWN_TIME) return;
 
       sessionStorage.setItem("last_global_ad_time", String(now));
 
@@ -323,10 +312,7 @@ function RootComponent() {
     };
 
     document.addEventListener("click", handleGlobalClick);
-
-    return () => {
-      document.removeEventListener("click", handleGlobalClick);
-    };
+    return () => document.removeEventListener("click", handleGlobalClick);
   }, [isAdminPage]);
 
   return (
