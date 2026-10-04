@@ -117,7 +117,7 @@ export const Route = createFileRoute("/")({
   validateSearch: (search) => homeSearchSchema.parse(search),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => fetchHomepageSubtitles(deps),
-  head: () => ({
+  head: ({ search }) => ({
     meta: [
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       {
@@ -136,7 +136,7 @@ export const Route = createFileRoute("/")({
       { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:locale", content: "si_LK" },
       { property: "og:locale:alternate", content: "en_US" },
-      { name: "robots", content: "index, follow" },
+      { name: "robots", content: search.q || search.type !== "all" || search.genre || search.year || search.rating ? "noindex, follow" : "index, follow" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
