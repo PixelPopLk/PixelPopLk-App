@@ -74,19 +74,31 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const { data: subtitles, error } = await supabase
-          .from(SUBTITLES_TABLE)
-          .select(
-            "id, created_at, updated_at, season, episode, genre, image_url, title",
-          )
-          .order("created_at", { ascending: false });
+        // Supabase/PostgREST commonly caps a single REST response at 1,000 rows.
+        // Page through the catalog so the sitemap keeps all subtitle URLs as the
+        // library grows instead of silently dropping older entries.
+        const SITEMAP_PAGE_SIZE = 1000;
+        const subtitles: any[] = [];
+        let offset = 0;
 
-        // Keep the sitemap valid even if the dynamic catalog query temporarily
-        // fails. Static URLs remain available for crawlers instead of returning 5xx.
-        if (error) {
-          console.error("Sitemap subtitle fetch failed:", error.message);
+        while (true) {
+          const { data, error } = await supabase
+            .from(SUBTITLES_TABLE)
+            .select(
+              "id, created_at, updated_at, season, episode, genre, image_url, title",
+            )
+            .order("created_at", { ascending: false })
+            .range(offset, offset + SITEMAP_PAGE_SIZE - 1);
+
+          if (error) {
+            console.error("Sitemap subtitle fetch failed:", error.message);
+            break;
+          }
+
+          subtitles.push(...(data ?? []));
+          if (!data || data.length < SITEMAP_PAGE_SIZE) break;
+          offset += SITEMAP_PAGE_SIZE;
         }
-
         const showEpisodesMap = new Map<string, any[]>();
         const episodeEntries: any[] = [];
         const movieEntries: any[] = [];
