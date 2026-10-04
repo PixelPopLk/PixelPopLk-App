@@ -50,12 +50,17 @@ const homeSearchSchema = z.object({
 // Homepage does not need the entire catalog on first load.
 // Keep this bounded and fetch only fields actually used by the homepage.
 const HOMEPAGE_CATALOG_LIMIT = 200;
+const HOMEPAGE_MOVIE_LIMIT = 48;
+const HOMEPAGE_SERIES_LIMIT = 24;
 const HOMEPAGE_SUBTITLE_COLUMNS =
   "id, created_at, title, image_url, genre, description, rating, year, season, episode";
 
 async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>): Promise<Subtitle[]> {
   const queryText = search.q?.trim() || null;
-  const year = search.year && (/^\d{4}$/.test(search.year) || search.year === "Older") ? search.year : null;
+  const year =
+    search.year && (/^\d{4}$/.test(search.year) || search.year === "Older")
+      ? search.year
+      : null;
   const rating =
     search.rating && /^\d+(?:\.\d+)?\+$/.test(search.rating)
       ? Number.parseFloat(search.rating)
@@ -63,25 +68,27 @@ async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>):
   const genre = search.genre?.trim() || null;
   const type = search.type ?? "all";
 
-  // Search/type-filtered requests use Postgres-side ranking/classification so we
-  // do not pull the full catalog into the server just to filter it in JavaScript.
-  if (queryText || type !== "all") {
-    const rpc = await supabase.rpc("search_homepage_subtitles", {
-      p_query: queryText,
-      p_type: type,
-      p_genre: genre,
-      p_year: year,
-      p_rating: rating,
-      p_limit: HOMEPAGE_CATALOG_LIMIT,
-    });
+  // One DB call returns:
+  // - latest movies as individual rows
+  // - latest unique series as complete episode groups
+  // - matching series even when the query hits an episode title
+  // This prevents a raw-row LIMIT from splitting a TV series across requests.
+  const rpc = await supabase.rpc("search_homepage_subtitles", {
+    p_query: queryText,
+    p_type: type,
+    p_genre: genre,
+    p_year: year,
+    p_rating: rating,
+    p_movie_limit: HOMEPAGE_MOVIE_LIMIT,
+    p_series_limit: HOMEPAGE_SERIES_LIMIT,
+  });
 
-    if (!rpc.error) {
-      return (rpc.data ?? []) as Subtitle[];
-    }
+  if (!rpc.error) {
+    return (rpc.data ?? []) as Subtitle[];
   }
 
-  // Safe fallback for deployments where the optional search RPC has not been
-  // applied to Supabase yet. This still keeps the homepage payload bounded.
+  // Safe fallback for deployments where the migration has not been applied yet.
+  // The production path should use the RPC above so series stay complete.
   let query = supabase
     .from(SUBTITLES_TABLE)
     .select(HOMEPAGE_SUBTITLE_COLUMNS)
@@ -98,6 +105,8 @@ async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>):
   }
   if (year) query = year === "Older" ? query.lte("year", "2022") : query.eq("year", year);
   if (rating != null) query = query.gte("rating", rating);
+  if (type === "series") query = query.not("season", "is", null);
+  if (type === "movie") query = query.is("season", null);
 
   const { data, error } = await query;
   if (error) throw error;
