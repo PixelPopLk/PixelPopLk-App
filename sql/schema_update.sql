@@ -93,54 +93,98 @@ EXECUTE FUNCTION trg_subtitles_auto_slug();
 
 
 -- 6. Fast homepage search/filter RPC.
--- Uses pg_trgm for typo-tolerant ranking while returning only the fields
--- required by the homepage. The type classification mirrors src/lib/subtitles.ts.
+-- Returns raw subtitle rows, but selection happens at the series/movie level:
+-- movie cards are individually limited, while each selected TV series is returned
+-- with its complete episode group. This keeps buildGridItems() authoritative.
 CREATE OR REPLACE FUNCTION public.search_homepage_subtitles(
   p_query TEXT DEFAULT NULL,
   p_type TEXT DEFAULT 'all',
   p_genre TEXT DEFAULT NULL,
   p_year TEXT DEFAULT NULL,
   p_rating NUMERIC DEFAULT NULL,
-  p_limit INTEGER DEFAULT 200
+  p_movie_limit INTEGER DEFAULT 48,
+  p_series_limit INTEGER DEFAULT 24
 )
 RETURNS SETOF JSONB
 LANGUAGE sql
 STABLE
 AS $$
-  WITH classified AS (
+  WITH normalized AS (
     SELECT
-      id,
-      created_at,
-      title,
-      image_url,
-      genre,
-      description,
-      rating,
-      year,
-      season,
-      episode,
+      s.id,
+      s.created_at,
+      s.title,
+      s.image_url,
+      s.genre,
+      s.description,
+      s.rating,
+      s.year,
+      s.season,
+      s.episode,
+      CASE
+        WHEN (
+          s.season IS NOT NULL
+          AND s.episode IS NOT NULL
+        ) THEN true
+        WHEN LOWER(COALESCE(s.genre, '')) LIKE '%movie%' THEN false
+        WHEN s.title ~* '^.*[[:space:]._-]*[Ss][0-9]{1,2}[[:space:]._-]*[Ee][0-9]{1,3}([[:space:]._-]+.*)?$' THEN true
+        WHEN s.title ~* '^.*[[:space:]._-]+Season[[:space:]._-]?[0-9]{1,2}[[:space:]._-]+Episode[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$' THEN true
+        WHEN s.title ~* '^.*[[:space:]._-]+[0-9]{1,2}x[0-9]{1,3}([[:space:]._-]+.*)?$' THEN true
+        WHEN s.title ~* '^.*[[:space:]._-]+(Episode|Epi|Ep)[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$' THEN true
+        ELSE false
+      END AS is_series,
       CASE
         WHEN NULLIF(TRIM(p_query), '') IS NULL
           OR LOWER(TRIM(p_query)) IN ('sub', 'subs', 'subtitle', 'subtitles', 'sinhala', 'film', 'movie')
-          THEN 0
+          THEN 0::REAL
         ELSE GREATEST(
-          similarity(title, TRIM(p_query)),
-          word_similarity(TRIM(p_query), title)
+          similarity(s.title, TRIM(p_query)),
+          word_similarity(TRIM(p_query), s.title)
         )
       END AS search_score,
-      (
-        (season IS NOT NULL AND episode IS NOT NULL)
-        OR (
-          LOWER(COALESCE(genre, '')) NOT LIKE '%movie%'
-          AND (
-            title ~* '^.*[[:space:]._-]+[Ss][0-9]{1,2}[[:space:]._-]*[Ee][0-9]{1,3}([[:space:]._-]+.*)?$'
-            OR title ~* '^.*[[:space:]._-]+Season[[:space:]._-]?[0-9]{1,2}[[:space:]._-]+Episode[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$'
-            OR title ~* '^.*[[:space:]._-]+[0-9]{1,2}x[0-9]{1,3}([[:space:]._-]+.*)?$'
-            OR title ~* '^.*[[:space:]._-]+(Episode|Epi|Ep)[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$'
+      TRIM(
+        REGEXP_REPLACE(
+          REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              REGEXP_REPLACE(
+                LOWER(COALESCE(s.title, '')),
+                '[[:space:]._-]*[Ss][0-9]{1,2}[[:space:]._-]*[Ee][0-9]{1,3}([[:space:]._-]+.*)?$',
+                '',
+                1, 0, 'i'
+              ),
+              '[[:space:]._-]+Season[[:space:]._-]?[0-9]{1,2}[[:space:]._-]+Episode[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$',
+              '',
+              1, 0, 'i'
+            ),
+            '[[:space:]._-]+[0-9]{1,2}x[0-9]{1,3}([[:space:]._-]+.*)?$',
+            '',
+            1, 0, 'i'
+          ),
+          '[[:space:]._-]+(Episode|Epi|Ep)[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$',
+          '',
+          1, 0, 'i'
+        )
+      ) AS show_key
+    FROM public.subtitles s
+  ),
+  classified AS (
+    SELECT
+      n.*,
+      LOWER(
+        TRIM(
+          REGEXP_REPLACE(
+            REGEXP_REPLACE(n.show_key, '[._]+', ' ', 'g'),
+            '[[:space:]]+',
+            ' ',
+            'g'
           )
         )
-      ) AS is_series
-    FROM subtitles
+      ) AS normalized_show_key
+    FROM normalized n
+  ),
+  filtered AS (
+    SELECT *
+    FROM classified
     WHERE
       (
         NULLIF(TRIM(p_query), '') IS NULL
@@ -171,7 +215,7 @@ AS $$
           TRIM(p_year) = 'Older'
           AND CASE
             WHEN year::TEXT ~ '^[0-9]{4}$' THEN year::INT <= 2022
-            ELSE FALSE
+            ELSE false
           END
         )
         OR (
@@ -183,9 +227,45 @@ AS $$
         p_rating IS NULL
         OR CASE
           WHEN rating::TEXT ~ '^[0-9]+(\.[0-9]+)?$' THEN rating::NUMERIC >= p_rating
-          ELSE FALSE
+          ELSE false
         END
       )
+      AND (
+        p_type = 'all'
+        OR (p_type = 'series' AND is_series)
+        OR (p_type = 'movie' AND NOT is_series)
+      )
+  ),
+  selected_movies AS (
+    SELECT id
+    FROM filtered
+    WHERE NOT is_series
+      AND p_type IN ('all', 'movie')
+    ORDER BY search_score DESC, created_at DESC
+    LIMIT GREATEST(0, LEAST(COALESCE(p_movie_limit, 48), 48))
+  ),
+  selected_series AS (
+    SELECT normalized_show_key
+    FROM filtered
+    WHERE is_series
+      AND NULLIF(normalized_show_key, '') IS NOT NULL
+      AND p_type IN ('all', 'series')
+    GROUP BY normalized_show_key
+    ORDER BY MAX(search_score) DESC, MAX(created_at) DESC
+    LIMIT GREATEST(0, LEAST(COALESCE(p_series_limit, 24), 24))
+  ),
+  selected_rows AS (
+    SELECT c.*
+    FROM classified c
+    INNER JOIN selected_series ss
+      ON ss.normalized_show_key = c.normalized_show_key
+
+    UNION ALL
+
+    SELECT c.*
+    FROM classified c
+    INNER JOIN selected_movies sm
+      ON sm.id = c.id
   )
   SELECT jsonb_build_object(
     'id', id,
@@ -199,14 +279,9 @@ AS $$
     'season', season,
     'episode', episode
   )
-  FROM classified
-  WHERE
-    p_type = 'all'
-    OR (p_type = 'series' AND is_series)
-    OR (p_type = 'movie' AND NOT is_series)
-  ORDER BY search_score DESC, created_at DESC
-  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 200), 200));
+  FROM selected_rows
+  ORDER BY search_score DESC, created_at DESC;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.search_homepage_subtitles(TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER)
+GRANT EXECUTE ON FUNCTION public.search_homepage_subtitles(TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER, INTEGER)
   TO anon, authenticated;
