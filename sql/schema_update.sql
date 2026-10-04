@@ -90,3 +90,110 @@ EXECUTE FUNCTION trg_subtitles_auto_slug();
 -- ඔබගේ Slugs සාර්ථකව සැකසී ඇත්දැයි බැලීමට පහත query එක run කරන්න:
 -- SELECT id, title, year, slug FROM subtitles ORDER BY created_at DESC LIMIT 20;
 -- =====================================================================================
+
+
+-- 6. Fast homepage search/filter RPC.
+-- Uses pg_trgm for typo-tolerant ranking while returning only the fields
+-- required by the homepage. The type classification mirrors src/lib/subtitles.ts.
+CREATE OR REPLACE FUNCTION public.search_homepage_subtitles(
+  p_query TEXT DEFAULT NULL,
+  p_type TEXT DEFAULT 'all',
+  p_genre TEXT DEFAULT NULL,
+  p_year TEXT DEFAULT NULL,
+  p_rating NUMERIC DEFAULT NULL,
+  p_limit INTEGER DEFAULT 200
+)
+RETURNS SETOF JSONB
+LANGUAGE sql
+STABLE
+AS $$
+  WITH classified AS (
+    SELECT
+      id,
+      created_at,
+      title,
+      image_url,
+      genre,
+      description,
+      rating,
+      year,
+      season,
+      episode,
+      CASE
+        WHEN NULLIF(TRIM(p_query), '') IS NULL THEN 0
+        ELSE GREATEST(
+          similarity(title, TRIM(p_query)),
+          word_similarity(TRIM(p_query), title)
+        )
+      END AS search_score,
+      (
+        (season IS NOT NULL AND episode IS NOT NULL)
+        OR (
+          LOWER(COALESCE(genre, '')) NOT LIKE '%movie%'
+          AND (
+            title ~* '^.*[[:space:]._-]+[Ss][0-9]{1,2}[[:space:]._-]*[Ee][0-9]{1,3}([[:space:]._-]+.*)?$'
+            OR title ~* '^.*[[:space:]._-]+Season[[:space:]._-]?[0-9]{1,2}[[:space:]._-]+Episode[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$'
+            OR title ~* '^.*[[:space:]._-]+[0-9]{1,2}x[0-9]{1,3}([[:space:]._-]+.*)?$'
+            OR title ~* '^.*[[:space:]._-]+(Episode|Epi|Ep)[[:space:]._-]?[0-9]{1,3}([[:space:]._-]+.*)?$'
+          )
+        )
+      ) AS is_series
+    FROM subtitles
+    WHERE
+      (
+        NULLIF(TRIM(p_query), '') IS NULL
+        OR title ILIKE '%' || TRIM(p_query) || '%'
+        OR similarity(title, TRIM(p_query)) >= 0.12
+        OR word_similarity(TRIM(p_query), title) >= 0.20
+      )
+      AND (
+        NULLIF(TRIM(p_genre), '') IS NULL
+        OR (
+          LOWER(TRIM(p_genre)) = 'sci-fi'
+          AND (
+            genre ILIKE '%sci-fi%'
+            OR genre ILIKE '%scifi%'
+            OR genre ILIKE '%sci fi%'
+            OR genre ILIKE '%science fiction%'
+          )
+        )
+        OR (
+          LOWER(TRIM(p_genre)) <> 'sci-fi'
+          AND genre ILIKE '%' || TRIM(p_genre) || '%'
+        )
+      )
+      AND (
+        NULLIF(TRIM(p_year), '') IS NULL
+        OR year::TEXT = TRIM(p_year)
+      )
+      AND (
+        p_rating IS NULL
+        OR CASE
+          WHEN rating::TEXT ~ '^[0-9]+(\.[0-9]+)?$' THEN rating::NUMERIC >= p_rating
+          ELSE FALSE
+        END
+      )
+  )
+  SELECT jsonb_build_object(
+    'id', id,
+    'created_at', created_at,
+    'title', title,
+    'image_url', image_url,
+    'genre', genre,
+    'description', description,
+    'rating', rating,
+    'year', year,
+    'season', season,
+    'episode', episode
+  )
+  FROM classified
+  WHERE
+    p_type = 'all'
+    OR (p_type = 'series' AND is_series)
+    OR (p_type = 'movie' AND NOT is_series)
+  ORDER BY search_score DESC, created_at DESC
+  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 200), 200));
+$$;
+
+GRANT EXECUTE ON FUNCTION public.search_homepage_subtitles(TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER)
+  TO anon, authenticated;
