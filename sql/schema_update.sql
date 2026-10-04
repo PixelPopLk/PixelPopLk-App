@@ -202,7 +202,7 @@ AS $
       AND (
         NULLIF(TRIM(p_genre), '') IS NULL
         OR (
-          LOWER(TRIM(p_genre)) = 'sci-fi'
+          LOWER(TRIM(p_genre)) IN ('sci-fi', 'sci fi', 'scifi', 'science fiction')
           AND (
             genre ILIKE '%sci-fi%'
             OR genre ILIKE '%scifi%'
