@@ -105,8 +105,6 @@ async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>):
   }
   if (year) query = year === "Older" ? query.lte("year", "2022") : query.eq("year", year);
   if (rating != null) query = query.gte("rating", rating);
-  if (type === "series") query = query.not("season", "is", null);
-  if (type === "movie") query = query.is("season", null);
 
   const { data, error } = await query;
   if (error) throw error;
