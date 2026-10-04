@@ -107,48 +107,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
     const parsed = parseTitle(targetItem.title ?? "");
     const targetShowName = parsed.showName.toLowerCase().trim();
     const safeShowPrefix = (parsed.showName || targetItem.title || "")
-      .replace(/[%_\\]/g, "\\async function fetchContentData(id: string): Promise<Subtitle[]> {
-  const { data: targetItem, error: firstError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .eq("id", Number(id) as any)
-    .maybeSingle();
-
-  if (firstError) throw firstError;
-  if (!targetItem) return [] as Subtitle[];
-
-  const isSeries = (() => {
-    const sNum = targetItem.season;
-    const eNum = targetItem.episode;
-    if (sNum != null && eNum != null) return true;
-
-    const g = (targetItem.genre ?? "").toLowerCase();
-    const genresList = g.split(/[,/|]/).map((x) => x.trim());
-    if (genresList.includes("movie")) return false;
-
-    const parsed = parseTitle(targetItem.title ?? "");
-    return parsed.episode != null;
-  })();
-
-  if (isSeries) {
-    const parsed = parseTitle(targetItem.title ?? "");
-    const safeShowPrefix = (parsed.showName || targetItem.title || "")
       .replace(/[%_\\]/g, "\\$&")
-      .trim();
-    const { data: allEpisodes, error: secondError } = await supabase
-      .from(SUBTITLES_TABLE)
-      .select(SAFE_COLUMNS)
-      .ilike("title", `${safeShowPrefix}%`)
-      .order("created_at", { ascending: false });
-
-    if (secondError) throw secondError;
-    const episodes = (allEpisodes ?? []) as Subtitle[];
-
-    return episodes;
-  }
-
-  return [targetItem] as Subtitle[];
-}")
       .trim();
 
     let allEpisodes: any[] = [];
@@ -192,7 +151,8 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
       ) ??
       [...episodes].sort(
         (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime(),
       )[0];
 
     if (
