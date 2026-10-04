@@ -93,6 +93,10 @@ EXECUTE FUNCTION trg_subtitles_auto_slug();
 
 
 -- 6. Fast homepage search/filter RPC.
+-- Remove the previous 6-argument overload so PostgREST has one unambiguous
+-- function signature for homepage search.
+DROP FUNCTION IF EXISTS public.search_homepage_subtitles(TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER);
+
 -- Returns raw subtitle rows, but selection happens at the series/movie level:
 -- movie cards are individually limited, while each selected TV series is returned
 -- with its complete episode group. This keeps buildGridItems() authoritative.
@@ -108,7 +112,9 @@ CREATE OR REPLACE FUNCTION public.search_homepage_subtitles(
 RETURNS SETOF JSONB
 LANGUAGE sql
 STABLE
-AS $$
+SET pg_trgm.similarity_threshold = 0.12
+SET pg_trgm.word_similarity_threshold = 0.20
+AS $
   WITH normalized AS (
     SELECT
       s.id,
@@ -190,8 +196,8 @@ AS $$
         NULLIF(TRIM(p_query), '') IS NULL
         OR LOWER(TRIM(p_query)) IN ('sub', 'subs', 'subtitle', 'subtitles', 'sinhala', 'film', 'movie')
         OR title ILIKE '%' || TRIM(p_query) || '%'
-        OR similarity(title, TRIM(p_query)) >= 0.12
-        OR word_similarity(TRIM(p_query), title) >= 0.20
+        OR title % TRIM(p_query)
+        OR TRIM(p_query) <% title
       )
       AND (
         NULLIF(TRIM(p_genre), '') IS NULL
