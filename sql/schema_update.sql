@@ -120,7 +120,9 @@ AS $$
       season,
       episode,
       CASE
-        WHEN NULLIF(TRIM(p_query), '') IS NULL THEN 0
+        WHEN NULLIF(TRIM(p_query), '') IS NULL
+          OR LOWER(TRIM(p_query)) IN ('sub', 'subs', 'subtitle', 'subtitles', 'sinhala', 'film', 'movie')
+          THEN 0
         ELSE GREATEST(
           similarity(title, TRIM(p_query)),
           word_similarity(TRIM(p_query), title)
@@ -168,39 +170,7 @@ AS $$
         OR (
           TRIM(p_year) = 'Older'
           AND CASE
-            WHEN year::TEXT ~ '^[0-9]{4}
-      AND (
-        p_rating IS NULL
-        OR CASE
-          WHEN rating::TEXT ~ '^[0-9]+(\.[0-9]+)?$' THEN rating::NUMERIC >= p_rating
-          ELSE FALSE
-        END
-      )
-  )
-  SELECT jsonb_build_object(
-    'id', id,
-    'created_at', created_at,
-    'title', title,
-    'image_url', image_url,
-    'genre', genre,
-    'description', description,
-    'rating', rating,
-    'year', year,
-    'season', season,
-    'episode', episode
-  )
-  FROM classified
-  WHERE
-    p_type = 'all'
-    OR (p_type = 'series' AND is_series)
-    OR (p_type = 'movie' AND NOT is_series)
-  ORDER BY search_score DESC, created_at DESC
-  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 200), 200));
-$$;
-
-GRANT EXECUTE ON FUNCTION public.search_homepage_subtitles(TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER)
-  TO anon, authenticated;
- THEN year::INT <= 2022
+            WHEN year::TEXT ~ '^[0-9]{4}$' THEN year::INT <= 2022
             ELSE FALSE
           END
         )
