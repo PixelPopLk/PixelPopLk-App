@@ -17,6 +17,21 @@ import { useState, useMemo } from "react";
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 async function fetchLatestTVSeries(): Promise<Subtitle[]> {
+  const rpc = await supabase.rpc("search_homepage_subtitles", {
+    p_query: null,
+    p_type: "series",
+    p_genre: null,
+    p_year: null,
+    p_rating: null,
+    p_movie_limit: 0,
+    p_series_limit: 48,
+  });
+
+  if (!rpc.error) {
+    return (rpc.data ?? []) as Subtitle[];
+  }
+
+  // Fallback until the homepage search RPC migration is applied in Supabase.
   const { data, error } = await supabase
     .from(SUBTITLES_TABLE)
     .select(SAFE_SUBTITLE_COLUMNS)
