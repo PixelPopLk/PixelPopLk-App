@@ -57,6 +57,12 @@ CREATE INDEX IF NOT EXISTS idx_subtitles_slug ON subtitles (slug);
 CREATE INDEX IF NOT EXISTS idx_subtitles_genre ON subtitles (genre);
 CREATE INDEX IF NOT EXISTS idx_subtitles_created_at_desc ON subtitles (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_subtitles_season_ep ON subtitles (season, episode);
+-- Homepage search indexes: supports fast partial title/genre filtering without loading the catalog.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_subtitles_title_trgm ON subtitles USING GIN (title gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_subtitles_genre_trgm ON subtitles USING GIN (genre gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_subtitles_year ON subtitles (year);
+CREATE INDEX IF NOT EXISTS idx_subtitles_rating ON subtitles (rating);
 
 -- 5. අනාගතයේදී අලුතින් Subtitle එකක් Insert වන විට ස්වයංක්‍රීයව Slug එක හැදෙන Trigger එක
 CREATE OR REPLACE FUNCTION trg_subtitles_auto_slug()
