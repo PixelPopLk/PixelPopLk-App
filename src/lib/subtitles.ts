@@ -38,7 +38,7 @@ export type GridItem =
   | {
       kind: "series";
       key: string;
-      id: Subtitle["id"]; // representative id (latest episode) used for routing
+      id: Subtitle["id"]; // stable representative id used for the series landing URL
       showName: string;
       poster: string;
       latestDate: string;
@@ -83,11 +83,12 @@ export function buildGridItems(subs: Subtitle[]): GridItem[] {
   const seriesItems: GridItem[] = Array.from(groups.entries()).map(([key, eps]) => {
     const sorted = [...eps].sort((a, b) => a.season - b.season || a.episode - b.episode);
     const latest = [...eps].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))[0];
+    const canonical = sorted.find((e) => e.season === 1 && e.episode === 1) ?? sorted[0];
     const showName = cleanShowName(parseTitle(latest.title).showName);
     return {
       kind: "series",
       key: `series:${key}`,
-      id: latest.id,
+      id: canonical.id,
       showName,
       poster: latest.image_url,
       latestDate: latest.created_at,
