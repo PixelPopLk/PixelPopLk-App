@@ -92,31 +92,7 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
 
   const targetShowName = parsed.showName.toLowerCase().trim();
   const safeShowPrefix = (parsed.showName || targetItem.title || "")
-    .replace(/[%_\\]/g, "\\async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
-  const { data: targetItem, error: firstError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .eq("id", Number(id) as any)
-    .maybeSingle();
-
-  if (firstError) throw firstError;
-  if (!targetItem) return [] as Subtitle[];
-
-  const parsed = parseTitle(targetItem.title ?? "");
-  const safeShowPrefix = (parsed.showName || targetItem.title || "")
     .replace(/[%_\\]/g, "\\$&")
-    .trim();
-  const { data: allEpisodes, error: secondError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .ilike("title", `${safeShowPrefix}%`)
-    .order("created_at", { ascending: false });
-
-  if (secondError) throw secondError;
-  const episodes = (allEpisodes ?? []) as Subtitle[];
-
-  return episodes;
-}")
     .trim();
 
   let allEpisodes: any[] = [];
