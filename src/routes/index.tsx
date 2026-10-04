@@ -45,11 +45,18 @@ const homeSearchSchema = z.object({
   q: z.string().optional().catch(undefined),
 });
 
-async function fetchAllSubtitles(): Promise<Subtitle[]> {
+// Homepage does not need the entire catalog on first load.
+// Keep this bounded and fetch only fields actually used by the homepage.
+const HOMEPAGE_CATALOG_LIMIT = 200;
+const HOMEPAGE_SUBTITLE_COLUMNS =
+  "id, created_at, title, image_url, genre, description, rating, year, season, episode";
+
+async function fetchHomepageSubtitles(): Promise<Subtitle[]> {
   const { data, error } = await supabase
     .from(SUBTITLES_TABLE)
-    .select(SAFE_SUBTITLE_COLUMNS)
-    .order("created_at", { ascending: false });
+    .select(HOMEPAGE_SUBTITLE_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(HOMEPAGE_CATALOG_LIMIT);
 
   if (error) throw error;
   return (data ?? []) as Subtitle[];
@@ -57,7 +64,7 @@ async function fetchAllSubtitles(): Promise<Subtitle[]> {
 
 export const Route = createFileRoute("/")({
   validateSearch: (search) => homeSearchSchema.parse(search),
-  loader: async () => fetchAllSubtitles(),
+  loader: async () => fetchHomepageSubtitles(),
   head: () => ({
     meta: [
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
