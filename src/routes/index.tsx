@@ -43,6 +43,8 @@ const homeSearchSchema = z.object({
   type: z.enum(["all", "movie", "series"]).optional().catch("all"),
   genre: z.string().optional().catch(undefined),
   q: z.string().optional().catch(undefined),
+  year: z.string().optional().catch(undefined),
+  rating: z.string().optional().catch(undefined),
 });
 
 // Homepage does not need the entire catalog on first load.
@@ -51,20 +53,38 @@ const HOMEPAGE_CATALOG_LIMIT = 200;
 const HOMEPAGE_SUBTITLE_COLUMNS =
   "id, created_at, title, image_url, genre, description, rating, year, season, episode";
 
-async function fetchHomepageSubtitles(): Promise<Subtitle[]> {
-  const { data, error } = await supabase
+async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>): Promise<Subtitle[]> {
+  let query = supabase
     .from(SUBTITLES_TABLE)
     .select(HOMEPAGE_SUBTITLE_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(HOMEPAGE_CATALOG_LIMIT);
 
+  // Push the most selective filters into Postgres so the browser never receives the full catalog.
+  if (search.q?.trim()) {
+    const q = search.q.trim().replace(/[\\%_]/g, "");
+    query = query.ilike("title", `%${q}%`);
+  }
+  if (search.genre) {
+    const genre = search.genre.trim().replace(/[\\%_]/g, "");
+    if (genre) query = query.ilike("genre", `%${genre}%`);
+  }
+  if (search.year && /^\\d{4}$/.test(search.year)) {
+    query = query.eq("year", search.year);
+  }
+  if (search.rating && /^\\d+(?:\\.\\d+)?\\+$/.test(search.rating)) {
+    query = query.gte("rating", Number.parseFloat(search.rating));
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as Subtitle[];
 }
 
 export const Route = createFileRoute("/")({
   validateSearch: (search) => homeSearchSchema.parse(search),
-  loader: async () => fetchHomepageSubtitles(),
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => fetchHomepageSubtitles(deps),
   head: () => ({
     meta: [
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
