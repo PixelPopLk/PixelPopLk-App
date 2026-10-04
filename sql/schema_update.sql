@@ -142,6 +142,7 @@ AS $$
     WHERE
       (
         NULLIF(TRIM(p_query), '') IS NULL
+        OR LOWER(TRIM(p_query)) IN ('sub', 'subs', 'subtitle', 'subtitles', 'sinhala', 'film', 'movie')
         OR title ILIKE '%' || TRIM(p_query) || '%'
         OR similarity(title, TRIM(p_query)) >= 0.12
         OR word_similarity(TRIM(p_query), title) >= 0.20
