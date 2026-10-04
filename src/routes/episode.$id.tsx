@@ -51,11 +51,16 @@ const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
-  const { data: targetItem, error: firstError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .eq("id", Number(id) as any)
-    .maybeSingle();
+  const { data: targetItem, error: firstError } = await queryWithMetaFallback(
+    (columns) =>
+      supabase
+        .from(SUBTITLES_TABLE)
+        .select(columns)
+        .eq("id", Number(id) as any)
+        .maybeSingle(),
+    SEO_SAFE_COLUMNS,
+    SAFE_COLUMNS,
+  );
 
   if (firstError) throw firstError;
   if (!targetItem) return [] as Subtitle[];
@@ -64,11 +69,16 @@ async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
   const safeShowPrefix = (parsed.showName || targetItem.title || "")
     .replace(/[%_\\]/g, "\\$&")
     .trim();
-  const { data: allEpisodes, error: secondError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .ilike("title", `${safeShowPrefix}%`)
-    .order("created_at", { ascending: false });
+  const { data: allEpisodes, error: secondError } = await queryWithMetaFallback(
+    (columns) =>
+      supabase
+        .from(SUBTITLES_TABLE)
+        .select(columns)
+        .ilike("title", `${safeShowPrefix}%`)
+        .order("created_at", { ascending: false }),
+    SEO_SAFE_COLUMNS,
+    SAFE_COLUMNS,
+  );
 
   if (secondError) throw secondError;
   const episodes = (allEpisodes ?? []) as Subtitle[];
