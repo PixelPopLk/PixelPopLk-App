@@ -55,7 +55,7 @@ const HOMEPAGE_SUBTITLE_COLUMNS =
 
 async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>): Promise<Subtitle[]> {
   const queryText = search.q?.trim() || null;
-  const year = search.year && /^\d{4}$/.test(search.year) ? search.year : null;
+  const year = search.year && (/^\d{4}$/.test(search.year) || search.year === "Older") ? search.year : null;
   const rating =
     search.rating && /^\d+(?:\.\d+)?\+$/.test(search.rating)
       ? Number.parseFloat(search.rating)
@@ -96,7 +96,7 @@ async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>):
     const cleanGenre = genre.replace(/[\%_]/g, "");
     if (cleanGenre) query = query.ilike("genre", `%${cleanGenre}%`);
   }
-  if (year) query = query.eq("year", year);
+  if (year) query = year === "Older" ? query.lte("year", "2022") : query.eq("year", year);
   if (rating != null) query = query.gte("rating", rating);
 
   const { data, error } = await query;
