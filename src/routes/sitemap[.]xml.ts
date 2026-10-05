@@ -92,6 +92,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
           if (error) {
             console.error("Sitemap subtitle fetch failed:", error.message);
+            catalogFetchFailed = true;
             break;
           }
 
@@ -99,6 +100,10 @@ export const Route = createFileRoute("/sitemap.xml")({
           if (!data || data.length < SITEMAP_PAGE_SIZE) break;
           offset += SITEMAP_PAGE_SIZE;
         }
+        // Do not publish or cache a partial sitemap. A transient catalog failure must
+        // fall back to a safe minimal sitemap instead.
+        let catalogFetchFailed = false;
+
         const showEpisodesMap = new Map<string, any[]>();
         const episodeEntries: any[] = [];
         const movieEntries: any[] = [];
@@ -144,9 +149,20 @@ export const Route = createFileRoute("/sitemap.xml")({
           const showName = cleanShowName(
             parseTitle(canonicalRow.title || "").showName,
           );
-          const date =
-            sitemapDate(canonicalRow.updated_at) ??
-            sitemapDate(canonicalRow.created_at);
+          // The series hub represents the whole show, so its lastmod must reflect
+          // the newest episode change—not just the S01E01 canonical row.
+          const latestEpisodeDate = episodes.reduce<string | undefined>(
+            (latest, episode) => {
+              const candidate =
+                sitemapDate(episode.updated_at) ??
+                sitemapDate(episode.created_at);
+              if (!candidate) return latest;
+              if (!latest) return candidate;
+              return candidate > latest ? candidate : latest;
+            },
+            undefined,
+          );
+          const date = latestEpisodeDate;
 
           seriesHubEntries.push({
             url: `${BASE_URL}/content/${canonicalRow.id}`,
@@ -242,6 +258,22 @@ export const Route = createFileRoute("/sitemap.xml")({
         }
 
         xml += `</urlset>`;
+
+        if (catalogFetchFailed) {
+          console.warn(
+            "Sitemap catalog fetch was incomplete; serving a safe non-cacheable fallback.",
+          );
+          return new Response(
+            `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE_URL}/</loc></url></urlset>`,
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/xml; charset=utf-8",
+                "Cache-Control": "no-store, max-age=0",
+              },
+            },
+          );
+        }
 
         return new Response(xml, {
           headers: {
