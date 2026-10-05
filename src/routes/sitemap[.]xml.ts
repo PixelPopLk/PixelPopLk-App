@@ -4,6 +4,8 @@ import { parseTitle, cleanShowName } from "@/lib/subtitles";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
+let lastKnownGoodSitemap: string | null = null;
+
 function isSeriesRow(sub: any) {
   if (sub.season != null && sub.episode != null) return true;
   const g = (sub.genre ?? "").toLowerCase();
@@ -264,7 +266,8 @@ export const Route = createFileRoute("/sitemap.xml")({
             "Sitemap catalog fetch was incomplete; serving a safe non-cacheable fallback.",
           );
           return new Response(
-            `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE_URL}/</loc></url></urlset>`,
+            lastKnownGoodSitemap ??
+              `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE_URL}/</loc></url></urlset>`,
             {
               status: 200,
               headers: {
@@ -274,6 +277,8 @@ export const Route = createFileRoute("/sitemap.xml")({
             },
           );
         }
+
+        lastKnownGoodSitemap = xml;
 
         return new Response(xml, {
           headers: {
