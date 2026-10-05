@@ -179,13 +179,13 @@ AS $$
       LOWER(
         TRIM(
           REGEXP_REPLACE(
-            REGEXP_REPLACE(
-              REGEXP_REPLACE(n.show_key, '[._]+', ' ', 'g'),
-              '[[:space:]]+',
-              ' ',
-              'g'
-            ),
-            '[[:space:]\\-:]+
+            REGEXP_REPLACE(n.show_key, '[._]+', ' ', 'g'),
+            '[[:space:]]+',
+            ' ',
+            'g'
+          )
+        )
+      ) AS normalized_show_key
     FROM normalized n
   ),
   filtered AS (
