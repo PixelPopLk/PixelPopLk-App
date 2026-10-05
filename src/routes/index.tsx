@@ -115,8 +115,18 @@ export const Route = createFileRoute("/")({
   validateSearch: (search) => homeSearchSchema.parse(search),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => fetchHomepageSubtitles(deps),
-  head: () => ({
-    meta: [
+  head: ({ match }) => {
+    const search = match.search;
+    const hasFilterParams = Boolean(
+      search.q ||
+      search.genre ||
+      search.year ||
+      search.rating ||
+      search.type !== "all",
+    );
+
+    return {
+      meta: [
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       {
         name: "description",
@@ -134,15 +144,19 @@ export const Route = createFileRoute("/")({
       { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:locale", content: "si_LK" },
       { property: "og:locale:alternate", content: "en_US" },
-      { name: "robots", content: "index, follow" },
+      {
+        name: "robots",
+        content: hasFilterParams ? "noindex, follow" : "index, follow",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
       { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
       { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
     ],
-    links: [{ rel: "canonical", href: "https://pixelpoplk.pages.dev/" }],
-  }),
+      links: [{ rel: "canonical", href: "https://pixelpoplk.pages.dev/" }],
+    };
+  },
   component: HomePage,
   errorComponent: ({ error }) => (
     <div className="min-h-screen flex items-center justify-center p-6 text-center">
