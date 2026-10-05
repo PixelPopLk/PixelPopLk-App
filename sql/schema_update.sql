@@ -179,9 +179,120 @@ AS $$
       LOWER(
         TRIM(
           REGEXP_REPLACE(
-            REGEXP_REPLACE(n.show_key, '[._]+', ' ', 'g'),
-            '[[:space:]]+',
-            ' ',
+            REGEXP_REPLACE(
+              REGEXP_REPLACE(n.show_key, '[._]+', ' ', 'g'),
+              '[[:space:]]+',
+              ' ',
+              'g'
+            ),
+            '[[:space:]\\-:]+
+    FROM normalized n
+  ),
+  filtered AS (
+    SELECT *
+    FROM classified
+    WHERE
+      (
+        NULLIF(TRIM(p_query), '') IS NULL
+        OR LOWER(TRIM(p_query)) IN ('sub', 'subs', 'subtitle', 'subtitles', 'sinhala', 'film', 'movie')
+        OR title ILIKE '%' || TRIM(p_query) || '%'
+        OR title % TRIM(p_query)
+        OR TRIM(p_query) <% title
+      )
+      AND (
+        NULLIF(TRIM(p_genre), '') IS NULL
+        OR (
+          LOWER(TRIM(p_genre)) IN ('sci-fi', 'sci fi', 'scifi', 'science fiction')
+          AND (
+            genre ILIKE '%sci-fi%'
+            OR genre ILIKE '%scifi%'
+            OR genre ILIKE '%sci fi%'
+            OR genre ILIKE '%science fiction%'
+          )
+        )
+        OR (
+          LOWER(TRIM(p_genre)) <> 'sci-fi'
+          AND genre ILIKE '%' || TRIM(p_genre) || '%'
+        )
+      )
+      AND (
+        NULLIF(TRIM(p_year), '') IS NULL
+        OR (
+          TRIM(p_year) = 'Older'
+          AND CASE
+            WHEN year::TEXT ~ '^[0-9]{4}$' THEN year::INT <= 2022
+            ELSE false
+          END
+        )
+        OR (
+          TRIM(p_year) <> 'Older'
+          AND year::TEXT = TRIM(p_year)
+        )
+      )
+      AND (
+        p_rating IS NULL
+        OR CASE
+          WHEN rating::TEXT ~ '^[0-9]+(\.[0-9]+)?$' THEN rating::NUMERIC >= p_rating
+          ELSE false
+        END
+      )
+      AND (
+        p_type = 'all'
+        OR (p_type = 'series' AND is_series)
+        OR (p_type = 'movie' AND NOT is_series)
+      )
+  ),
+  selected_movies AS (
+    SELECT id
+    FROM filtered
+    WHERE NOT is_series
+      AND p_type IN ('all', 'movie')
+    ORDER BY search_score DESC, created_at DESC
+    LIMIT GREATEST(0, LEAST(COALESCE(p_movie_limit, 48), 48))
+  ),
+  selected_series AS (
+    SELECT normalized_show_key
+    FROM filtered
+    WHERE is_series
+      AND NULLIF(normalized_show_key, '') IS NOT NULL
+      AND p_type IN ('all', 'series')
+    GROUP BY normalized_show_key
+    ORDER BY MAX(search_score) DESC, MAX(created_at) DESC
+    LIMIT GREATEST(0, LEAST(COALESCE(p_series_limit, 24), 24))
+  ),
+  selected_rows AS (
+    SELECT c.*
+    FROM classified c
+    INNER JOIN selected_series ss
+      ON ss.normalized_show_key = c.normalized_show_key
+
+    UNION ALL
+
+    SELECT c.*
+    FROM classified c
+    INNER JOIN selected_movies sm
+      ON sm.id = c.id
+  )
+  SELECT jsonb_build_object(
+    'id', id,
+    'created_at', created_at,
+    'title', title,
+    'image_url', image_url,
+    'genre', genre,
+    'description', description,
+    'rating', rating,
+    'year', year,
+    'season', season,
+    'episode', episode
+  )
+  FROM selected_rows
+  ORDER BY search_score DESC, created_at DESC;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.search_homepage_subtitles(TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER, INTEGER)
+  TO anon, authenticated;
+,
+            '',
             'g'
           )
         )
