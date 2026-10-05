@@ -82,6 +82,7 @@ export const Route = createFileRoute("/sitemap.xml")({
         const SITEMAP_PAGE_SIZE = 1000;
         const subtitles: any[] = [];
         let offset = 0;
+        let catalogFetchFailed = false;
 
         while (true) {
           const { data, error } = await supabase
@@ -104,7 +105,6 @@ export const Route = createFileRoute("/sitemap.xml")({
         }
         // Do not publish or cache a partial sitemap. A transient catalog failure must
         // fall back to a safe minimal sitemap instead.
-        let catalogFetchFailed = false;
 
         const showEpisodesMap = new Map<string, any[]>();
         const episodeEntries: any[] = [];
