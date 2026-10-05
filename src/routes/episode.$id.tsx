@@ -406,12 +406,7 @@ function EpisodePage() {
           description:
             ep.description ||
             `Sinhala subtitle for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
-          workFeaturedBy: {
-            "@type": "DataDownload",
-            name: `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle`,
-            encodingFormat: "application/zip",
-            description: `Download Sinhala Subtitle (.zip) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
-          },
+
         }
       : null;
 
