@@ -114,7 +114,7 @@ LANGUAGE sql
 STABLE
 SET pg_trgm.similarity_threshold = 0.12
 SET pg_trgm.word_similarity_threshold = 0.20
-AS $
+AS $$
   WITH normalized AS (
     SELECT
       s.id,
