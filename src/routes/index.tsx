@@ -96,11 +96,11 @@ async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>):
     .limit(HOMEPAGE_CATALOG_LIMIT);
 
   if (queryText) {
-    const q = queryText.replace(/[\%_]/g, "");
+    const q = queryText.replace(/[%_]/g, "");
     if (q) query = query.ilike("title", `%${q}%`);
   }
   if (genre) {
-    const cleanGenre = genre.replace(/[\%_]/g, "");
+    const cleanGenre = genre.replace(/[%_]/g, "");
     if (cleanGenre) query = query.ilike("genre", `%${cleanGenre}%`);
   }
   if (year) query = year === "Older" ? query.lte("year", "2022") : query.eq("year", year);
