@@ -7,7 +7,7 @@ export function cleanShowName(raw: string) {
   return raw
     .replace(/[._]+/g, " ")
     .replace(/\s+-\s+$/, "")
-    .replace(/[\s\-:]+$/g, "")
+    .replace(/[\s-:]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -15,17 +15,17 @@ export function cleanShowName(raw: string) {
 export function parseTitle(title: string): ParsedTitle {
   if (!title) return { showName: "" };
 
-  let m = title.match(/^(.*?)[\s._\-]*[Ss](\d{1,2})[\s._\-]*[Ee](\d{1,3})(?:[\s._\-]+(.+))?$/);
+  let m = title.match(/^(.*?)[\s._-]*[Ss](\d{1,2})[\s._-]*[Ee](\d{1,3})(?:[\s._-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
 
-  m = title.match(/^(.*?)[\s._\-]+Season[\s._\-]?(\d{1,2})[\s._\-]+Episode[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
+  m = title.match(/^(.*?)[\s._-]+Season[\s._-]?(\d{1,2})[\s._-]+Episode[\s._-]?(\d{1,3})(?:[\s._-]+(.+))?$/i);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
 
-  m = title.match(/^(.*?)[\s._\-]+(\d{1,2})x(\d{1,3})(?:[\s._\-]+(.+))?$/);
+  m = title.match(/^(.*?)[\s._-]+(\d{1,2})x(\d{1,3})(?:[\s._-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
 
   // 🔥 "Title Episode 1" හෝ "Title Ep 2" වැනි දෑ සාර්ථකව TV Series ලෙස හඳුනාගනී
-  m = title.match(/^(.*?)[\s._\-]+(?:Episode|Epi|Ep)[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
+  m = title.match(/^(.*?)[\s._-]+(?:Episode|Epi|Ep)[\s._-]?(\d{1,3})(?:[\s._-]+(.+))?$/i);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: 1, episode: +m[2], episodeTitle: m[3]?.trim() } };
 
   return { showName: title.trim() };
