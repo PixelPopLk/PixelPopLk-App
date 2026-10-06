@@ -238,9 +238,6 @@ function RootShell({ children }: { children: ReactNode }) {
         {children}
         <Scripts />
 
-        {!isAdminPage && (
-          <script async src="https://acorntar.com/f9/ab/d2/f9abd27b8744d3a0411d6b53882e464a.js" />
-        )}
       </body>
     </html>
   );
