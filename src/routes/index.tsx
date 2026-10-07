@@ -907,7 +907,7 @@ function HomePage() {
           </div>
         )}
       
-    </div>
+    </main>
   );
 }
 
