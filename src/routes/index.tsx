@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Download,
@@ -783,20 +782,12 @@ function HomePage() {
       <Footer />
 
       {/* 🟢 Request Subtitle Modal (data-no-ad යොදා ad popups වළක්වා ඇත) */}
-      <AnimatePresence>
-        {requestModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {requestModalOpen && (
+          <div
             data-no-ad="true"
             className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-default"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative"
+            <div className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative"
             >
               <button
                 type="button"
@@ -877,20 +868,12 @@ function HomePage() {
       </AnimatePresence>
 
       {/* 🟢 Clean Countdown Modal (Alerts සහ freeze ඉවත් කර ඇත) */}
-      <AnimatePresence>
-        {modalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {modalOpen && (
+          <div
             data-no-ad="true"
             className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-default"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
+            <div className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
             >
               <button
                 type="button"
@@ -1041,8 +1024,7 @@ function Hero({
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </AnimatePresence>
+          </div>
 
           {featured.length > 1 && (
             <>
