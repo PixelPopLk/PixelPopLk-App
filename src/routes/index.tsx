@@ -1,4 +1,3 @@
-import { getResponsiveImageProps } from "@/lib/images";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
