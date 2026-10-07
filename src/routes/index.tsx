@@ -968,14 +968,9 @@ function Hero({
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
-          <AnimatePresence mode="wait">
-            <motion.div
+          <div
               key={current.key}
-              initial={{ opacity: 0, scale: 1.02 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6 }}
-              className="relative h-[360px] sm:h-[440px]"
+              className="relative h-[360px] sm:h-[440px] animate-[heroFade_0.6s_ease-out]"
             >
               <img
                 src={itemPoster(current)}
