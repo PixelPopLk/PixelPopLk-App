@@ -798,7 +798,8 @@ function HomePage() {
                   setRequestNotes("");
                   setRequestStatusMsg("");
                 }}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                aria-label="Close dialog"
+                className="absolute top-4 right-4 min-w-11 min-h-11 text-muted-foreground hover:text-foreground transition cursor-pointer grid place-items-center"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1081,9 +1082,10 @@ function FilterSelect({
     <div className="relative">
       <select
         id={id}
+        aria-label={id === "year-filter" ? "Filter by release year" : id === "rating-filter" ? "Filter by rating" : id === "sort-filter" ? "Sort subtitles" : id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`appearance-none cursor-pointer pl-3 pr-7 py-1.5 rounded-lg text-xs font-semibold border transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+        className={`appearance-none cursor-pointer pl-3 pr-7 py-2.5 min-h-11 rounded-lg text-xs font-semibold border transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
           active
             ? "bg-primary/15 border-primary/40 text-primary"
             : "bg-card/60 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
@@ -1115,7 +1117,7 @@ function FilterTabs({ active, onChange }: { active: Category; onChange: (c: Cate
             key={c}
             type="button"
             onClick={() => onChange(c)}
-            className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition ${
+            className={`shrink-0 min-h-11 px-4 py-2.5 rounded-full text-sm font-medium border transition ${
               isActive
                 ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
                 : "bg-card/60 text-muted-foreground border-border hover:text-foreground hover:border-primary/40"
