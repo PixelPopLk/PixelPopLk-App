@@ -1,4 +1,3 @@
-import { getResponsiveImageProps } from "@/lib/images";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import AdBanner from "@/components/AdBanner";
