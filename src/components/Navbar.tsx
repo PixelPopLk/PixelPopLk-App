@@ -1,4 +1,3 @@
-import { getResponsiveImageProps } from "@/lib/images";
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, Search, X, ArrowLeft, Sun, Moon } from "lucide-react";
@@ -186,14 +185,8 @@ export function Navbar({
                     >
                       {item.posterUrl ? (
                         <img
-                          src={getResponsiveImageProps(item.posterUrl, { widths: [96, 192], sizes: "48px" }).src}
-                          srcSet={getResponsiveImageProps(item.posterUrl, { widths: [96, 192], sizes: "48px" }).srcSet}
-                          sizes="48px"
+                          src={item.posterUrl}
                           alt={item.title}
-                          width={48}
-                          height={64}
-                          loading="lazy"
-                          decoding="async"
                           className="w-12 h-16 object-cover rounded-lg shrink-0 bg-muted border border-border/50 group-hover:scale-105 transition-transform"
                         />
                       ) : (
