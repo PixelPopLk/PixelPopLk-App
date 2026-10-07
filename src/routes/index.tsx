@@ -974,6 +974,12 @@ function Hero({
               key={current.key}
               className="relative h-[360px] sm:h-[440px] animate-[heroFade_0.6s_ease-out]"
             >
+              <link
+                rel="preload"
+                as="image"
+                href={optimizePosterUrl(itemPoster(current), 780)}
+                fetchPriority="high"
+              />
               <img
                 src={optimizePosterUrl(itemPoster(current), 780)}
                 srcSet={`${optimizePosterUrl(itemPoster(current), 480)} 480w, ${optimizePosterUrl(itemPoster(current), 780)} 780w, ${optimizePosterUrl(itemPoster(current), 1280)} 1280w`}
