@@ -862,10 +862,10 @@ function HomePage() {
                   )}
                 </button>
               </form>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      
 
       {/* 🟢 Clean Countdown Modal (Alerts සහ freeze ඉවත් කර ඇත) */}
       {modalOpen && (
@@ -902,10 +902,10 @@ function HomePage() {
               <p className="text-[11px] text-muted-foreground/70 bg-muted/30 py-2.5 px-3 rounded-xl border border-border leading-relaxed">
                 Loading your destination, please do not close this window.
               </p>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      
     </div>
   );
 }
