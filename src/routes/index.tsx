@@ -975,6 +975,7 @@ function Hero({
             >
               <img
                 src={optimizePosterUrl(itemPoster(current), 780)}
+                srcSet={`${optimizePosterUrl(itemPoster(current), 480)} 480w, ${optimizePosterUrl(itemPoster(current), 780)} 780w, ${optimizePosterUrl(itemPoster(current), 1280)} 1280w`}
                 alt={itemTitle(current)}
                 loading={slide === 0 ? "eager" : "lazy"}
                 // @ts-expect-error - fetchPriority attribute
@@ -1284,6 +1285,8 @@ function SubtitleCard({
           {poster ? (
             <img
               src={optimizePosterUrl(poster, 342)}
+              srcSet={`${optimizePosterUrl(poster, 185)} 185w, ${optimizePosterUrl(poster, 342)} 342w`}
+              sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 220px"
               alt={`${title} Sinhala Subtitle`}
               width={300}
               height={450}
