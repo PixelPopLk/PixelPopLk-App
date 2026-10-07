@@ -216,29 +216,6 @@ function RootShell({ children }: { children: ReactNode }) {
         {children}
         <Scripts />
 
-        {!isAdminPage && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                (function() {
-                  var loadAd = function() {
-                    if (window.__pixelpop_ad_loaded) return;
-                    window.__pixelpop_ad_loaded = true;
-                    var s = document.createElement('script');
-                    s.async = true;
-                    s.src = 'https://acorntar.com/f9/ab/d2/f9abd27b8744d3a0411d6b53882e464a.js';
-                    document.body.appendChild(s);
-                  };
-                  if ('requestIdleCallback' in window) {
-                    window.requestIdleCallback(loadAd, { timeout: 2500 });
-                  } else {
-                    window.setTimeout(loadAd, 1500);
-                  }
-                })();
-              `,
-            }}
-          />
-        )}
       </body>
     </html>
   );
