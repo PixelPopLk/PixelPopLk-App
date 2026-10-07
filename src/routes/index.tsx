@@ -563,7 +563,7 @@ function HomePage() {
   }, [filtered]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background">
       {collectionSchema && (
         <script
           type="application/ld+json"
@@ -1050,7 +1050,7 @@ function Hero({
                     type="button"
                     onClick={() => setSlide(i)}
                     aria-label={`Slide ${i + 1}`}
-                    className={`h-1.5 rounded-full transition-all ${
+                    className={`min-w-3 min-h-3 rounded-full transition-all ${
                       i === slide ? "w-8 bg-primary" : "w-2 bg-muted-foreground/40"
                     }`}
                   />
