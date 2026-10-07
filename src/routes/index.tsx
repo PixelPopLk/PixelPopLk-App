@@ -122,7 +122,7 @@ export const Route = createFileRoute("/")({
       search.genre ||
       search.year ||
       search.rating ||
-      search.type !== "all",
+      (search.type !== undefined && search.type !== "all"),
     );
 
     return {
