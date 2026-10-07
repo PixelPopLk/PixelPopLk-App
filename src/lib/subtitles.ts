@@ -118,6 +118,18 @@ export function itemPoster(it: GridItem) {
   return it.kind === "movie" ? it.sub.image_url : it.poster;
 }
 
+/**
+ * TMDB stores posters at multiple widths. Keep manually supplied/non-TMDB
+ * URLs untouched, while serving a smaller variant for the actual slot.
+ */
+export function optimizePosterUrl(url: string, width: 185 | 342 | 500 | 780 | 1280): string {
+  if (!url) return url;
+  return url.replace(
+    /https:\/\/image\.tmdb\.org\/t\/p\/(?:w92|w154|w185|w342|w500|w780|w1280|original)(?=\/)/,
+    `https://image.tmdb.org/t/p/w${width}`,
+  );
+}
+
 export function itemDate(it: GridItem) {
   return it.kind === "movie" ? it.sub.created_at : it.latestDate;
 }

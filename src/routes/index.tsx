@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Download,
@@ -31,6 +30,7 @@ import {
   itemDate,
   itemGenres,
   itemPoster,
+  optimizePosterUrl,
   itemTitle,
   formatDate,
   type GridItem,
@@ -122,7 +122,7 @@ export const Route = createFileRoute("/")({
       search.genre ||
       search.year ||
       search.rating ||
-      search.type !== "all",
+      (search.type !== undefined && search.type !== "all"),
     );
 
     return {
@@ -563,7 +563,7 @@ function HomePage() {
   }, [filtered]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background">
       {collectionSchema && (
         <script
           type="application/ld+json"
@@ -783,20 +783,12 @@ function HomePage() {
       <Footer />
 
       {/* 🟢 Request Subtitle Modal (data-no-ad යොදා ad popups වළක්වා ඇත) */}
-      <AnimatePresence>
-        {requestModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {requestModalOpen && (
+          <div
             data-no-ad="true"
             className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-default"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative"
+            <div className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative"
             >
               <button
                 type="button"
@@ -806,7 +798,8 @@ function HomePage() {
                   setRequestNotes("");
                   setRequestStatusMsg("");
                 }}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                aria-label="Close dialog"
+                className="absolute top-4 right-4 min-w-11 min-h-11 text-muted-foreground hover:text-foreground transition cursor-pointer grid place-items-center"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -871,26 +864,18 @@ function HomePage() {
                   )}
                 </button>
               </form>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      
 
       {/* 🟢 Clean Countdown Modal (Alerts සහ freeze ඉවත් කර ඇත) */}
-      <AnimatePresence>
-        {modalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {modalOpen && (
+          <div
             data-no-ad="true"
             className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-default"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
+            <div className="bg-card border border-border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
             >
               <button
                 type="button"
@@ -919,11 +904,11 @@ function HomePage() {
               <p className="text-[11px] text-muted-foreground/70 bg-muted/30 py-2.5 px-3 rounded-xl border border-border leading-relaxed">
                 Loading your destination, please do not close this window.
               </p>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-    </div>
+      
+    </main>
   );
 }
 
@@ -985,21 +970,24 @@ function Hero({
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
-          <AnimatePresence mode="wait">
-            <motion.div
+          <div
               key={current.key}
-              initial={{ opacity: 0, scale: 1.02 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6 }}
-              className="relative h-[360px] sm:h-[440px]"
+              className="relative h-[360px] sm:h-[440px] animate-[heroFade_0.6s_ease-out]"
             >
+              <link
+                rel="preload"
+                as="image"
+                href={optimizePosterUrl(itemPoster(current), 780)}
+                fetchPriority="high"
+              />
               <img
-                src={itemPoster(current)}
+                src={optimizePosterUrl(itemPoster(current), 780)}
+                srcSet={`${optimizePosterUrl(itemPoster(current), 480)} 480w, ${optimizePosterUrl(itemPoster(current), 780)} 780w, ${optimizePosterUrl(itemPoster(current), 1280)} 1280w`}
                 alt={itemTitle(current)}
                 loading={slide === 0 ? "eager" : "lazy"}
                 // @ts-expect-error - fetchPriority attribute
                 fetchPriority={slide === 0 ? "high" : "low"}
+                sizes="100vw"
                 decoding="async"
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = "0")}
@@ -1041,8 +1029,7 @@ function Hero({
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </AnimatePresence>
+          </div>
 
           {featured.length > 1 && (
             <>
@@ -1070,7 +1057,7 @@ function Hero({
                     type="button"
                     onClick={() => setSlide(i)}
                     aria-label={`Slide ${i + 1}`}
-                    className={`h-1.5 rounded-full transition-all ${
+                    className={`min-w-3 min-h-3 rounded-full transition-all ${
                       i === slide ? "w-8 bg-primary" : "w-2 bg-muted-foreground/40"
                     }`}
                   />
@@ -1101,9 +1088,10 @@ function FilterSelect({
     <div className="relative">
       <select
         id={id}
+        aria-label={id === "year-filter" ? "Filter by release year" : id === "rating-filter" ? "Filter by rating" : id === "sort-filter" ? "Sort subtitles" : id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`appearance-none cursor-pointer pl-3 pr-7 py-1.5 rounded-lg text-xs font-semibold border transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+        className={`appearance-none cursor-pointer pl-3 pr-7 py-2.5 min-h-11 rounded-lg text-xs font-semibold border transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
           active
             ? "bg-primary/15 border-primary/40 text-primary"
             : "bg-card/60 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
@@ -1135,7 +1123,7 @@ function FilterTabs({ active, onChange }: { active: Category; onChange: (c: Cate
             key={c}
             type="button"
             onClick={() => onChange(c)}
-            className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition ${
+            className={`shrink-0 min-h-11 px-4 py-2.5 rounded-full text-sm font-medium border transition ${
               isActive
                 ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
                 : "bg-card/60 text-muted-foreground border-border hover:text-foreground hover:border-primary/40"
@@ -1304,7 +1292,9 @@ function SubtitleCard({
         <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden shrink-0">
           {poster ? (
             <img
-              src={poster}
+              src={optimizePosterUrl(poster, 342)}
+              srcSet={`${optimizePosterUrl(poster, 185)} 185w, ${optimizePosterUrl(poster, 342)} 342w`}
+              sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 220px"
               alt={`${title} Sinhala Subtitle`}
               width={300}
               height={450}

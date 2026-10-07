@@ -63,7 +63,7 @@ export default function AdBanner({
           observer.disconnect();
         }
       },
-      { rootMargin: "1200px 0px" }, // Begin the external request early enough for the banner to be ready when reached.
+      { rootMargin: "600px 0px" }, // Load closer to the viewport so ads compete less with critical page resources.
     );
     observer.observe(el);
 
@@ -85,7 +85,7 @@ export default function AdBanner({
     iframe.style.border = "none";
     iframe.style.overflow = "hidden";
     iframe.scrolling = "no";
-    iframe.loading = "eager";
+    iframe.loading = "lazy";
     iframe.title = "Advertisement";
 
     containerRef.current.appendChild(iframe);

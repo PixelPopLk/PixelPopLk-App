@@ -20,6 +20,9 @@ export function LogoIcon({ className = "w-9 h-9" }: { className?: string }) {
     <img 
       src="/logo.png" 
       alt="PixelPop LK Logo" 
+      width={40}
+      height={40}
+      decoding="async"
       className={`${className} object-contain`} 
     />
   );
