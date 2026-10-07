@@ -977,7 +977,9 @@ function Hero({
               <link
                 rel="preload"
                 as="image"
-                href={optimizePosterUrl(itemPoster(current), 780)}
+                href={optimizePosterUrl(itemPoster(current), 480)}
+                imageSrcSet={`${optimizePosterUrl(itemPoster(current), 480)} 480w, ${optimizePosterUrl(itemPoster(current), 780)} 780w, ${optimizePosterUrl(itemPoster(current), 1280)} 1280w`}
+                imageSizes="100vw"
                 fetchPriority="high"
               />
               <img
