@@ -1,3 +1,4 @@
+import { getResponsiveImageProps } from "@/lib/images";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
@@ -995,7 +996,8 @@ function Hero({
               className="relative h-[360px] sm:h-[440px]"
             >
               <img
-                src={itemPoster(current)}
+                src={getResponsiveImageProps(itemPoster(current), { widths: [480, 768, 1200], sizes: "100vw" }).src}
+                srcSet={getResponsiveImageProps(itemPoster(current), { widths: [480, 768, 1200], sizes: "100vw" }).srcSet}\n                sizes="100vw"
                 alt={itemTitle(current)}
                 loading={slide === 0 ? "eager" : "lazy"}
                 // @ts-expect-error - fetchPriority attribute
@@ -1304,7 +1306,8 @@ function SubtitleCard({
         <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden shrink-0">
           {poster ? (
             <img
-              src={poster}
+              src={getResponsiveImageProps(poster, { widths: [300, 600], sizes: "(max-width: 640px) 50vw, 300px" }).src}
+                srcSet={getResponsiveImageProps(poster, { widths: [300, 600], sizes: "(max-width: 640px) 50vw, 300px" }).srcSet}\n              sizes="(max-width: 640px) 50vw, 300px"
               alt={`${title} Sinhala Subtitle`}
               width={300}
               height={450}
