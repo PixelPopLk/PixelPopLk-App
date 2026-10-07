@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import AdBanner from "@/components/AdBanner";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -60,14 +60,35 @@ const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
-  const { data: targetItem, error: firstError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .eq("id", Number(id) as any)
-    .maybeSingle();
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId) || numericId <= 0) throw notFound();
+
+  let targetItem: any = null;
+  let firstError: any = null;
+
+  // Retry one transient Supabase failure so a temporary backend hiccup does not
+  // turn a valid SEO page into an avoidable 5xx response.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_COLUMNS)
+      .eq("id", numericId as any)
+      .maybeSingle();
+
+    if (!result.error) {
+      targetItem = result.data;
+      firstError = null;
+      break;
+    }
+
+    firstError = result.error;
+    if (attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
 
   if (firstError) throw firstError;
-  if (!targetItem) return [] as Subtitle[];
+  if (!targetItem) throw notFound();
 
   const isSeries = (() => {
     const sNum = targetItem.season;
@@ -84,17 +105,66 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
 
   if (isSeries) {
     const parsed = parseTitle(targetItem.title ?? "");
+    const targetShowName = parsed.showName.toLowerCase().trim();
     const safeShowPrefix = (parsed.showName || targetItem.title || "")
       .replace(/[%_\\]/g, "\\$&")
       .trim();
-    const { data: allEpisodes, error: secondError } = await supabase
-      .from(SUBTITLES_TABLE)
-      .select(SAFE_COLUMNS)
-      .ilike("title", `${safeShowPrefix}%`)
-      .order("created_at", { ascending: false });
+
+    let allEpisodes: any[] = [];
+    let secondError: any = null;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await supabase
+        .from(SUBTITLES_TABLE)
+        .select(SAFE_COLUMNS)
+        .ilike("title", `${safeShowPrefix}%`)
+        .order("created_at", { ascending: false });
+
+      if (!result.error) {
+        allEpisodes = result.data ?? [];
+        secondError = null;
+        break;
+      }
+
+      secondError = result.error;
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
 
     if (secondError) throw secondError;
-    const episodes = (allEpisodes ?? []) as Subtitle[];
+
+    const exactEpisodes = allEpisodes.filter(
+      (episode) =>
+        parseTitle(episode.title ?? "").showName.toLowerCase().trim() ===
+        targetShowName,
+    );
+    const episodes =
+      (exactEpisodes.length > 0 ? exactEpisodes : [targetItem]) as Subtitle[];
+
+    // Episode IDs under /content/* are legacy aliases for the series landing
+    // page. Redirect them to one stable URL so Google sees one canonical page.
+    const canonicalEpisode =
+      episodes.find(
+        (episode) =>
+          Number(episode.season) === 1 && Number(episode.episode) === 1,
+      ) ??
+      [...episodes].sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime(),
+      )[0];
+
+    if (
+      canonicalEpisode &&
+      String(canonicalEpisode.id) !== String(numericId)
+    ) {
+      throw redirect({
+        to: "/content/$id",
+        params: { id: String(canonicalEpisode.id) },
+        statusCode: 301,
+      });
+    }
 
     return episodes;
   }

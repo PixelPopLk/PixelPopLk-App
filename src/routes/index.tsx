@@ -43,23 +43,90 @@ const homeSearchSchema = z.object({
   type: z.enum(["all", "movie", "series"]).optional().catch("all"),
   genre: z.string().optional().catch(undefined),
   q: z.string().optional().catch(undefined),
+  year: z.string().optional().catch(undefined),
+  rating: z.string().optional().catch(undefined),
 });
 
-async function fetchAllSubtitles(): Promise<Subtitle[]> {
-  const { data, error } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_SUBTITLE_COLUMNS)
-    .order("created_at", { ascending: false });
+// Homepage does not need the entire catalog on first load.
+// Keep this bounded and fetch only fields actually used by the homepage.
+const HOMEPAGE_CATALOG_LIMIT = 200;
+const HOMEPAGE_MOVIE_LIMIT = 48;
+const HOMEPAGE_SERIES_LIMIT = 24;
+const HOMEPAGE_SUBTITLE_COLUMNS =
+  "id, created_at, title, image_url, genre, description, rating, year, season, episode";
 
+async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>): Promise<Subtitle[]> {
+  const queryText = search.q?.trim() || null;
+  const year =
+    search.year && (/^\d{4}$/.test(search.year) || search.year === "Older")
+      ? search.year
+      : null;
+  const rating =
+    search.rating && /^\d+(?:\.\d+)?\+$/.test(search.rating)
+      ? Number.parseFloat(search.rating)
+      : null;
+  const genre = search.genre?.trim() || null;
+  const type = search.type ?? "all";
+
+  // One DB call returns:
+  // - latest movies as individual rows
+  // - latest unique series as complete episode groups
+  // - matching series even when the query hits an episode title
+  // This prevents a raw-row LIMIT from splitting a TV series across requests.
+  const rpc = await supabase.rpc("search_homepage_subtitles", {
+    p_query: queryText,
+    p_type: type,
+    p_genre: genre,
+    p_year: year,
+    p_rating: rating,
+    p_movie_limit: HOMEPAGE_MOVIE_LIMIT,
+    p_series_limit: HOMEPAGE_SERIES_LIMIT,
+  });
+
+  if (!rpc.error) {
+    return (rpc.data ?? []) as Subtitle[];
+  }
+
+  // Safe fallback for deployments where the migration has not been applied yet.
+  // The production path should use the RPC above so series stay complete.
+  let query = supabase
+    .from(SUBTITLES_TABLE)
+    .select(HOMEPAGE_SUBTITLE_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(HOMEPAGE_CATALOG_LIMIT);
+
+  if (queryText) {
+    const q = queryText.replace(/[%_]/g, "");
+    if (q) query = query.ilike("title", `%${q}%`);
+  }
+  if (genre) {
+    const cleanGenre = genre.replace(/[%_]/g, "");
+    if (cleanGenre) query = query.ilike("genre", `%${cleanGenre}%`);
+  }
+  if (year) query = year === "Older" ? query.lte("year", "2022") : query.eq("year", year);
+  if (rating != null) query = query.gte("rating", rating);
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as Subtitle[];
 }
 
 export const Route = createFileRoute("/")({
   validateSearch: (search) => homeSearchSchema.parse(search),
-  loader: async () => fetchAllSubtitles(),
-  head: () => ({
-    meta: [
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => fetchHomepageSubtitles(deps),
+  head: ({ match }) => {
+    const search = match.search;
+    const hasFilterParams = Boolean(
+      search.q ||
+      search.genre ||
+      search.year ||
+      search.rating ||
+      search.type !== "all",
+    );
+
+    return {
+      meta: [
       { title: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       {
         name: "description",
@@ -77,15 +144,19 @@ export const Route = createFileRoute("/")({
       { property: "og:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { property: "og:locale", content: "si_LK" },
       { property: "og:locale:alternate", content: "en_US" },
-      { name: "robots", content: "index, follow" },
+      {
+        name: "robots",
+        content: hasFilterParams ? "noindex, follow" : "index, follow",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
       { name: "twitter:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
       { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
       { name: "twitter:image:alt", content: "PixelPopLK — Sinhala Subtitles for Movies & TV Series" },
     ],
-    links: [{ rel: "canonical", href: "https://pixelpoplk.pages.dev/" }],
-  }),
+      links: [{ rel: "canonical", href: "https://pixelpoplk.pages.dev/" }],
+    };
+  },
   component: HomePage,
   errorComponent: ({ error }) => (
     <div className="min-h-screen flex items-center justify-center p-6 text-center">
@@ -170,6 +241,19 @@ function getItemRating(it: GridItem): number | null {
 
 function matchesYear(it: GridItem, yf: YearFilter): boolean {
   if (yf === "All") return true;
+
+  if (it.kind === "series") {
+    return it.episodes.some((episode) => {
+      const rawYear = episode.year;
+      const year = rawYear !== undefined && rawYear !== null && String(rawYear).trim() !== ""
+        ? Number.parseInt(String(rawYear), 10)
+        : null;
+      if (year == null || Number.isNaN(year)) return false;
+      if (yf === "Older") return year <= 2022;
+      return year === Number.parseInt(yf, 10);
+    });
+  }
+
   const y = getItemYear(it);
   if (y == null) return false;
   if (yf === "Older") return y <= 2022;
@@ -178,6 +262,17 @@ function matchesYear(it: GridItem, yf: YearFilter): boolean {
 
 function matchesRating(it: GridItem, rf: RatingFilter): boolean {
   if (rf === "All") return true;
+
+  if (it.kind === "series") {
+    const min = parseFloat(rf);
+    return it.episodes.some((episode) => {
+      const raw = episode.rating;
+      if (raw === undefined || raw === null || String(raw).trim() === "") return false;
+      const rating = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
+      return !Number.isNaN(rating) && rating >= min;
+    });
+  }
+
   const r = getItemRating(it);
   if (r == null) return false;
   const min = parseFloat(rf);
@@ -191,11 +286,18 @@ function sanitizeInput(str: string): string {
 
 function HomePage() {
   const navigate = useNavigate();
-  const { type = "all", genre, q } = Route.useSearch();
+  const { type = "all", genre, q, year, rating } = Route.useSearch();
   const [query, setQuery] = useState("");
   const [slide, setSlide] = useState(0);
-  const [yearFilter, setYearFilter] = useState<YearFilter>("All");
-  const [ratingFilter, setRatingFilter] = useState<RatingFilter>("All");
+  const [yearFilter, setYearFilter] = useState<YearFilter>(() => {
+    if (year === "2026" || year === "2025" || year === "2024" || year === "2023") return year;
+    if (year === "Older") return "Older";
+    return "All";
+  });
+  const [ratingFilter, setRatingFilter] = useState<RatingFilter>(() => {
+    if (rating === "8.0+" || rating === "7.0+" || rating === "6.0+") return rating;
+    return "All";
+  });
   const [sortFilter, setSortFilter] = useState<SortFilter>("latest");
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -216,12 +318,38 @@ function HomePage() {
   const [requestStatusMsg, setRequestStatusMsg] = useState("");
 
   useEffect(() => {
-    if (q !== undefined) {
-      setQuery(sanitizeInput(q));
-    } else {
-      setQuery("");
-    }
+    setQuery(q !== undefined ? sanitizeInput(q) : "");
   }, [q]);
+
+  // Debounce URL/search-loader updates so typing does not fire one DB request per keystroke.
+  useEffect(() => {
+    const cleanQuery = sanitizeInput(query);
+    const timer = window.setTimeout(() => {
+      if (cleanQuery === (q ?? "")) return;
+      navigate({
+        search: (prev) => ({ ...prev, q: cleanQuery || undefined }),
+        replace: true,
+      });
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [query, q, navigate]);
+
+  useEffect(() => {
+    const nextYear: YearFilter =
+      year === "2026" || year === "2025" || year === "2024" || year === "2023"
+        ? year
+        : year === "Older"
+          ? "Older"
+          : "All";
+    setYearFilter(nextYear);
+
+    const nextRating: RatingFilter =
+      rating === "8.0+" || rating === "7.0+" || rating === "6.0+"
+        ? rating
+        : "All";
+    setRatingFilter(nextRating);
+  }, [year, rating]);
 
   // Keep a small on-device library so returning visitors can pick up where they left off.
   useEffect(() => {
@@ -246,12 +374,7 @@ function HomePage() {
   };
 
   const handleQueryChange = (val: string) => {
-    const cleanVal = sanitizeInput(val);
-    setQuery(cleanVal);
-    navigate({
-      search: (prev) => ({ ...prev, q: cleanVal || undefined }),
-      replace: true,
-    });
+    setQuery(sanitizeInput(val));
   };
 
   const data = Route.useLoaderData();
@@ -512,7 +635,13 @@ function HomePage() {
             <FilterSelect
               id="filter-year"
               value={yearFilter}
-              onChange={(v) => setYearFilter(v as YearFilter)}
+              onChange={(v) => {
+                const next = v as YearFilter;
+                setYearFilter(next);
+                navigate({
+                  search: (prev) => ({ ...prev, year: next === "All" ? undefined : next }),
+                });
+              }}
               options={[
                 { value: "All", label: "Year" },
                 { value: "2026", label: "2026" },
@@ -526,7 +655,13 @@ function HomePage() {
             <FilterSelect
               id="filter-rating"
               value={ratingFilter}
-              onChange={(v) => setRatingFilter(v as RatingFilter)}
+              onChange={(v) => {
+                const next = v as RatingFilter;
+                setRatingFilter(next);
+                navigate({
+                  search: (prev) => ({ ...prev, rating: next === "All" ? undefined : next }),
+                });
+              }}
               options={[
                 { value: "All", label: "IMDb Rating" },
                 { value: "8.0+", label: "8.0+ ⭐" },
@@ -551,6 +686,9 @@ function HomePage() {
                   setYearFilter("All");
                   setRatingFilter("All");
                   setSortFilter("latest");
+                  navigate({
+                    search: (prev) => ({ ...prev, year: undefined, rating: undefined }),
+                  });
                 }}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-muted/40 hover:bg-muted/70 border border-border text-xs text-muted-foreground hover:text-foreground transition cursor-pointer"
               >

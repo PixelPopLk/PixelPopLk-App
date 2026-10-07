@@ -4,6 +4,8 @@ import { parseTitle, cleanShowName } from "@/lib/subtitles";
 
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
+let lastKnownGoodSitemap: string | null = null;
+
 function isSeriesRow(sub: any) {
   if (sub.season != null && sub.episode != null) return true;
   const g = (sub.genre ?? "").toLowerCase();
@@ -41,7 +43,6 @@ const CORE_GENRES = [
   "thriller",
 ];
 
-/** Return a sitemap-safe date only when it is a real, non-future timestamp. */
 function sitemapDate(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
 
@@ -52,25 +53,60 @@ function sitemapDate(value: string | null | undefined): string | undefined {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Pick one stable canonical URL for each TV show.
+ * Prefer S01E01 because using the latest episode made the series URL change
+ * every time a new episode was added, which is a poor canonical signal.
+ * If S01E01 is unavailable, fall back to the oldest episode.
+ */
+function pickCanonicalSeriesRow(episodes: any[]) {
+  return (
+    episodes.find(
+      (episode) =>
+        Number(episode.season) === 1 && Number(episode.episode) === 1,
+    ) ??
+    [...episodes].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    )[0]
+  );
+}
+
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const { data: subtitles, error } = await supabase
-          .from(SUBTITLES_TABLE)
-          .select(
-            "id, created_at, updated_at, season, episode, genre, image_url, title",
-          )
-          .order("created_at", { ascending: false });
+        // Supabase/PostgREST commonly caps a single REST response at 1,000 rows.
+        // Page through the catalog so the sitemap keeps all subtitle URLs as the
+        // library grows instead of silently dropping older entries.
+        const SITEMAP_PAGE_SIZE = 1000;
+        const subtitles: any[] = [];
+        let offset = 0;
+        let catalogFetchFailed = false;
 
-        // Always return a valid sitemap for crawlers. Dynamic subtitle URLs are
-        // omitted temporarily if Supabase is unavailable; static and genre URLs
-        // remain indexable instead of receiving a 500 response.
-        if (error) {
-          console.error("Sitemap subtitle fetch failed:", error.message);
+        while (true) {
+          const { data, error } = await supabase
+            .from(SUBTITLES_TABLE)
+            .select(
+              "id, created_at, updated_at, season, episode, genre, image_url, title",
+            )
+            .order("created_at", { ascending: false })
+            .range(offset, offset + SITEMAP_PAGE_SIZE - 1);
+
+          if (error) {
+            console.error("Sitemap subtitle fetch failed:", error.message);
+            catalogFetchFailed = true;
+            break;
+          }
+
+          subtitles.push(...(data ?? []));
+          if (!data || data.length < SITEMAP_PAGE_SIZE) break;
+          offset += SITEMAP_PAGE_SIZE;
         }
+        // Do not publish or cache a partial sitemap. A transient catalog failure must
+        // fall back to a safe minimal sitemap instead.
 
-        const showLatestMap = new Map<string, any>();
+        const showEpisodesMap = new Map<string, any[]>();
         const episodeEntries: any[] = [];
         const movieEntries: any[] = [];
 
@@ -90,16 +126,11 @@ export const Route = createFileRoute("/sitemap.xml")({
             });
 
             const showKey =
-              cleanShowName(
-                parseTitle(sub.title || "").showName,
-              ).toLowerCase() || `id:${sub.id}`;
-            const existing = showLatestMap.get(showKey);
-            if (
-              !existing ||
-              new Date(sub.created_at) > new Date(existing.created_at)
-            ) {
-              showLatestMap.set(showKey, sub);
-            }
+              cleanShowName(parseTitle(sub.title || "").showName).toLowerCase() ||
+              `id:${sub.id}`;
+            const group = showEpisodesMap.get(showKey) ?? [];
+            group.push(sub);
+            showEpisodesMap.set(showKey, group);
           } else {
             movieEntries.push({
               url: `${BASE_URL}/content/${sub.id}`,
@@ -113,21 +144,35 @@ export const Route = createFileRoute("/sitemap.xml")({
         }
 
         const seriesHubEntries: any[] = [];
-        for (const latestSub of showLatestMap.values()) {
+        for (const episodes of showEpisodesMap.values()) {
+          const canonicalRow = pickCanonicalSeriesRow(episodes);
+          if (!canonicalRow) continue;
+
           const showName = cleanShowName(
-            parseTitle(latestSub.title || "").showName,
+            parseTitle(canonicalRow.title || "").showName,
           );
-          const date =
-            sitemapDate(latestSub.updated_at) ??
-            sitemapDate(latestSub.created_at);
+          // The series hub represents the whole show, so its lastmod must reflect
+          // the newest episode change—not just the S01E01 canonical row.
+          const latestEpisodeDate = episodes.reduce<string | undefined>(
+            (latest, episode) => {
+              const candidate =
+                sitemapDate(episode.updated_at) ??
+                sitemapDate(episode.created_at);
+              if (!candidate) return latest;
+              if (!latest) return candidate;
+              return candidate > latest ? candidate : latest;
+            },
+            undefined,
+          );
+          const date = latestEpisodeDate;
 
           seriesHubEntries.push({
-            url: `${BASE_URL}/content/${latestSub.id}`,
+            url: `${BASE_URL}/content/${canonicalRow.id}`,
             date,
             changefreq: "weekly",
             priority: "0.9",
             title: escapeXml(`${showName} Sinhala Subtitles`),
-            image_url: latestSub.image_url,
+            image_url: canonicalRow.image_url,
           });
         }
 
@@ -135,11 +180,6 @@ export const Route = createFileRoute("/sitemap.xml")({
         xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
         xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
 
-        // This TanStack Start server route is the sole authoritative producer
-        // of /sitemap.xml. Keep only canonical, indexable landing and content URLs.
-        // Static pages intentionally omit lastmod because there is no source
-        // record from which to derive a trustworthy modification date.
-        // 1. Core Top-Level Pages
         const staticPages = [
           {
             url: `${BASE_URL}/`,
@@ -185,7 +225,6 @@ export const Route = createFileRoute("/sitemap.xml")({
           xml += `  </url>\n`;
         }
 
-        // 2. Genre Pages
         for (const g of CORE_GENRES) {
           xml += `  <url>\n`;
           xml += `    <loc>${BASE_URL}/genres/${g}</loc>\n`;
@@ -194,7 +233,8 @@ export const Route = createFileRoute("/sitemap.xml")({
           xml += `  </url>\n`;
         }
 
-        // 3. Dynamic Entries
+        // Sitemap contains only canonical landing URLs plus unique episode URLs.
+        const seenUrls = new Set<string>();
         const allItems = [
           ...seriesHubEntries,
           ...movieEntries,
@@ -202,6 +242,9 @@ export const Route = createFileRoute("/sitemap.xml")({
         ];
 
         for (const item of allItems) {
+          if (seenUrls.has(item.url)) continue;
+          seenUrls.add(item.url);
+
           xml += `  <url>\n`;
           xml += `    <loc>${item.url}</loc>\n`;
           if (item.date) xml += `    <lastmod>${item.date}</lastmod>\n`;
@@ -217,6 +260,25 @@ export const Route = createFileRoute("/sitemap.xml")({
         }
 
         xml += `</urlset>`;
+
+        if (catalogFetchFailed) {
+          console.warn(
+            "Sitemap catalog fetch was incomplete; serving a safe non-cacheable fallback.",
+          );
+          return new Response(
+            lastKnownGoodSitemap ??
+              `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE_URL}/</loc></url></urlset>`,
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/xml; charset=utf-8",
+                "Cache-Control": "no-store, max-age=0",
+              },
+            },
+          );
+        }
+
+        lastKnownGoodSitemap = xml;
 
         return new Response(xml, {
           headers: {

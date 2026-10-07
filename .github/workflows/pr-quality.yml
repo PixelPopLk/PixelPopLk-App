@@ -1,0 +1,51 @@
+name: PR Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint changed source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" -- '*.ts' '*.tsx' || true)"
+          if [ -z "$files" ]; then
+            echo "No TypeScript source files changed."
+            exit 0
+          fi
+          printf '%s\n' "$files"
+          # The repository already contains legacy formatting and explicit-any usage.
+          # Keep the PR gate focused on actionable ESLint correctness without making
+          # a broad formatting-only cleanup a merge blocker.
+          printf '%s\n' "$files" | xargs bunx eslint --no-warn-ignored \
+            --rule 'prettier/prettier: off' \
+            --rule '@typescript-eslint/no-explicit-any: warn'
+
+      - name: Build
+        run: bun run build

@@ -51,27 +51,82 @@ const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
-  const { data: targetItem, error: firstError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .eq("id", Number(id) as any)
-    .maybeSingle();
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId) || numericId <= 0) throw notFound();
+
+  let targetItem: any = null;
+  let firstError: any = null;
+
+  // Retry one transient Supabase failure so a temporary backend hiccup does not
+  // unnecessarily surface as a 5xx response to crawlers.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_COLUMNS)
+      .eq("id", numericId as any)
+      .maybeSingle();
+
+    if (!result.error) {
+      targetItem = result.data;
+      firstError = null;
+      break;
+    }
+
+    firstError = result.error;
+    if (attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
 
   if (firstError) throw firstError;
-  if (!targetItem) return [] as Subtitle[];
+  if (!targetItem) throw notFound();
 
   const parsed = parseTitle(targetItem.title ?? "");
+  if (
+    targetItem.season == null &&
+    targetItem.episode == null &&
+    parsed.episode == null
+  ) {
+    throw notFound();
+  }
+
+  const targetShowName = parsed.showName.toLowerCase().trim();
   const safeShowPrefix = (parsed.showName || targetItem.title || "")
     .replace(/[%_\\]/g, "\\$&")
     .trim();
-  const { data: allEpisodes, error: secondError } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_COLUMNS)
-    .ilike("title", `${safeShowPrefix}%`)
-    .order("created_at", { ascending: false });
+
+  let allEpisodes: any[] = [];
+  let secondError: any = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_COLUMNS)
+      .ilike("title", `${safeShowPrefix}%`)
+      .order("created_at", { ascending: false });
+
+    if (!result.error) {
+      allEpisodes = result.data ?? [];
+      secondError = null;
+      break;
+    }
+
+    secondError = result.error;
+    if (attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
 
   if (secondError) throw secondError;
-  const episodes = (allEpisodes ?? []) as Subtitle[];
+
+  const exactEpisodes = allEpisodes.filter(
+    (episode) =>
+      parseTitle(episode.title ?? "").showName.toLowerCase().trim() ===
+      targetShowName,
+  );
+  const episodes = (
+    exactEpisodes.length > 0 ? exactEpisodes : [targetItem]
+  ) as Subtitle[];
 
   return episodes;
 }
@@ -351,12 +406,7 @@ function EpisodePage() {
           description:
             ep.description ||
             `Sinhala subtitle for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
-          workFeaturedBy: {
-            "@type": "DataDownload",
-            name: `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitle`,
-            encodingFormat: "application/zip",
-            description: `Download Sinhala Subtitle (.zip) for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
-          },
+
         }
       : null;
 

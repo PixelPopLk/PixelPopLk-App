@@ -7,7 +7,7 @@ export function cleanShowName(raw: string) {
   return raw
     .replace(/[._]+/g, " ")
     .replace(/\s+-\s+$/, "")
-    .replace(/[\s\-:]+$/g, "")
+    .replace(/[\s-:]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -15,17 +15,17 @@ export function cleanShowName(raw: string) {
 export function parseTitle(title: string): ParsedTitle {
   if (!title) return { showName: "" };
 
-  let m = title.match(/^(.*?)[\s._\-]*[Ss](\d{1,2})[\s._\-]*[Ee](\d{1,3})(?:[\s._\-]+(.+))?$/);
+  let m = title.match(/^(.*?)[\s._-]*[Ss](\d{1,2})[\s._-]*[Ee](\d{1,3})(?:[\s._-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
 
-  m = title.match(/^(.*?)[\s._\-]+Season[\s._\-]?(\d{1,2})[\s._\-]+Episode[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
+  m = title.match(/^(.*?)[\s._-]+Season[\s._-]?(\d{1,2})[\s._-]+Episode[\s._-]?(\d{1,3})(?:[\s._-]+(.+))?$/i);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
 
-  m = title.match(/^(.*?)[\s._\-]+(\d{1,2})x(\d{1,3})(?:[\s._\-]+(.+))?$/);
+  m = title.match(/^(.*?)[\s._-]+(\d{1,2})x(\d{1,3})(?:[\s._-]+(.+))?$/);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: +m[2], episode: +m[3], episodeTitle: m[4]?.trim() } };
 
   // 🔥 "Title Episode 1" හෝ "Title Ep 2" වැනි දෑ සාර්ථකව TV Series ලෙස හඳුනාගනී
-  m = title.match(/^(.*?)[\s._\-]+(?:Episode|Epi|Ep)[\s._\-]?(\d{1,3})(?:[\s._\-]+(.+))?$/i);
+  m = title.match(/^(.*?)[\s._-]+(?:Episode|Epi|Ep)[\s._-]?(\d{1,3})(?:[\s._-]+(.+))?$/i);
   if (m) return { showName: cleanShowName(m[1]), episode: { season: 1, episode: +m[2], episodeTitle: m[3]?.trim() } };
 
   return { showName: title.trim() };
@@ -38,7 +38,7 @@ export type GridItem =
   | {
       kind: "series";
       key: string;
-      id: Subtitle["id"]; // representative id (latest episode) used for routing
+      id: Subtitle["id"]; // stable representative id used for the series landing URL
       showName: string;
       poster: string;
       latestDate: string;
@@ -83,11 +83,12 @@ export function buildGridItems(subs: Subtitle[]): GridItem[] {
   const seriesItems: GridItem[] = Array.from(groups.entries()).map(([key, eps]) => {
     const sorted = [...eps].sort((a, b) => a.season - b.season || a.episode - b.episode);
     const latest = [...eps].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))[0];
+    const canonical = sorted.find((e) => e.season === 1 && e.episode === 1) ?? sorted[0];
     const showName = cleanShowName(parseTitle(latest.title).showName);
     return {
       kind: "series",
       key: `series:${key}`,
-      id: latest.id,
+      id: canonical.id,
       showName,
       poster: latest.image_url,
       latestDate: latest.created_at,
