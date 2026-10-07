@@ -30,6 +30,7 @@ import {
   itemDate,
   itemGenres,
   itemPoster,
+  optimizePosterUrl,
   itemTitle,
   formatDate,
   type GridItem,
@@ -973,11 +974,12 @@ function Hero({
               className="relative h-[360px] sm:h-[440px] animate-[heroFade_0.6s_ease-out]"
             >
               <img
-                src={itemPoster(current)}
+                src={optimizePosterUrl(itemPoster(current), 780)}
                 alt={itemTitle(current)}
                 loading={slide === 0 ? "eager" : "lazy"}
                 // @ts-expect-error - fetchPriority attribute
                 fetchPriority={slide === 0 ? "high" : "low"}
+                sizes="100vw"
                 decoding="async"
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = "0")}
@@ -1281,7 +1283,7 @@ function SubtitleCard({
         <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden shrink-0">
           {poster ? (
             <img
-              src={poster}
+              src={optimizePosterUrl(poster, 342)}
               alt={`${title} Sinhala Subtitle`}
               width={300}
               height={450}
