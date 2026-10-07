@@ -593,9 +593,7 @@ function Hero({
       {poster && (
         <div className="pointer-events-none absolute inset-0 opacity-30">
           <img
-            src={getResponsiveImageProps(poster, { widths: [480, 768, 1200], sizes: "100vw" }).src}
-                srcSet={getResponsiveImageProps(poster, { widths: [480, 768, 1200], sizes: "100vw" }).srcSet}\n                sizes="100vw"
-                srcSet={getResponsiveImageProps(poster, { widths: [480, 768, 1200], sizes: "100vw" }).srcSet}\n            sizes="100vw"
+            src={poster}
             alt=""
             aria-hidden="true"
             loading="lazy"
@@ -610,7 +608,7 @@ function Hero({
           <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-border shadow-card bg-muted max-w-[280px] sm:max-w-none mx-auto md:mx-0">
             {poster ? (
               <img
-                src={getResponsiveImageProps(poster, { widths: [480, 768, 1200], sizes: "100vw" }).src}
+                src={poster}
                 alt={title}
                 // @ts-expect-error - fetchPriority attribute
                 fetchPriority="high"
@@ -1062,8 +1060,7 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
           >
             <div className="relative aspect-[2/3] bg-muted overflow-hidden">
               <img
-                src={getResponsiveImageProps(itemPoster(it), { widths: [200, 400], sizes: "(max-width: 768px) 33vw, 200px" }).src}
-                srcSet={getResponsiveImageProps(itemPoster(it), { widths: [200, 400], sizes: "(max-width: 768px) 33vw, 200px" }).srcSet}\n                sizes="(max-width: 768px) 33vw, 200px"
+                src={itemPoster(it)}
                 alt={itemTitle(it)}
                 width={200}
                 height={300}
