@@ -445,11 +445,95 @@ function EpisodePage() {
         }
       : null;
 
+  const episodePageSchema =
+    series && ep
+      ? {
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          name: `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitles`,
+          url: BASE_URL + "/episode/" + ep.id,
+          inLanguage: ["si", "en"],
+          isPartOf: {
+            "@type": "WebSite",
+            name: "PixelPopLK",
+            url: BASE_URL,
+          },
+          about: {
+            "@type": "TVEpisode",
+            name: episodeTitle,
+            episodeNumber: ep.episode,
+            partOfSeason: {
+              "@type": "TVSeason",
+              seasonNumber: ep.season,
+            },
+            partOfSeries: {
+              "@type": "TVSeries",
+              name: series.showName,
+              url: BASE_URL + "/content/" + series.id,
+            },
+            description: ep.description || `Sinhala subtitles for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
+          },
+        }
+      : null;
+
+  // Keep these answers aligned with the visible subtitle guide below.
+  const episodeFaqItems =
+    series && ep
+      ? [
+          {
+            question: "What does the direct subtitle download include?",
+            answer:
+              "The direct download contains the Sinhala subtitle file in a ZIP archive, not the episode video.",
+          },
+          {
+            question: "What language are the subtitles?",
+            answer: "These subtitles are in Sinhala (සිංහල).",
+          },
+          {
+            question: "How do I use the subtitle file?",
+            answer:
+              "Extract the ZIP archive and keep the .srt subtitle filename the same as the video filename so a compatible player can match them.",
+          },
+          {
+            question: "Which players can display the subtitles?",
+            answer:
+              "The subtitles are intended for compatible players such as VLC Media Player and MX Player, and supported Smart TVs.",
+          },
+        ]
+      : [];
+  const episodeFaqSchema =
+    episodeFaqItems.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: episodeFaqItems.map((item) => ({
+            "@type": "Question",
+            name: item.question,
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: item.answer,
+            },
+          })),
+        }
+      : null;
+
   const backToUrl = series ? `/content/${series.id}` : "/";
   const backToText = series ? `Back to ${series.showName}` : "Home";
 
   return (
     <EpisodeShell backTo={backToUrl} backText={backToText}>
+      {episodePageSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(episodePageSchema) }}
+        />
+      )}
+      {episodeFaqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(episodeFaqSchema) }}
+        />
+      )}
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
@@ -691,6 +775,31 @@ function EpisodePage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Helpful answers for users and crawlers; content mirrors the FAQ schema above. */}
+                <section
+                  aria-labelledby="subtitle-faq-heading"
+                  className="mt-5 rounded-2xl border border-border/80 bg-card/60 p-4 sm:p-5"
+                >
+                  <h2
+                    id="subtitle-faq-heading"
+                    className="text-sm font-bold text-foreground"
+                  >
+                    Subtitle Download FAQs
+                  </h2>
+                  <dl className="mt-3 space-y-4">
+                    {episodeFaqItems.map((faq) => (
+                      <div key={faq.question}>
+                        <dt className="text-sm font-semibold text-foreground">
+                          {faq.question}
+                        </dt>
+                        <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                          {faq.answer}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
 
                 {/* 🟢 Secure Blob Download Buttons */}
                 <div

@@ -371,8 +371,57 @@ function ContentPage() {
       }
     : null;
 
+  // Describe the actual page and the movie/series it covers in machine-readable form.
+  // Keep this separate from ratings/reviews: third-party ratings are not site ratings.
+  const contentSchema = item
+    ? {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: titleName,
+        url: BASE_URL + "/content/" + item.id,
+        inLanguage: ["si", "en"],
+        keywords: [
+          "Sinhala subtitles",
+          "subtitle download",
+          ...(item.kind === "movie"
+            ? [
+                ...splitGenres(item.sub.genre),
+                ...(item.sub.year ? [String(item.sub.year)] : []),
+              ]
+            : splitGenres(item.episodes[0]?.genre)),
+        ],
+        isPartOf: {
+          "@type": "WebSite",
+          name: "PixelPopLK",
+          url: BASE_URL,
+        },
+        about:
+          item.kind === "movie"
+            ? {
+                "@type": "Movie",
+                name: item.sub.title,
+                image: item.poster || undefined,
+                genre: splitGenres(item.sub.genre),
+                description: item.sub.description || undefined,
+              }
+            : {
+                "@type": "TVSeries",
+                name: item.showName,
+                image: item.poster || undefined,
+                genre: splitGenres(item.episodes[0]?.genre),
+                description: item.episodes[0]?.description || undefined,
+              },
+      }
+    : null;
+
   return (
     <Shell>
+      {contentSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(contentSchema) }}
+        />
+      )}
       {breadcrumbSchema && (
         <script
           type="application/ld+json"
