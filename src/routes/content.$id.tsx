@@ -380,6 +380,16 @@ function ContentPage() {
         name: titleName,
         url: BASE_URL + "/content/" + item.id,
         inLanguage: ["si", "en"],
+        keywords: [
+          "Sinhala subtitles",
+          "subtitle download",
+          ...(item.kind === "movie"
+            ? [
+                ...splitGenres(item.sub.genre),
+                ...(item.sub.year ? [String(item.sub.year)] : []),
+              ]
+            : splitGenres(item.episodes[0]?.genre)),
+        ],
         isPartOf: {
           "@type": "WebSite",
           name: "PixelPopLK",
