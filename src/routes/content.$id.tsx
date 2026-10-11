@@ -857,19 +857,19 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
 
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
       <div
-        className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0"
+        className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0 items-stretch"
         data-download-zone="true"
       >
         <DownloadButton
           subtitleId={s.id}
           title={s.title}
-          label="Direct Download"
+          label="Subtitles Download"
         />
         {Boolean((s as any).has_telegram || (s as any).telegram_link) && (
           <DownloadButton
             subtitleId={s.id}
             title={s.title}
-            label="Telegram Download"
+            label="Video Files Download"
             variant="telegram"
           />
         )}
