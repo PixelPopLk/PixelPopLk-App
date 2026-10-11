@@ -487,12 +487,6 @@ function EpisodePage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(episodePageSchema) }}
         />
       )}
-      {episodeFaqSchema && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(episodeFaqSchema) }}
-        />
-      )}
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
