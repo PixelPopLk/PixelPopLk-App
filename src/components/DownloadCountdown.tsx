@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useId } from "react";
 import {
   Download,
-  Lock,
   CheckCircle2,
   Loader2,
   Send,
@@ -402,12 +401,11 @@ export function DownloadButton({
       case "locked":
         return (
           <>
-            <Lock className="w-4 h-4" />
             <span>
               {label ||
                 (normalizedVariant === "telegram"
-                  ? "Telegram Download"
-                  : "Direct Download")}
+                  ? "Video Files Download"
+                  : "Subtitles Download")}
             </span>
           </>
         );
@@ -435,8 +433,8 @@ export function DownloadButton({
             <span className="font-extrabold">
               {label ||
                 (normalizedVariant === "telegram"
-                  ? "Get Video File (Telegram)"
-                  : "Download Subtitle (.zip)")}
+                  ? "Video Files Download"
+                  : "Subtitles Download")}
             </span>
           </>
         );
