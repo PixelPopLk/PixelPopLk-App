@@ -6,7 +6,6 @@ import {
   Loader2,
   Send,
   AlertCircle,
-  Info,
 } from "lucide-react";
 import { logDownload } from "@/integrations/supabase/client";
 
@@ -440,9 +439,7 @@ export function DownloadButton({
 
     switch (state) {
       case "locked":
-        return normalizedVariant === "telegram"
-          ? `${base} bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_4px_15px_rgba(14,165,233,0.35)] hover:opacity-95`
-          : `${base} bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95`;
+        return `${base} bg-red-600 hover:bg-red-700 text-white shadow-lg`;
 
       case "verifying":
         return `${base} bg-indigo-600 text-white animate-pulse border border-indigo-400/30`;
@@ -455,11 +452,6 @@ export function DownloadButton({
 
   return (
     <div className="flex flex-col items-center gap-1.5 w-full">
-      <span className="text-[11px] sm:text-xs text-muted-foreground/90 font-medium flex items-center justify-center gap-1.5 px-2 py-0.5 text-center select-none">
-        <Info className="w-3.5 h-3.5 text-primary shrink-0" />
-        Unlock ක්ලික් කර තත්පර 5ක් රැඳී සිට නැවත මෙහි එන්න (Back වෙන්න)
-      </span>
-
       <button
         type="button"
         data-no-ad="true"
