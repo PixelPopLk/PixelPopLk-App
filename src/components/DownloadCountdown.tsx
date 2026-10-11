@@ -125,6 +125,7 @@ export function DownloadButton({
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
   const [downloadLink, setDownloadLink] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const autoDownloadStartedRef = useRef(false);
 
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const validityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -171,6 +172,7 @@ export function DownloadButton({
     setState("locked");
     setRemainingSec(REQUIRED_AD_SECONDS);
     setDownloadLink("");
+    autoDownloadStartedRef.current = false;
     if (tickerRef.current) {
       clearInterval(tickerRef.current);
       tickerRef.current = null;
@@ -221,6 +223,21 @@ export function DownloadButton({
 
             setDownloadLink(link);
             setState("ready");
+            // Auto-start the direct download when the five-second countdown finishes.
+            // Keep the green button visible as a manual fallback.
+            if (!autoDownloadStartedRef.current) {
+              autoDownloadStartedRef.current = true;
+              try {
+                if (normalizedVariant === "telegram") {
+                  window.location.assign(link);
+                } else {
+                  triggerBrowserDownload(link, title);
+                }
+                logDownload(subtitleId, normalizedVariant);
+              } catch {
+                // User can retry with the green button.
+              }
+            }
             if (validityTimerRef.current)
               clearTimeout(validityTimerRef.current);
             validityTimerRef.current = setTimeout(
@@ -387,9 +404,10 @@ export function DownloadButton({
           <>
             <Lock className="w-4 h-4" />
             <span>
-              {normalizedVariant === "telegram"
-                ? "🔓 Unlock Video File (Telegram)"
-                : "🔓 Unlock Sinhala Subtitle (.zip)"}
+              {label ||
+                (normalizedVariant === "telegram"
+                  ? "Telegram Download"
+                  : "Direct Download")}
             </span>
           </>
         );
@@ -400,8 +418,8 @@ export function DownloadButton({
             <Loader2 className="w-4 h-4 animate-spin text-white" />
             <span>
               {remainingSec > 0
-                ? `⏳ Unlocking... ${remainingSec}s`
-                : "Preparing Link..."}
+                ? `⏳ Please wait ${remainingSec}s...`
+                : "Preparing download..."}
             </span>
           </>
         );
