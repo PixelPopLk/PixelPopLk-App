@@ -809,7 +809,7 @@ function EpisodePage() {
                   <DownloadButton
                     subtitleId={ep.id}
                     title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                    label="Direct Download (.zip)"
+                    label="Direct Download"
                   />
                   {Boolean(
                     (ep as any).has_telegram || (ep as any).telegram_link,
