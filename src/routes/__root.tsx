@@ -152,7 +152,7 @@ function RootShell({ children }: { children: ReactNode }) {
   const isAdminPage = location.pathname.startsWith("/manage-admin");
 
   return (
-    <html lang="si" className="dark">
+    <html lang="si" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
