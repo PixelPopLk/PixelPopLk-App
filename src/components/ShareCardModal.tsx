@@ -197,9 +197,9 @@ export function ShareCardModal({
   return (
     <div
       data-no-ad="true"
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"
+      className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center overflow-y-auto p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"
     >
-      <div className="relative w-full max-w-2xl bg-card border border-border/80 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
+      <div className="relative my-auto w-full max-w-2xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto bg-card border border-border/80 rounded-3xl p-4 sm:p-8 shadow-2xl">
         {/* Top glow accent */}
         <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-500 via-amber-500 to-primary" />
 
