@@ -72,6 +72,10 @@
   --shadow-card: 0 10px 30px -12px oklch(0 0 0 / 0.7);
 }
 
+:root.dark {
+  color-scheme: dark;
+}
+
 :root:not(.dark) {
   color-scheme: light;
   --background: oklch(0.975 0.006 250);
