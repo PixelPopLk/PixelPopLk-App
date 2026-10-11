@@ -229,7 +229,7 @@ export function DownloadButton({
               autoDownloadStartedRef.current = true;
               try {
                 if (normalizedVariant === "telegram") {
-                  window.location.assign(link);
+                  window.open(link, "_blank", "noopener,noreferrer");
                 } else {
                   triggerBrowserDownload(link, title);
                 }
