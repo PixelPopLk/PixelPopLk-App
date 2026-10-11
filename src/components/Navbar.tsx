@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, Search, X, ArrowLeft, Sun, Moon } from "lucide-react";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -60,7 +60,7 @@ export function Navbar({
     return true;
   });
 
-  const applyTheme = (dark: boolean, persist = false) => {
+  const applyTheme = useCallback((dark: boolean, persist = false) => {
     document.documentElement.classList.toggle("dark", dark);
     setIsDark(dark);
 
@@ -74,7 +74,7 @@ export function Navbar({
         // Theme still works for this page if storage is unavailable.
       }
     }
-  };
+  }, []);
 
   const toggleTheme = () => applyTheme(!isDark, true);
 
@@ -88,7 +88,7 @@ export function Navbar({
 
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     applyTheme(savedTheme === "dark" || (savedTheme !== "light" && prefersDark));
-  }, []);
+  }, [applyTheme]);
 
   // Search Container එකෙන් එලිය ක්ලික් කල විට පමණක් Dropdown එක close වීම
   useEffect(() => {
