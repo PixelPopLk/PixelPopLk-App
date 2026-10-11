@@ -863,7 +863,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         <DownloadButton
           subtitleId={s.id}
           title={s.title}
-          label="Direct Download (.zip)"
+          label="Direct Download"
         />
         {Boolean((s as any).has_telegram || (s as any).telegram_link) && (
           <DownloadButton
