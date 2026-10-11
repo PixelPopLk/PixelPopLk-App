@@ -803,13 +803,13 @@ function EpisodePage() {
 
                 {/* 🟢 Secure Blob Download Buttons */}
                 <div
-                  className="mt-5 flex flex-col sm:flex-row gap-3"
+                  className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch"
                   data-download-zone="true"
                 >
                   <DownloadButton
                     subtitleId={ep.id}
                     title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                    label="Direct Download"
+                    label="Subtitles Download"
                   />
                   {Boolean(
                     (ep as any).has_telegram || (ep as any).telegram_link,
@@ -817,7 +817,7 @@ function EpisodePage() {
                     <DownloadButton
                       subtitleId={ep.id}
                       title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                      label="Telegram Download"
+                      label="Video Files Download"
                       variant="telegram"
                     />
                   )}
