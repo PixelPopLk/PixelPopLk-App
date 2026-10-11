@@ -60,27 +60,34 @@ export function Navbar({
     return true;
   });
 
-  const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-      setIsDark(true);
+  const applyTheme = (dark: boolean, persist = false) => {
+    document.documentElement.classList.toggle("dark", dark);
+    setIsDark(dark);
+
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = dark ? "#0e0e12" : "#f7f8fc";
+
+    if (persist) {
+      try {
+        localStorage.setItem("theme", dark ? "dark" : "light");
+      } catch {
+        // Theme still works for this page if storage is unavailable.
+      }
     }
   };
 
+  const toggleTheme = () => applyTheme(!isDark, true);
+
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark" || (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
-      document.documentElement.classList.add("dark");
-      setIsDark(true);
-    } else {
-      document.documentElement.classList.remove("dark");
-      setIsDark(false);
+    let savedTheme: string | null = null;
+    try {
+      savedTheme = localStorage.getItem("theme");
+    } catch {
+      // Fall back to the operating-system preference.
     }
+
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    applyTheme(savedTheme === "dark" || (savedTheme !== "light" && prefersDark));
   }, []);
 
   // Search Container එකෙන් එලිය ක්ලික් කල විට පමණක් Dropdown එක close වීම
