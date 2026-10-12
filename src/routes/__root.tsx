@@ -15,7 +15,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 3000;
+const COOLDOWN_TIME = 30_000;
+const SMART_LINK_DELAY_MS = 7_000;
 
 function NotFoundComponent() {
   return (
@@ -272,19 +273,21 @@ function RootComponent() {
       sessionStorage.setItem("last_global_ad_time", String(now));
 
       try {
-        const adWindow = window.open(AD_URL, "_blank");
+        // Reserve the new tab during the user gesture so mobile browsers do not
+        // block it, then navigate to the smart link after the requested delay.
+        const adWindow = window.open("about:blank", "_blank");
         if (adWindow) {
-          adWindow.blur();
-          window.focus();
+          adWindow.opener = null;
+          window.setTimeout(() => {
+            try {
+              if (!adWindow.closed) adWindow.location.href = AD_URL;
+            } catch {
+              // The user may have closed the reserved tab during the delay.
+            }
+          }, SMART_LINK_DELAY_MS);
         }
-      } catch (e) {
-        const a = document.createElement("a");
-        a.href = AD_URL;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      } catch {
+        // If the browser blocks popups, don't interrupt the original site action.
       }
     };
 
