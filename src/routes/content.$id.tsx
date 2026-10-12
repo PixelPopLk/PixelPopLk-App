@@ -640,7 +640,7 @@ function Hero({
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border shadow-card w-full">
       {poster && (
-        <div className="pointer-events-none absolute inset-0 opacity-30">
+        <div className="pointer-events-none absolute inset-0 hidden opacity-30 dark:block">
           <img
             src={poster}
             alt=""
