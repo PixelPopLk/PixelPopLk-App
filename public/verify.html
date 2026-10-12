@@ -1,27 +1,79 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Redirecting...</title>
-  <script>
-    const AD_URL = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9";
-    const WORKER_URL = "https://pixelbot.pasindumadusanka348.workers.dev";
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('a');
-
-    if (userId) {
-      // Background එකෙන් Worker එකට වෙලාව සටහන් කිරීමට Signal එක යවයි (Zero Delay)
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(`${WORKER_URL}/ad_started?a=${userId}`);
-      } else {
-        fetch(`${WORKER_URL}/ad_started?a=${userId}`, { keepalive: true }).catch(() => {});
-      }
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Opening sponsor ad…</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      background: #0e0e12;
+      color: #f4f4f5;
+      font: 16px/1.5 system-ui, sans-serif;
+      text-align: center;
     }
-
-    // ඇසිපිය ගහන සැනින් (Instant 0.05s) Ad එකට Redirect වීම!
-    window.location.replace(AD_URL);
-  </script>
+    main { max-width: 26rem; padding: 2rem; }
+    p { color: #b8b8c2; }
+  </style>
 </head>
-<body style="background:#0e0e12;margin:0;"></body>
+<body>
+  <main>
+    <h1 id="title">Opening sponsor ad…</h1>
+    <p id="message">Please wait a moment.</p>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const AD_URL = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9";
+      const WORKER_URL = "https://pixelbot.pasindumadusanka348.workers.dev";
+      const params = new URLSearchParams(window.location.search);
+
+      // The bot generates verify.html?u=<user_id>&t=<verification_token>.
+      // Keep both values intact so the Worker can validate this exact session.
+      const userId = params.get("u");
+      const token = params.get("t");
+
+      const title = document.getElementById("title");
+      const message = document.getElementById("message");
+
+      if (!userId || !token) {
+        title.textContent = "Invalid or expired download link";
+        message.textContent = "Please return to the bot and request a fresh download link.";
+        return;
+      }
+
+      const startedUrl = new URL("/ad_started", WORKER_URL);
+      startedUrl.searchParams.set("u", userId);
+      startedUrl.searchParams.set("t", token);
+
+      // Wait for the Worker response before redirecting. sendBeacon() does not
+      // expose the response, so it cannot tell us whether the session was accepted.
+      fetch(startedUrl.toString(), {
+        method: "GET",
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "error"
+      })
+        .then(async (response) => {
+          let result = null;
+          try { result = await response.json(); } catch (_) {}
+          if (!response.ok || !result || result.ok !== true) {
+            throw new Error("The download session could not be verified.");
+          }
+          window.location.replace(AD_URL);
+        })
+        .catch(() => {
+          title.textContent = "Could not open the ad";
+          message.textContent = "The download session could not be checked. Please return to the bot and open a fresh download link.";
+        });
+    })();
+  </script>
+</body>
 </html>
