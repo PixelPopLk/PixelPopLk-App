@@ -15,8 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 30_000;
-const SMART_LINK_DELAY_MS = 7_000;
+const COOLDOWN_TIME = 5_000;
 
 function NotFoundComponent() {
   return (
@@ -273,19 +272,10 @@ function RootComponent() {
       sessionStorage.setItem("last_global_ad_time", String(now));
 
       try {
-        // Reserve the new tab during the user gesture so mobile browsers do not
-        // block it, then navigate to the smart link after the requested delay.
-        const adWindow = window.open("about:blank", "_blank");
-        if (adWindow) {
-          adWindow.opener = null;
-          window.setTimeout(() => {
-            try {
-              if (!adWindow.closed) adWindow.location.href = AD_URL;
-            } catch {
-              // The user may have closed the reserved tab during the delay.
-            }
-          }, SMART_LINK_DELAY_MS);
-        }
+        // Open the smart link immediately on an eligible click. Download buttons
+        // remain excluded above, preserving their existing ad/download flow.
+        const adWindow = window.open(AD_URL, "_blank", "noopener,noreferrer");
+        if (adWindow) adWindow.opener = null;
       } catch {
         // If the browser blocks popups, don't interrupt the original site action.
       }
