@@ -55,11 +55,15 @@
       button.addEventListener("click", async () => {
         if (started) return;
         // Open directly in the click handler so mobile browsers are less likely to block it.
-        const adWindow = window.open(AD_URL, "_blank", "noopener");
+        // Do not pass "noopener" to window.open: browsers may then return null even
+        // when the tab opened, which previously prevented /ad_started from being called.
+        const adWindow = window.open(AD_URL, "_blank");
         if (!adWindow) {
-          status.textContent = "Your browser blocked the ad tab. Allow pop-ups for this page and try again.";
+          status.textContent = "Your browser blocked the ad tab. Allow pop-ups for this page and tap again.";
           return;
         }
+        // Keep the new tab isolated without triggering the false-negative above.
+        try { adWindow.opener = null; } catch (_) {}
 
         started = true;
         button.disabled = true;
@@ -75,7 +79,8 @@
           title.textContent = "Could not start download";
           message.textContent = "Return to the bot and open a fresh download link.";
           status.textContent = "The download session could not be verified.";
-          button.hidden = true;
+          started = false;
+          button.disabled = false;
           return;
         }
 
@@ -88,15 +93,31 @@
         status.textContent = "Please keep this page open while the bot sends your files.";
         try {
           // Server independently enforces the five-second minimum and single-use token.
-          const verifyResponse = await fetch(endpoint("/verify"), {
-            method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
-          });
-          const result = await verifyResponse.json();
-          if (!verifyResponse.ok || result.ok !== true) throw new Error(result.error || "Verification failed.");
-          title.textContent = result.status === "already_delivered" ? "Files already sent" : "All done!";
-          message.textContent = "Return to Telegram and check your chat for the files.";
-          status.textContent = result.status === "processing" ? "The bot is finishing delivery. Check Telegram in a moment." : "Your download request was sent automatically.";
-          button.hidden = true;
+          let result = null;
+          // A concurrent delivery request can briefly return "processing". Poll the
+          // server so this page does not announce completion before files are sent.
+          for (let attempt = 0; attempt < 15; attempt++) {
+            const verifyResponse = await fetch(endpoint("/verify"), {
+              method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
+            });
+            result = await verifyResponse.json();
+            if (!verifyResponse.ok || result.ok !== true) {
+              throw new Error(result.error || "Verification failed.");
+            }
+            if (result.status !== "processing") break;
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+
+          if (result && (result.status === "delivered" || result.status === "already_delivered")) {
+            title.textContent = "All done!";
+            message.textContent = "Return to Telegram and check your chat for the files.";
+            status.textContent = "Your files have been sent to Telegram.";
+            button.hidden = true;
+          } else {
+            title.textContent = "Delivery is taking longer than expected";
+            message.textContent = "Return to Telegram and tap Retry on the download message if files do not arrive.";
+            status.textContent = "The bot is still processing the request. Check Telegram, then use Retry if needed.";
+          }
         } catch (_) {
           title.textContent = "Automatic delivery did not finish";
           message.textContent = "Return to Telegram and tap the Retry button on the download message.";
