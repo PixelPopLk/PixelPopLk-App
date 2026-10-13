@@ -14,6 +14,12 @@
     button { width: 100%; margin-top: 1rem; padding: .9rem 1rem; border: 0; border-radius: .7rem; background: #667eea; color: white; font: inherit; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: .65; cursor: wait; }
     #status { min-height: 3rem; }
+    .ad-slot { display:flex; flex-direction:column; align-items:center; gap:.35rem; margin:1rem auto; }
+    .ad-label { color:#888895; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; }
+    .ad-frame { display:flex; align-items:center; justify-content:center; max-width:100%; overflow:hidden; background:#111116; }
+    .ad-rectangle { width:300px; min-height:250px; }
+    .ad-tall { width:160px; min-height:300px; }
+    .ad-frame iframe { max-width:100%; border:0; }
   </style>
 </head>
 <body>
@@ -22,6 +28,36 @@
     <p id="message">Tap the button to open the sponsor ad. Keep this page open; after 5 seconds, your files will be sent automatically.</p>
     <button id="start" type="button">Open Ad & Start 5-Second Timer</button>
     <p id="status" role="status" aria-live="polite"></p>
+    <section class="ad-slot" aria-label="Advertisement">
+      <span class="ad-label">Advertisement</span>
+      <div class="ad-frame ad-rectangle">
+        <script>
+          atOptions = {
+            'key' : '9dd5c8b0fb237459ed96d9d5952c404d',
+            'format' : 'iframe',
+            'height' : 250,
+            'width' : 300,
+            'params' : {}
+          };
+        </script>
+        <script src="https://acorntar.com/9dd5c8b0fb237459ed96d9d5952c404d/invoke.js"></script>
+      </div>
+    </section>
+    <section class="ad-slot" aria-label="Advertisement">
+      <span class="ad-label">Advertisement</span>
+      <div class="ad-frame ad-tall">
+        <script>
+          atOptions = {
+            'key' : '399fab0da57ef47c78efa4bbf8625b8b',
+            'format' : 'iframe',
+            'height' : 300,
+            'width' : 160,
+            'params' : {}
+          };
+        </script>
+        <script src="https://acorntar.com/399fab0da57ef47c78efa4bbf8625b8b/invoke.js"></script>
+      </div>
+    </section>
   </main>
 
   <script>
