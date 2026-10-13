@@ -4,75 +4,106 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <title>Opening sponsor ad…</title>
+  <title>Watch sponsor ad · PixelPop</title>
   <style>
     :root { color-scheme: dark; }
-    body {
-      min-height: 100vh;
-      margin: 0;
-      display: grid;
-      place-items: center;
-      background: #0e0e12;
-      color: #f4f4f5;
-      font: 16px/1.5 system-ui, sans-serif;
-      text-align: center;
-    }
-    main { max-width: 26rem; padding: 2rem; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0e0e12; color: #f4f4f5; font: 16px/1.5 system-ui, sans-serif; text-align: center; }
+    main { width: min(100% - 2rem, 28rem); padding: 2rem 1.5rem; border: 1px solid #30303a; border-radius: 1rem; background: #17171e; }
     p { color: #b8b8c2; }
+    button { width: 100%; margin-top: 1rem; padding: .9rem 1rem; border: 0; border-radius: .7rem; background: #667eea; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: wait; }
+    #status { min-height: 3rem; }
   </style>
 </head>
 <body>
   <main>
-    <h1 id="title">Opening sponsor ad…</h1>
-    <p id="message">Please wait a moment.</p>
+    <h1 id="title">Watch sponsor ad</h1>
+    <p id="message">Tap the button to open the sponsor ad. Keep this page open; after 5 seconds, your files will be sent automatically.</p>
+    <button id="start" type="button">Open Ad & Start 5-Second Timer</button>
+    <p id="status" role="status" aria-live="polite"></p>
   </main>
 
   <script>
     (() => {
       "use strict";
-
       const AD_URL = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9";
       const WORKER_URL = "https://pixelbot.pasindumadusanka348.workers.dev";
       const params = new URLSearchParams(window.location.search);
-
-      // The bot generates verify.html?u=<user_id>&t=<verification_token>.
-      // Keep both values intact so the Worker can validate this exact session.
-      const userId = params.get("u");
+      const userId = params.get("u") || params.get("a");
       const token = params.get("t");
-
       const title = document.getElementById("title");
       const message = document.getElementById("message");
+      const status = document.getElementById("status");
+      const button = document.getElementById("start");
 
       if (!userId || !token) {
         title.textContent = "Invalid or expired download link";
-        message.textContent = "Please return to the bot and request a fresh download link.";
+        message.textContent = "Return to the bot and request a fresh download link.";
+        button.hidden = true;
         return;
       }
 
-      const startedUrl = new URL("/ad_started", WORKER_URL);
-      startedUrl.searchParams.set("u", userId);
-      startedUrl.searchParams.set("t", token);
+      const endpoint = (path) => {
+        const url = new URL(path, WORKER_URL);
+        url.searchParams.set("u", userId);
+        url.searchParams.set("t", token);
+        return url.toString();
+      };
 
-      // Wait for the Worker response before redirecting. sendBeacon() does not
-      // expose the response, so it cannot tell us whether the session was accepted.
-      fetch(startedUrl.toString(), {
-        method: "GET",
-        cache: "no-store",
-        credentials: "omit",
-        redirect: "error"
-      })
-        .then(async (response) => {
-          let result = null;
-          try { result = await response.json(); } catch (_) {}
-          if (!response.ok || !result || result.ok !== true) {
-            throw new Error("The download session could not be verified.");
-          }
-          window.location.replace(AD_URL);
-        })
-        .catch(() => {
-          title.textContent = "Could not open the ad";
-          message.textContent = "The download session could not be checked. Please return to the bot and open a fresh download link.";
-        });
+      let started = false;
+      button.addEventListener("click", async () => {
+        if (started) return;
+        // Open directly in the click handler so mobile browsers are less likely to block it.
+        const adWindow = window.open(AD_URL, "_blank", "noopener");
+        if (!adWindow) {
+          status.textContent = "Your browser blocked the ad tab. Allow pop-ups for this page and try again.";
+          return;
+        }
+
+        started = true;
+        button.disabled = true;
+        title.textContent = "Sponsor ad opened";
+        let response;
+        try {
+          response = await fetch(endpoint("/ad_started"), {
+            method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
+          });
+          const result = await response.json();
+          if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not start verification.");
+        } catch (_) {
+          title.textContent = "Could not start download";
+          message.textContent = "Return to the bot and open a fresh download link.";
+          status.textContent = "The download session could not be verified.";
+          button.hidden = true;
+          return;
+        }
+
+        for (let remaining = 5; remaining > 0; remaining--) {
+          status.textContent = "Sending files automatically in " + remaining + " second" + (remaining === 1 ? "" : "s") + "…";
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        title.textContent = "Sending your files…";
+        status.textContent = "Please keep this page open while the bot sends your files.";
+        try {
+          // Server independently enforces the five-second minimum and single-use token.
+          const verifyResponse = await fetch(endpoint("/verify"), {
+            method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
+          });
+          const result = await verifyResponse.json();
+          if (!verifyResponse.ok || result.ok !== true) throw new Error(result.error || "Verification failed.");
+          title.textContent = result.status === "already_delivered" ? "Files already sent" : "All done!";
+          message.textContent = "Return to Telegram and check your chat for the files.";
+          status.textContent = result.status === "processing" ? "The bot is finishing delivery. Check Telegram in a moment." : "Your download request was sent automatically.";
+          button.hidden = true;
+        } catch (_) {
+          title.textContent = "Automatic delivery did not finish";
+          message.textContent = "Return to Telegram and tap the Retry button on the download message.";
+          status.textContent = "If the files do not arrive, use Retry in the bot.";
+          button.hidden = true;
+        }
+      });
     })();
   </script>
 </body>
