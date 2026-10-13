@@ -25,8 +25,8 @@
 <body>
   <main>
     <h1 id="title">Watch sponsor ad</h1>
-    <p id="message">Tap the button to open the sponsor ad. Keep this page open; after 5 seconds, your files will be sent automatically.</p>
-    <button id="start" type="button">Open Ad & Start 5-Second Timer</button>
+    <p id="message">Tap to open the sponsor link, visit it, then return to this page. Files are never requested automatically.</p>
+    <button id="start" type="button">Open sponsor link</button>
     <p id="status" role="status" aria-live="polite"></p>
     <section class="ad-slot" aria-label="Advertisement">
       <span class="ad-label">Advertisement</span>
@@ -88,58 +88,142 @@
       };
 
       let started = false;
-      button.addEventListener("click", async () => {
-        if (started) return;
-        // Open directly in the click handler so mobile browsers are less likely to block it.
-        // Do not pass "noopener" to window.open: browsers may then return null even
-        // when the tab opened, which previously prevented /ad_started from being called.
-        const adWindow = window.open(AD_URL, "_blank");
-        if (!adWindow) {
-          status.textContent = "Your browser blocked the ad tab. Allow pop-ups for this page and tap again.";
-          return;
-        }
-        // Keep the new tab isolated without triggering the false-negative above.
-        try { adWindow.opener = null; } catch (_) {}
+      let leftPage = false;
+      let returnedFromAd = false;
+      let verifyReady = false;
+      let verifying = false;
+      let startedAt = 0;
+      let timer = null;
 
-        started = true;
-        button.disabled = true;
-        title.textContent = "Sponsor ad opened";
-        let response;
-        try {
-          response = await fetch(endpoint("/ad_started"), {
-            method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
-          });
-          const result = await response.json();
-          if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not start verification.");
-        } catch (_) {
-          title.textContent = "Could not start download";
-          message.textContent = "Return to the bot and open a fresh download link.";
-          status.textContent = "The download session could not be verified.";
-          started = false;
+      const refreshButton = () => {
+        if (verifying) return;
+        if (!started) {
           button.disabled = false;
+          button.textContent = "Open sponsor link";
           return;
         }
-
-        for (let remaining = 5; remaining > 0; remaining--) {
-          status.textContent = "Sending files automatically in " + remaining + " second" + (remaining === 1 ? "" : "s") + "…";
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (!returnedFromAd) {
+          button.disabled = true;
+          button.textContent = "Open the sponsor link, then return here";
+          status.textContent = "No file request is sent automatically. Return to this tab after visiting the sponsor page.";
+          return;
         }
+        const remaining = Math.max(0, 5000 - (Date.now() - startedAt));
+        if (remaining > 0) {
+          button.disabled = true;
+          button.textContent = "Wait " + Math.ceil(remaining / 1000) + " seconds";
+          status.textContent = "Please keep this page open until the minimum wait has passed.";
+          return;
+        }
+        verifyReady = true;
+        button.disabled = false;
+        button.textContent = "Verify & Get Files";
+        status.textContent = "Ready. Press the button to request delivery in Telegram.";
+      };
 
-        title.textContent = "Sending your files…";
-        status.textContent = "Please keep this page open while the bot sends your files.";
-        try {
-          // Server independently enforces the five-second minimum and single-use token.
-          let result = null;
-          // A concurrent delivery request can briefly return "processing". Poll the
-          // server so this page does not announce completion before files are sent.
-          for (let attempt = 0; attempt < 15; attempt++) {
-            const verifyResponse = await fetch(endpoint("/verify"), {
+      const noteReturned = () => {
+        if (!started || !leftPage || document.visibilityState !== "visible") return;
+        returnedFromAd = true;
+        title.textContent = "Welcome back";
+        message.textContent = "Press Verify & Get Files to request delivery. The page will not request files automatically.";
+        refreshButton();
+      };
+
+      if (document.visibilityState === "visible") {
+        status.textContent = "Open the sponsor link, visit it, then return to this page.";
+      }
+      window.addEventListener("blur", () => {
+        if (started) leftPage = true;
+      });
+      window.addEventListener("focus", noteReturned);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          if (started) leftPage = true;
+          // Never request /verify from a visibility or unload event.
+          return;
+        }
+        noteReturned();
+        refreshButton();
+      });
+      window.addEventListener("pagehide", () => {
+        if (timer !== null) clearInterval(timer);
+        timer = null;
+        // Intentionally do not call /verify when leaving the page.
+      });
+
+      button.addEventListener("click", async () => {
+        if (verifying || document.visibilityState !== "visible") return;
+
+        if (!started) {
+          // Open from the click handler to avoid popup blockers. No files are requested here.
+          const adWindow = window.open(AD_URL, "_blank");
+          if (!adWindow) {
+            status.textContent = "Your browser blocked the sponsor tab. Allow pop-ups and tap again.";
+            return;
+          }
+          try { adWindow.opener = null; } catch (_) {}
+          started = true;
+          startedAt = Date.now();
+          button.disabled = true;
+          button.textContent = "Opening sponsor link…";
+          title.textContent = "Sponsor link opened";
+          message.textContent = "Visit the sponsor page, then return to this tab. Files will not be requested automatically.";
+          try {
+            const response = await fetch(endpoint("/ad_started"), {
               method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
             });
-            result = await verifyResponse.json();
-            if (!verifyResponse.ok || result.ok !== true) {
-              throw new Error(result.error || "Verification failed.");
+            const result = await response.json();
+            if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not start sponsor session.");
+          } catch (_) {
+            started = false;
+            button.disabled = false;
+            button.textContent = "Open sponsor link";
+            title.textContent = "Could not start sponsor session";
+            message.textContent = "Return to Telegram and open a fresh download link.";
+            status.textContent = "The bot has not been asked to send files.";
+            return;
+          }
+          timer = setInterval(() => {
+            if (document.visibilityState === "visible") refreshButton();
+          }, 500);
+          refreshButton();
+          return;
+        }
+
+        if (!returnedFromAd) {
+          status.textContent = "Visit the sponsor page and return to this tab before verifying.";
+          return;
+        }
+        if (!verifyReady) {
+          refreshButton();
+          return;
+        }
+
+        verifying = true;
+        button.disabled = true;
+        button.textContent = "Checking…";
+        title.textContent = "Checking your download…";
+        status.textContent = "The file request is being sent because you pressed Verify & Get Files.";
+        try {
+          let result = null;
+          for (let attempt = 0; attempt < 15; attempt++) {
+            if (document.visibilityState !== "visible") {
+              throw new Error("Page left");
             }
+            const response = await fetch(endpoint("/verify"), {
+              method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
+            });
+            result = await response.json();
+            if (response.status === 425 && result.status === "waiting") {
+              title.textContent = "Please wait a little longer";
+              message.textContent = "The server has not reached the minimum wait yet. Return and press Verify again.";
+              status.textContent = "Wait " + Number(result.remaining_seconds || 1) + " more second(s).";
+              verifying = false;
+              button.disabled = false;
+              button.textContent = "Verify & Get Files";
+              return;
+            }
+            if (!response.ok || result.ok !== true) throw new Error(result.error || "Verification failed.");
             if (result.status !== "processing") break;
             await new Promise((resolve) => setTimeout(resolve, 1000));
           }
@@ -147,18 +231,30 @@
           if (result && (result.status === "delivered" || result.status === "already_delivered")) {
             title.textContent = "All done!";
             message.textContent = "Return to Telegram and check your chat for the files.";
-            status.textContent = "Your files have been sent to Telegram.";
+            status.textContent = "The bot confirmed delivery.";
             button.hidden = true;
+          } else if (result && result.status === "processing") {
+            title.textContent = "Delivery is still processing";
+            message.textContent = "Check Telegram. If the files do not arrive, use Retry in the bot.";
+            status.textContent = "No further checks will be sent automatically.";
+            verifying = false;
+            button.disabled = false;
+            button.textContent = "Check delivery again";
+            verifyReady = true;
           } else {
-            title.textContent = "Delivery is taking longer than expected";
-            message.textContent = "Return to Telegram and tap Retry on the download message if files do not arrive.";
-            status.textContent = "The bot is still processing the request. Check Telegram, then use Retry if needed.";
+            throw new Error("Delivery was not confirmed.");
           }
         } catch (_) {
-          title.textContent = "Automatic delivery did not finish";
-          message.textContent = "Return to Telegram and tap the Retry button on the download message.";
-          status.textContent = "If the files do not arrive, use Retry in the bot.";
-          button.hidden = true;
+          title.textContent = "Could not confirm delivery";
+          message.textContent = "Return to Telegram and use Retry if the files do not arrive.";
+          status.textContent = "Delivery was not assumed to be successful.";
+          verifying = false;
+          button.disabled = false;
+          button.textContent = "Try verification again";
+          verifyReady = true;
+        } finally {
+          if (timer !== null && button.hidden) clearInterval(timer);
+          if (!button.hidden) refreshButton();
         }
       });
     })();
