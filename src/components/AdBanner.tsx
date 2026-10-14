@@ -118,7 +118,11 @@ export default function AdBanner({
               'params': {}
             };
           </script>
-          <script type="text/javascript" src="https://acorntar.com/${selectedKey}/invoke.js"></script>
+          <script
+            type="text/javascript"
+            src="https://acorntar.com/${selectedKey}/invoke.js"
+            onerror="parent.postMessage({ source: 'pixelpop-ad-banner', status: 'blocked' }, '*')"
+          ></script>
         </body>
       </html>
     `;
