@@ -1,94 +1,42 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/verify")({
   component: VerifyComponent,
 });
 
-// ඔයාගේ Site එකේ තියෙන Adsterra Direct Link එක
-const AD_URL = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e858e9";
-
-// අපි පස්සේ හදන Bot Cloudflare Worker එකේ URL එක
-const WORKER_URL = "https://your-bot-name.workers.dev";
-
 function VerifyComponent() {
-  const [verificationComplete, setVerificationComplete] = useState(false);
-
-  useEffect(() => {
-    // Keep the Telegram verification signal, but never force a third-party redirect.
-    const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get("a");
-
-    if (!userId) {
-      setVerificationComplete(true);
-      return;
-    }
-
-    fetch(`${WORKER_URL}/verify?a=${encodeURIComponent(userId)}`, {
-      keepalive: true,
-    })
-      .catch((err) => console.error("Verify Signal Error:", err))
-      .finally(() => setVerificationComplete(true));
-  }, []);
+  const continueToVerification = () => {
+    // The bot issues a short-lived token for the static verification page.
+    // Preserve the query string so that page can validate the actual session.
+    window.location.href = `/verify.html${window.location.search}`;
+  };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
-        backgroundColor: "#0e0e12",
-        color: "#ffffff",
-        fontFamily: "sans-serif",
-        textAlign: "center",
-        padding: "20px",
-      }}
+    <main
+      lang="si"
+      className="flex min-h-screen flex-col items-center justify-center bg-[#0e0e12] px-5 py-10 text-center text-white"
     >
-      {/* Loading Spinner එකක් */}
-      <div
-        style={{
-          width: "48px",
-          height: "48px",
-          border: "4px solid #1e1e24",
-          borderTop: "4px solid #38bdf8",
-          borderRadius: "50%",
-          animation: "spin 1s linear infinite",
-        }}
-      />
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-
-      <h3 style={{ marginTop: "20px", fontSize: "18px", fontWeight: "600" }}>
-        {verificationComplete ? "Verification step complete" : "Completing verification..."}
-      </h3>
-      <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: "6px", maxWidth: "420px" }}>
-        {verificationComplete
-          ? "Your browser may block sponsor links. If you choose to view the sponsor, open it below; otherwise you can continue using PixelPopLK."
-          : "Please wait while we finish the verification step."}
-      </p>
-      {verificationComplete && (
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "12px", marginTop: "20px" }}>
-          <button
-            type="button"
-            onClick={() => window.open(AD_URL, "_blank", "noopener,noreferrer")}
-            style={{ border: 0, borderRadius: "8px", padding: "12px 18px", background: "#38bdf8", color: "#0e0e12", fontWeight: 700, cursor: "pointer" }}
-          >
-            Open sponsor link
-          </button>
-          <a
-            href="/"
-            style={{ border: "1px solid #475569", borderRadius: "8px", padding: "12px 18px", color: "#ffffff", textDecoration: "none", fontWeight: 600 }}
-          >
-            Continue to PixelPopLK
-          </a>
-        </div>
-      )}
-    </div>
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-white/5 p-6">
+        <h1 className="text-xl font-bold">බාගත කිරීම තහවුරු කරන්න</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          බාගත කිරීමේ සබැඳිය Telegram bot එකෙන් ලැබුණු කෙටි කාලීන token එකක් භාවිතා කර තහවුරු කරනවා.
+          දැන්වීම් අවහිර කරන browser ආරක්ෂණ නිසා sponsor පිටුව නොපෙනෙන්න පුළුවන්.
+        </p>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          පහළ බොත්තම ඔබා නිවැරදි verification පිටුවට යන්න. එහි උපදෙස් අනුගමනය කරන්න.
+          සබැඳිය අවලංගු නම් Telegram bot එකෙන් අලුත් සබැඳියක් ලබාගන්න.
+        </p>
+        <button
+          type="button"
+          onClick={continueToVerification}
+          className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-sky-300"
+        >
+          Verification පිටුවට යන්න
+        </button>
+        <a href="/" className="mt-4 inline-block text-sm font-semibold text-sky-300 underline">
+          PixelPopLK වෙත ආපසු යන්න
+        </a>
+      </div>
+    </main>
   );
 }
