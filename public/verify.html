@@ -1,33 +1,60 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="si">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <title>Watch sponsor ad · PixelPop</title>
+  <title>නොමිලේ ගොනු ලබාගන්න · PixelPop</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0e0e12; color: #f4f4f5; font: 16px/1.5 system-ui, sans-serif; text-align: center; }
-    main { width: min(100% - 2rem, 28rem); padding: 2rem 1.5rem; border: 1px solid #30303a; border-radius: 1rem; background: #17171e; }
-    p { color: #b8b8c2; }
+    html { scroll-behavior: smooth; }
+    body { min-height: 100vh; margin: 0; display: flex; justify-content: center; align-items: flex-start; background: #0e0e12; color: #f4f4f5; font: 16px/1.6 system-ui, sans-serif; text-align: center; }
+    main { width: min(100% - 1.25rem, 30rem); margin: 1rem auto; padding: 1.25rem 1rem; border: 1px solid #30303a; border-radius: 1rem; background: #17171e; }
+    h1 { font-size: 1.45rem; line-height: 1.3; }
+    p { color: #c3c3ce; }
+    .instructions { text-align: left; padding: .8rem 1rem; border-radius: .75rem; background: #20202a; }
+    .instructions ol { margin: .4rem 0; padding-left: 1.35rem; }
     button { width: 100%; margin-top: 1rem; padding: .9rem 1rem; border: 0; border-radius: .7rem; background: #667eea; color: white; font: inherit; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: .65; cursor: wait; }
-    #status { min-height: 3rem; }
-    .ad-slot { display:flex; flex-direction:column; align-items:center; gap:.35rem; margin:1rem auto; }
+    #getFiles { background: #16a34a; }
+    #getFiles:disabled { background: #477b56; }
+    #status { min-height: 2.5rem; }
+    .ad-slot { display:flex; flex-direction:column; align-items:center; gap:.35rem; margin:1.25rem auto; }
     .ad-label { color:#888895; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; }
     .ad-frame { display:flex; align-items:center; justify-content:center; max-width:100%; overflow:hidden; background:#111116; }
     .ad-rectangle { width:300px; min-height:250px; }
     .ad-tall { width:160px; min-height:300px; }
     .ad-frame iframe { max-width:100%; border:0; }
+    .progress-wrap { height: .55rem; width: 100%; overflow: hidden; border-radius: 99px; background: #30303a; }
+    #progress { height: 100%; width: 0; background: #667eea; transition: width .2s linear; }
+    .small { font-size: .88rem; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <main>
-    <h1 id="title">Watch sponsor ad</h1>
-    <p id="message">Tap to open the sponsor link, visit it, then return to this page. Files are never requested automatically.</p>
-    <button id="start" type="button">Open sponsor link</button>
-    <p id="status" role="status" aria-live="polite"></p>
+    <h1 id="title">නොමිලේ ගොනු ලබාගන්න</h1>
+    <p id="message">පහත උපදෙස් අනුගමනය කර Adsterra sponsor link එක විවෘත කරන්න.</p>
+
+    <section class="instructions" aria-label="සිංහල උපදෙස්">
+      <strong>සිංහල උපදෙස්</strong>
+      <ol>
+        <li><strong>ඇඩ් එක විවෘත කරන්න</strong> බොත්තම ඔබන්න.</li>
+        <li>විවෘත වන sponsor පිටුවේ අවම තත්පර 5ක් රැඳී සිටින්න.</li>
+        <li>තත්පර 5ට කලින් ආපසු ආවොත්, ඉතිරි කාලය සම්පූර්ණ කිරීමට ඇඩ් එක නැවත විවෘත කරන්න.</li>
+        <li>තත්පර 5 සම්පූර්ණ වූ පසු පහළ banner ads පසුකර scroll කර <strong>Get Files</strong> බොත්තම ඔබන්න.</li>
+        <li>ඉන්පසු Telegram chat එක පරීක්ෂා කරන්න. ගොනු නොලැබුණොත් bot එකේ Retry බොත්තම භාවිතා කරන්න.</li>
+      </ol>
+      <p class="small">සටහන: මේ පිටුවෙන් ගොනු ස්වයංක්‍රීයව යවන්නේ නැහැ. Get Files ඔබන විට පමණක් bot එකට ඉල්ලීම යවයි.</p>
+    </section>
+
+    <button id="start" type="button">ඇඩ් එක විවෘත කරන්න</button>
+    <p id="status" role="status" aria-live="polite">ඇඩ් එක විවෘත කළ පසු ඉතිරි කාලය මෙතැන පෙන්වයි.</p>
+    <div class="progress-wrap" aria-label="තත්පර 5ක ප්‍රගතිය">
+      <div id="progress"></div>
+    </div>
+
     <section class="ad-slot" aria-label="Advertisement">
       <span class="ad-label">Advertisement</span>
       <div class="ad-frame ad-rectangle">
@@ -58,6 +85,12 @@
         <script src="https://acorntar.com/399fab0da57ef47c78efa4bbf8625b8b/invoke.js"></script>
       </div>
     </section>
+
+    <section id="downloadSection" hidden>
+      <h2>ගොනු ලබාගන්න</h2>
+      <p>තත්පර 5 සම්පූර්ණයි. දැන් පහළ බොත්තම ඔබා Telegram එකෙන් ගොනු ලබාගන්න.</p>
+      <button id="getFiles" type="button">Get Files · ගොනු ලබාගන්න</button>
+    </section>
   </main>
 
   <script>
@@ -71,12 +104,15 @@
       const title = document.getElementById("title");
       const message = document.getElementById("message");
       const status = document.getElementById("status");
-      const button = document.getElementById("start");
+      const startButton = document.getElementById("start");
+      const getFilesButton = document.getElementById("getFiles");
+      const downloadSection = document.getElementById("downloadSection");
+      const progress = document.getElementById("progress");
 
       if (!userId || !token) {
-        title.textContent = "Invalid or expired download link";
-        message.textContent = "Return to the bot and request a fresh download link.";
-        button.hidden = true;
+        title.textContent = "සබැඳිය අවලංගුයි හෝ කල් ඉකුත් වී ඇත";
+        message.textContent = "Telegram bot එකට ආපසු ගොස් අලුත් download link එකක් ලබාගන්න.";
+        startButton.hidden = true;
         return;
       }
 
@@ -87,176 +123,144 @@
         return url.toString();
       };
 
+      const REQUIRED_MS = 5000;
       let started = false;
-      let leftPage = false;
-      let returnedFromAd = false;
-      let verifyReady = false;
+      let starting = false;
       let verifying = false;
-      let startedAt = 0;
-      let timer = null;
+      let verifiedElapsedMs = 0;
+      let awaySince = 0;
+      let adStartedSent = false;
 
-      const refreshButton = () => {
-        if (verifying) return;
+      const updateProgress = () => {
+        const elapsed = Math.min(REQUIRED_MS, verifiedElapsedMs);
+        progress.style.width = ((elapsed / REQUIRED_MS) * 100) + "%";
+        const remaining = Math.max(0, Math.ceil((REQUIRED_MS - elapsed) / 1000));
+        if (elapsed >= REQUIRED_MS) {
+          startButton.hidden = true;
+          downloadSection.hidden = false;
+          status.textContent = "තත්පර 5 සම්පූර්ණයි! පහළට scroll කර Get Files බොත්තම ඔබන්න.";
+          title.textContent = "ඇඩ් කාලය සම්පූර්ණයි";
+          message.textContent = "දැන් banner ads පසුකර පහළ ඇති Get Files බොත්තම ඔබන්න.";
+          return;
+        }
+        downloadSection.hidden = true;
+        startButton.hidden = false;
         if (!started) {
-          button.disabled = false;
-          button.textContent = "Open sponsor link";
-          return;
+          startButton.disabled = starting;
+          startButton.textContent = starting ? "ආරම්භ කරමින්…" : "ඇඩ් එක විවෘත කරන්න";
+          status.textContent = "ඇඩ් එක විවෘත කර තත්පර 5ක කාලය සම්පූර්ණ කරන්න.";
+        } else {
+          startButton.disabled = starting;
+          startButton.textContent = "ඉතිරි තත්පර " + remaining + " සම්පූර්ණ කිරීමට ඇඩ් එක නැවත විවෘත කරන්න";
+          status.textContent = "තව තත්පර " + remaining + "ක් අවශ්‍යයි. බොත්තම ඔබා ඇඩ් පිටුවට නැවත යන්න.";
         }
-        if (!returnedFromAd) {
-          button.disabled = true;
-          button.textContent = "Open the sponsor link, then return here";
-          status.textContent = "No file request is sent automatically. Return to this tab after visiting the sponsor page.";
-          return;
-        }
-        const remaining = Math.max(0, 5000 - (Date.now() - startedAt));
-        if (remaining > 0) {
-          button.disabled = true;
-          button.textContent = "Wait " + Math.ceil(remaining / 1000) + " seconds";
-          status.textContent = "Please keep this page open until the minimum wait has passed.";
-          return;
-        }
-        verifyReady = true;
-        button.disabled = false;
-        button.textContent = "Verify & Get Files";
-        status.textContent = "Ready. Press the button to request delivery in Telegram.";
       };
 
-      const noteReturned = () => {
-        if (!started || !leftPage || document.visibilityState !== "visible") return;
-        returnedFromAd = true;
-        title.textContent = "Welcome back";
-        message.textContent = "Press Verify & Get Files to request delivery. The page will not request files automatically.";
-        refreshButton();
+      const recordAwayTime = () => {
+        if (!started || !awaySince) return;
+        const now = Date.now();
+        verifiedElapsedMs += Math.max(0, now - awaySince);
+        awaySince = 0;
+        verifiedElapsedMs = Math.min(REQUIRED_MS, verifiedElapsedMs);
+        updateProgress();
       };
 
-      if (document.visibilityState === "visible") {
-        status.textContent = "Open the sponsor link, visit it, then return to this page.";
-      }
-      window.addEventListener("blur", () => {
-        if (started) leftPage = true;
-      });
-      window.addEventListener("focus", noteReturned);
+      const markAway = () => {
+        if (started && !awaySince) awaySince = Date.now();
+      };
+
+      window.addEventListener("blur", markAway);
+      window.addEventListener("focus", recordAwayTime);
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") {
-          if (started) leftPage = true;
-          // Never request /verify from a visibility or unload event.
-          return;
-        }
-        noteReturned();
-        refreshButton();
-      });
-      window.addEventListener("pagehide", () => {
-        if (timer !== null) clearInterval(timer);
-        timer = null;
-        // Intentionally do not call /verify when leaving the page.
+        if (document.visibilityState === "hidden") markAway();
+        else recordAwayTime();
       });
 
-      button.addEventListener("click", async () => {
-        if (verifying || document.visibilityState !== "visible") return;
+      const openAd = () => {
+        const adWindow = window.open(AD_URL, "_blank");
+        if (!adWindow) {
+          status.textContent = "බ්‍රවුසරය sponsor tab එක අවහිර කළා. Pop-ups ඉඩදී නැවත උත්සාහ කරන්න.";
+          return false;
+        }
+        try { adWindow.opener = null; } catch (_) {}
+        // Start measuring time away as soon as the sponsor tab is opened.
+        if (!awaySince) awaySince = Date.now();
+        return true;
+      };
+
+      startButton.addEventListener("click", async () => {
+        if (starting || verifying || verifiedElapsedMs >= REQUIRED_MS) return;
+        if (!openAd()) return;
 
         if (!started) {
-          // Open from the click handler to avoid popup blockers. No files are requested here.
-          const adWindow = window.open(AD_URL, "_blank");
-          if (!adWindow) {
-            status.textContent = "Your browser blocked the sponsor tab. Allow pop-ups and tap again.";
-            return;
-          }
-          try { adWindow.opener = null; } catch (_) {}
           started = true;
-          startedAt = Date.now();
-          button.disabled = true;
-          button.textContent = "Opening sponsor link…";
-          title.textContent = "Sponsor link opened";
-          message.textContent = "Visit the sponsor page, then return to this tab. Files will not be requested automatically.";
+          starting = true;
+          startButton.disabled = true;
+          title.textContent = "Sponsor පිටුව විවෘතයි";
+          message.textContent = "Sponsor පිටුවේ රැඳී සිටින්න. ආපසු ආවොත් ඉතිරි කාලය පෙන්වයි.";
           try {
             const response = await fetch(endpoint("/ad_started"), {
               method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
             });
             const result = await response.json();
             if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not start sponsor session.");
+            adStartedSent = true;
           } catch (_) {
             started = false;
-            button.disabled = false;
-            button.textContent = "Open sponsor link";
-            title.textContent = "Could not start sponsor session";
-            message.textContent = "Return to Telegram and open a fresh download link.";
-            status.textContent = "The bot has not been asked to send files.";
-            return;
+            awaySince = 0;
+            title.textContent = "Ad session එක ආරම්භ කළ නොහැක";
+            message.textContent = "Telegram bot එකට ආපසු ගොස් අලුත් download link එකක් විවෘත කරන්න.";
+            status.textContent = "ගොනු යැවීමට ඉල්ලීමක් යවා නැහැ.";
+          } finally {
+            starting = false;
+            updateProgress();
           }
-          timer = setInterval(() => {
-            if (document.visibilityState === "visible") refreshButton();
-          }, 500);
-          refreshButton();
           return;
         }
 
-        if (!returnedFromAd) {
-          status.textContent = "Visit the sponsor page and return to this tab before verifying.";
-          return;
-        }
-        if (!verifyReady) {
-          refreshButton();
-          return;
-        }
+        updateProgress();
+      });
 
+      getFilesButton.addEventListener("click", async () => {
+        if (verifying || verifiedElapsedMs < REQUIRED_MS || !adStartedSent) return;
         verifying = true;
-        button.disabled = true;
-        button.textContent = "Checking…";
-        title.textContent = "Checking your download…";
-        status.textContent = "The file request is being sent because you pressed Verify & Get Files.";
+        getFilesButton.disabled = true;
+        getFilesButton.textContent = "පරීක්ෂා කරමින්…";
+        status.textContent = "Telegram bot එකෙන් ගොනු ලබාදීම තහවුරු කරමින්.";
         try {
           let result = null;
           for (let attempt = 0; attempt < 15; attempt++) {
-            if (document.visibilityState !== "visible") {
-              throw new Error("Page left");
-            }
             const response = await fetch(endpoint("/verify"), {
               method: "GET", cache: "no-store", credentials: "omit", redirect: "error"
             });
             result = await response.json();
             if (response.status === 425 && result.status === "waiting") {
-              title.textContent = "Please wait a little longer";
-              message.textContent = "The server has not reached the minimum wait yet. Return and press Verify again.";
-              status.textContent = "Wait " + Number(result.remaining_seconds || 1) + " more second(s).";
-              verifying = false;
-              button.disabled = false;
-              button.textContent = "Verify & Get Files";
-              return;
+              throw new Error("සේවාදායකයට තව ටිකක් කාලය අවශ්‍යයි. Telegram bot එකේ Retry භාවිතා කරන්න.");
             }
             if (!response.ok || result.ok !== true) throw new Error(result.error || "Verification failed.");
             if (result.status !== "processing") break;
             await new Promise((resolve) => setTimeout(resolve, 1000));
           }
-
           if (result && (result.status === "delivered" || result.status === "already_delivered")) {
-            title.textContent = "All done!";
-            message.textContent = "Return to Telegram and check your chat for the files.";
-            status.textContent = "The bot confirmed delivery.";
-            button.hidden = true;
+            title.textContent = "සාර්ථකයි!";
+            message.textContent = "Telegram chat එකට ආපසු ගොස් ගොනු පරීක්ෂා කරන්න.";
+            status.textContent = "Bot එක ගොනු ලබාදීම තහවුරු කළා.";
+            getFilesButton.hidden = true;
           } else if (result && result.status === "processing") {
-            title.textContent = "Delivery is still processing";
-            message.textContent = "Check Telegram. If the files do not arrive, use Retry in the bot.";
-            status.textContent = "No further checks will be sent automatically.";
-            verifying = false;
-            button.disabled = false;
-            button.textContent = "Check delivery again";
-            verifyReady = true;
+            throw new Error("ගොනු යැවීම තවම සිදුවෙමින් පවතී. Telegram එක පරීක්ෂා කරන්න; නොලැබුණොත් Retry ඔබන්න.");
           } else {
-            throw new Error("Delivery was not confirmed.");
+            throw new Error("ගොනු ලබාදීම තහවුරු කළ නොහැක.");
           }
-        } catch (_) {
-          title.textContent = "Could not confirm delivery";
-          message.textContent = "Return to Telegram and use Retry if the files do not arrive.";
-          status.textContent = "Delivery was not assumed to be successful.";
-          verifying = false;
-          button.disabled = false;
-          button.textContent = "Try verification again";
-          verifyReady = true;
+        } catch (error) {
+          status.textContent = error && error.message ? error.message : "ගොනු ලබාදීම තහවුරු කළ නොහැක. Telegram bot එකේ Retry භාවිතා කරන්න.";
+          getFilesButton.disabled = false;
+          getFilesButton.textContent = "නැවත පරීක්ෂා කරන්න · Retry";
         } finally {
-          if (timer !== null && button.hidden) clearInterval(timer);
-          if (!button.hidden) refreshButton();
+          verifying = false;
         }
       });
+
+      updateProgress();
     })();
   </script>
 </body>
