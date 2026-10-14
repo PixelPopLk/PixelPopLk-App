@@ -218,7 +218,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const location = useLocation();
-  const isAdminPage = location.pathname.startsWith("/manage-admin");
+  const isAdminPage =
+    location.pathname === "/manage-admin" ||
+    location.pathname.startsWith("/manage-admin/");
   const [adBlockDetected, setAdBlockDetected] = useState(false);
 
   useEffect(() => {
@@ -287,22 +289,30 @@ function RootComponent() {
         >
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
             <h2 id="adblock-gate-title" className="text-xl font-bold text-foreground">
-              Ads could not load
+              දැන්වීම් පූරණය වුණේ නැහැ
             </h2>
             <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
-              PixelPopLK is supported by advertisements, but an ad script was blocked or could not be reached.
-              To continue using the site, allow ads and third-party scripts for this website, then retry.
+              PixelPopLK නොමිලේ පවත්වාගෙන යාමට දැන්වීම්වලින් ලැබෙන ආදායම උපකාරී වෙනවා. නමුත් දැන්වීම් script එකක්
+              අවහිර වී හෝ ජාල සම්බන්ධතා දෝෂයක් නිසා පූරණය නොවී තිබිය හැක.
             </p>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Browser protections such as Firefox Enhanced Tracking Protection, Brave Shields, uBlock Origin,
-              AdGuard, or network filtering may cause this. A temporary connection issue can also trigger this notice.
-            </p>
+            <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 text-left text-sm leading-6 text-muted-foreground">
+              <p className="font-semibold text-foreground">ඉදිරියට යාමට කළ හැකි දේ</p>
+              <p className="mt-2">
+                PixelPopLK වෙබ් අඩවිය සඳහා ඔබේ ad-blocker එකේ “Allow ads” හෝ “Whitelist this site” තෝරන්න.
+                ඉන්පසු පහළ බොත්තම ඔබා පිටුව නැවත පූරණය කරන්න.
+              </p>
+              <p className="mt-2">
+                Firefox Enhanced Tracking Protection, Brave Shields, uBlock Origin, AdGuard හෝ DNS/ජාල පෙරහනක්
+                නිසා දැන්වීම් අවහිර විය හැක. මේ පරීක්ෂාව සම්පූර්ණයෙන්ම නිවැරදි නොවන නිසා සාමාන්‍ය ජාල දෝෂයක්
+                වුණත් මෙම පණිවිඩය පෙන්විය හැක.
+              </p>
+            </div>
             <button
               type="button"
               onClick={retryAfterAllowingAds}
               className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              I've allowed ads — retry
+              දැන්වීම් ඉඩ දුන්නා — නැවත උත්සාහ කරන්න
             </button>
           </div>
         </div>
