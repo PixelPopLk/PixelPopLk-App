@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/verify")({
   component: VerifyComponent,
@@ -12,26 +12,23 @@ const AD_URL = "https://acorntar.com/dk4nenmww6?key=f4402d71c88bddbb0bd00cf797e8
 const WORKER_URL = "https://your-bot-name.workers.dev";
 
 function VerifyComponent() {
+  const [verificationComplete, setVerificationComplete] = useState(false);
+
   useEffect(() => {
-    // 1. URL එකෙන් Telegram Chat/User ID එක ගන්නවා (?a=6857599209)
+    // Keep the Telegram verification signal, but never force a third-party redirect.
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get("a");
 
-    const redirectToAd = () => {
-      window.location.replace(AD_URL);
-    };
-
-    if (userId) {
-      // 2. Worker එකට User verify උනා කියලා Signal එක යවනවා
-      fetch(`${WORKER_URL}/verify?a=${userId}`, { keepalive: true })
-        .catch((err) => console.error("Verify Signal Error:", err))
-        .finally(() => {
-          // 3. තත්පරයකින් කෙලින්ම Adsterra Ad එකට Redirect වෙනවා
-          setTimeout(redirectToAd, 800);
-        });
-    } else {
-      redirectToAd();
+    if (!userId) {
+      setVerificationComplete(true);
+      return;
     }
+
+    fetch(`${WORKER_URL}/verify?a=${encodeURIComponent(userId)}`, {
+      keepalive: true,
+    })
+      .catch((err) => console.error("Verify Signal Error:", err))
+      .finally(() => setVerificationComplete(true));
   }, []);
 
   return (
@@ -68,11 +65,30 @@ function VerifyComponent() {
       `}</style>
 
       <h3 style={{ marginTop: "20px", fontSize: "18px", fontWeight: "600" }}>
-        Redirecting to Sponsor Ad...
+        {verificationComplete ? "Verification step complete" : "Completing verification..."}
       </h3>
-      <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: "6px" }}>
-        Please wait, you will be redirected automatically.
+      <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: "6px", maxWidth: "420px" }}>
+        {verificationComplete
+          ? "Your browser may block sponsor links. If you choose to view the sponsor, open it below; otherwise you can continue using PixelPopLK."
+          : "Please wait while we finish the verification step."}
       </p>
+      {verificationComplete && (
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "12px", marginTop: "20px" }}>
+          <button
+            type="button"
+            onClick={() => window.open(AD_URL, "_blank", "noopener,noreferrer")}
+            style={{ border: 0, borderRadius: "8px", padding: "12px 18px", background: "#38bdf8", color: "#0e0e12", fontWeight: 700, cursor: "pointer" }}
+          >
+            Open sponsor link
+          </button>
+          <a
+            href="/"
+            style={{ border: "1px solid #475569", borderRadius: "8px", padding: "12px 18px", color: "#ffffff", textDecoration: "none", fontWeight: 600 }}
+          >
+            Continue to PixelPopLK
+          </a>
+        </div>
+      )}
     </div>
   );
 }
