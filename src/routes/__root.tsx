@@ -8,7 +8,7 @@ import {
   Scripts,
   useLocation,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -219,13 +219,94 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/manage-admin");
+  const [adBlockDetected, setAdBlockDetected] = useState(false);
 
+  useEffect(() => {
+    const storageKey = "pixelpop_adblock_detected";
 
+    try {
+      setAdBlockDetected(sessionStorage.getItem(storageKey) === "1");
+    } catch {
+      // Storage may be disabled; live detection can still work.
+    }
+
+    const handleAdStatus = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      const data = event.data as {
+        source?: unknown;
+        status?: unknown;
+      } | null;
+
+      if (
+        !data ||
+        data.source !== "pixelpop-ad-banner" ||
+        data.status !== "blocked"
+      ) {
+        return;
+      }
+
+      const isAdFrame = Array.from(
+        document.querySelectorAll<HTMLIFrameElement>('iframe[title="Advertisement"]'),
+      ).some((frame) => frame.contentWindow === event.source);
+
+      if (!isAdFrame) return;
+
+      try {
+        sessionStorage.setItem(storageKey, "1");
+      } catch {
+        // The current page remains gated even when storage is unavailable.
+      }
+      setAdBlockDetected(true);
+    };
+
+    window.addEventListener("message", handleAdStatus);
+    return () => window.removeEventListener("message", handleAdStatus);
+  }, []);
+
+  const retryAfterAllowingAds = () => {
+    try {
+      sessionStorage.removeItem("pixelpop_adblock_detected");
+    } catch {
+      // Continue with a reload when storage is disabled.
+    }
+    window.location.reload();
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
       <PwaInstallPrompt />
       <Outlet />
+      {adBlockDetected && !isAdminPage && (
+        <div
+          className="fixed inset-0 z-[100000] flex min-h-screen items-center justify-center overflow-y-auto bg-background/95 px-4 py-8 backdrop-blur-sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="adblock-gate-title"
+          aria-describedby="adblock-gate-description"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+            <h2 id="adblock-gate-title" className="text-xl font-bold text-foreground">
+              Ads could not load
+            </h2>
+            <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
+              PixelPopLK is supported by advertisements, but an ad script was blocked or could not be reached.
+              To continue using the site, allow ads and third-party scripts for this website, then retry.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Browser protections such as Firefox Enhanced Tracking Protection, Brave Shields, uBlock Origin,
+              AdGuard, or network filtering may cause this. A temporary connection issue can also trigger this notice.
+            </p>
+            <button
+              type="button"
+              onClick={retryAfterAllowingAds}
+              className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              I've allowed ads — retry
+            </button>
+          </div>
+        </div>
+      )}
     </QueryClientProvider>
   );
 }
