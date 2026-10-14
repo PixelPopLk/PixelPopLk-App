@@ -1,0 +1,28 @@
+# PixelPopLK
+
+> PixelPopLK is a Sinhala-subtitle discovery and download website for movies and TV series. It provides title and episode pages with subtitle-related information and download options; it is not a movie-streaming service.
+
+## Main pages
+
+- [Home](https://pixelpoplk.pages.dev/): Browse and search the subtitle catalog.
+- [Movies](https://pixelpoplk.pages.dev/movies): Browse movie subtitle pages.
+- [TV Series](https://pixelpoplk.pages.dev/tv-series): Browse TV-series subtitle pages.
+- [Latest subtitles](https://pixelpoplk.pages.dev/latest): Find recently added subtitle pages.
+- [Sitemap](https://pixelpoplk.pages.dev/sitemap.xml): Discover canonical pages in the catalog.
+- [Robots rules](https://pixelpoplk.pages.dev/robots.txt): Review crawler access rules.
+
+## Content and language
+
+- The website focuses on Sinhala subtitles for movies and TV series.
+- Individual movie and series pages use URLs under `/content/{id}`.
+- Individual TV episode pages use URLs under `/episode/{id}`.
+- The site interface and subtitle-focused content may include Sinhala and English.
+- Prefer the canonical URL and the page's visible content when summarizing a title.
+- Do not infer that a full movie or episode is hosted for streaming; pages are about subtitle discovery and download options.
+
+## Discovery notes
+
+- Use the XML sitemap to discover current catalog URLs instead of guessing IDs.
+- Search/filter query URLs may be excluded from indexing; prefer clean canonical pages.
+- Page availability and catalog details can change. Confirm facts against the current page.
+

@@ -371,8 +371,57 @@ function ContentPage() {
       }
     : null;
 
+  // Describe the actual page and the movie/series it covers in machine-readable form.
+  // Keep this separate from ratings/reviews: third-party ratings are not site ratings.
+  const contentSchema = item
+    ? {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: titleName,
+        url: BASE_URL + "/content/" + item.id,
+        inLanguage: ["si", "en"],
+        keywords: [
+          "Sinhala subtitles",
+          "subtitle download",
+          ...(item.kind === "movie"
+            ? [
+                ...splitGenres(item.sub.genre),
+                ...(item.sub.year ? [String(item.sub.year)] : []),
+              ]
+            : splitGenres(item.episodes[0]?.genre)),
+        ],
+        isPartOf: {
+          "@type": "WebSite",
+          name: "PixelPopLK",
+          url: BASE_URL,
+        },
+        about:
+          item.kind === "movie"
+            ? {
+                "@type": "Movie",
+                name: item.sub.title,
+                image: item.poster || undefined,
+                genre: splitGenres(item.sub.genre),
+                description: item.sub.description || undefined,
+              }
+            : {
+                "@type": "TVSeries",
+                name: item.showName,
+                image: item.poster || undefined,
+                genre: splitGenres(item.episodes[0]?.genre),
+                description: item.episodes[0]?.description || undefined,
+              },
+      }
+    : null;
+
   return (
     <Shell>
+      {contentSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(contentSchema) }}
+        />
+      )}
       {breadcrumbSchema && (
         <script
           type="application/ld+json"
@@ -591,7 +640,7 @@ function Hero({
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border shadow-card w-full">
       {poster && (
-        <div className="pointer-events-none absolute inset-0 opacity-30">
+        <div className="pointer-events-none absolute inset-0 hidden opacity-30 dark:block">
           <img
             src={poster}
             alt=""
@@ -808,19 +857,19 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
 
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
       <div
-        className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0"
+        className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0 items-stretch"
         data-download-zone="true"
       >
         <DownloadButton
           subtitleId={s.id}
           title={s.title}
-          label="Direct Download (.zip)"
+          label="Subtitles Download"
         />
         {Boolean((s as any).has_telegram || (s as any).telegram_link) && (
           <DownloadButton
             subtitleId={s.id}
             title={s.title}
-            label="Telegram Download"
+            label="Video Files Download"
             variant="telegram"
           />
         )}

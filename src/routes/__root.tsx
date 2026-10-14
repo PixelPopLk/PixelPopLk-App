@@ -15,7 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 3000;
+const COOLDOWN_TIME = 5_000;
 
 function NotFoundComponent() {
   return (
@@ -152,7 +152,7 @@ function RootShell({ children }: { children: ReactNode }) {
   const isAdminPage = location.pathname.startsWith("/manage-admin");
 
   return (
-    <html lang="si" className="dark">
+    <html lang="si" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -272,19 +272,12 @@ function RootComponent() {
       sessionStorage.setItem("last_global_ad_time", String(now));
 
       try {
-        const adWindow = window.open(AD_URL, "_blank");
-        if (adWindow) {
-          adWindow.blur();
-          window.focus();
-        }
-      } catch (e) {
-        const a = document.createElement("a");
-        a.href = AD_URL;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Open the smart link immediately on an eligible click. Download buttons
+        // remain excluded above, preserving their existing ad/download flow.
+        const adWindow = window.open(AD_URL, "_blank", "noopener,noreferrer");
+        if (adWindow) adWindow.opener = null;
+      } catch {
+        // If the browser blocks popups, don't interrupt the original site action.
       }
     };
 

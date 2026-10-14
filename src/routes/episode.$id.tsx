@@ -445,11 +445,48 @@ function EpisodePage() {
         }
       : null;
 
+  const episodePageSchema =
+    series && ep
+      ? {
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          name: `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitles`,
+          url: BASE_URL + "/episode/" + ep.id,
+          inLanguage: ["si", "en"],
+          isPartOf: {
+            "@type": "WebSite",
+            name: "PixelPopLK",
+            url: BASE_URL,
+          },
+          about: {
+            "@type": "TVEpisode",
+            name: episodeTitle,
+            episodeNumber: ep.episode,
+            partOfSeason: {
+              "@type": "TVSeason",
+              seasonNumber: ep.season,
+            },
+            partOfSeries: {
+              "@type": "TVSeries",
+              name: series.showName,
+              url: BASE_URL + "/content/" + series.id,
+            },
+            description: ep.description || `Sinhala subtitles for ${series.showName} Season ${ep.season} Episode ${ep.episode}`,
+          },
+        }
+      : null;
+
   const backToUrl = series ? `/content/${series.id}` : "/";
   const backToText = series ? `Back to ${series.showName}` : "Home";
 
   return (
     <EpisodeShell backTo={backToUrl} backText={backToText}>
+      {episodePageSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(episodePageSchema) }}
+        />
+      )}
       {isLoading ? (
         <div className="h-96 rounded-3xl bg-muted/30 animate-pulse" />
       ) : !data ? (
@@ -506,7 +543,7 @@ function EpisodePage() {
 
           <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
             {poster && (
-              <div className="pointer-events-none absolute inset-0 opacity-30">
+              <div className="pointer-events-none absolute inset-0 hidden opacity-30 dark:block">
                 <img
                   src={poster}
                   alt=""
@@ -694,13 +731,13 @@ function EpisodePage() {
 
                 {/* 🟢 Secure Blob Download Buttons */}
                 <div
-                  className="mt-5 flex flex-col sm:flex-row gap-3"
+                  className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch"
                   data-download-zone="true"
                 >
                   <DownloadButton
                     subtitleId={ep.id}
                     title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                    label="Direct Download (.zip)"
+                    label="Subtitles Download"
                   />
                   {Boolean(
                     (ep as any).has_telegram || (ep as any).telegram_link,
@@ -708,7 +745,7 @@ function EpisodePage() {
                     <DownloadButton
                       subtitleId={ep.id}
                       title={`${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`}
-                      label="Telegram Download"
+                      label="Video Files Download"
                       variant="telegram"
                     />
                   )}
