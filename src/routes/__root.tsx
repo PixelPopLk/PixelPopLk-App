@@ -14,9 +14,6 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
-const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 3000;
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -148,9 +145,6 @@ const websiteSchema = {
 };
 
 function RootShell({ children }: { children: ReactNode }) {
-  const location = useLocation();
-  const isAdminPage = location.pathname.startsWith("/manage-admin");
-
   return (
     <html lang="si" className="dark">
       <head>
@@ -226,71 +220,7 @@ function RootComponent() {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/manage-admin");
 
-  useEffect(() => {
-    if (isAdminPage) return;
 
-    const handleGlobalClick = (event: MouseEvent) => {
-      if (window.location.pathname.startsWith("/manage-admin")) return;
-
-      const target = event.target as HTMLElement;
-      if (!target) return;
-
-      const isInsidePopup = target.closest(
-        '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
-        '.modal, .dialog, .popup, [data-radix-dialog-content], ' +
-        '[data-sonner-toast], [data-toast], .toast, [role="alert"], ' +
-        '[class*="overlay"], [class*="backdrop"], [data-no-ad="true"]'
-      );
-      if (isInsidePopup) return;
-
-      const clickable = target.closest("a, button, [role='button'], [data-clickable='true']") as HTMLElement | null;
-      if (!clickable) return;
-
-      const linkElement = clickable.closest("a") as HTMLAnchorElement | null;
-      const targetUrl = linkElement ? linkElement.href : null;
-
-      const isDownloadButton =
-        clickable.hasAttribute("download") ||
-        Boolean(clickable.closest("[download], [data-download], [data-no-ad]")) ||
-        (typeof clickable.className === "string" && /download/i.test(clickable.className)) ||
-        (clickable.id && /download/i.test(clickable.id)) ||
-        (clickable.textContent && /download|බාගන්න/i.test(clickable.textContent)) ||
-        (targetUrl && (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) || /download/i.test(targetUrl)));
-
-      const isTelegramButton =
-        Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
-        Boolean(clickable.textContent && /telegram|ටෙලිග්‍රෑම්/i.test(clickable.textContent)) ||
-        (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
-        (clickable.id && /telegram/i.test(clickable.id));
-
-      if (isDownloadButton || isTelegramButton) return;
-
-      const now = Date.now();
-      const lastGlobalAdTime = Number(sessionStorage.getItem("last_global_ad_time") || 0);
-      if (now - lastGlobalAdTime < COOLDOWN_TIME) return;
-
-      sessionStorage.setItem("last_global_ad_time", String(now));
-
-      try {
-        const adWindow = window.open(AD_URL, "_blank");
-        if (adWindow) {
-          adWindow.blur();
-          window.focus();
-        }
-      } catch (e) {
-        const a = document.createElement("a");
-        a.href = AD_URL;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-    };
-
-    document.addEventListener("click", handleGlobalClick);
-    return () => document.removeEventListener("click", handleGlobalClick);
-  }, [isAdminPage]);
 
   return (
     <QueryClientProvider client={queryClient}>
