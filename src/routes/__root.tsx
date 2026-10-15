@@ -235,9 +235,7 @@ function RootComponent() {
     bait.className = "adsbox ad-placement ad-banner adsbygoogle text-ad";
     bait.setAttribute("aria-hidden", "true");
     bait.style.cssText =
-      "position:absolute!important;top:-10000px!important;left:-10000px!important;" +
-      "display:block!important;width:10px!important;height:10px!important;" +
-      "pointer-events:none!important;";
+      "position:absolute;top:-10000px;left:-10000px;width:10px;height:10px;pointer-events:none;";
     document.body.appendChild(bait);
 
     const detectAdBlocker = () => {
