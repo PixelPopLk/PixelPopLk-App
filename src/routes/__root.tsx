@@ -224,54 +224,43 @@ function RootComponent() {
   const [adBlockDetected, setAdBlockDetected] = useState(false);
 
   useEffect(() => {
-    const storageKey = "pixelpop_adblock_detected";
-
-    try {
-      setAdBlockDetected(sessionStorage.getItem(storageKey) === "1");
-    } catch {
-      // Storage may be disabled; live detection can still work.
+    if (isAdminPage) {
+      setAdBlockDetected(false);
+      return;
     }
 
-    const handleAdStatus = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
+    // Use a local CSS bait test instead of ad-script network errors. This avoids
+    // blocking users whose ordinary internet connection cannot reach an ad host.
+    const bait = document.createElement("div");
+    bait.className = "adsbox ad-placement ad-banner adsbygoogle text-ad";
+    bait.setAttribute("aria-hidden", "true");
+    bait.style.cssText =
+      "position:absolute!important;top:-10000px!important;left:-10000px!important;" +
+      "display:block!important;width:10px!important;height:10px!important;" +
+      "pointer-events:none!important;";
+    document.body.appendChild(bait);
 
-      const data = event.data as {
-        source?: unknown;
-        status?: unknown;
-      } | null;
-
-      if (
-        !data ||
-        data.source !== "pixelpop-ad-banner" ||
-        data.status !== "blocked"
-      ) {
-        return;
-      }
-
-      const isAdFrame = Array.from(
-        document.querySelectorAll<HTMLIFrameElement>('iframe[title="Advertisement"]'),
-      ).some((frame) => frame.contentWindow === event.source);
-
-      if (!isAdFrame) return;
-
-      try {
-        sessionStorage.setItem(storageKey, "1");
-      } catch {
-        // The current page remains gated even when storage is unavailable.
-      }
-      setAdBlockDetected(true);
+    const detectAdBlocker = () => {
+      const style = window.getComputedStyle(bait);
+      const blocked =
+        bait.offsetParent === null ||
+        bait.offsetHeight === 0 ||
+        bait.offsetWidth === 0 ||
+        style.display === "none" ||
+        style.visibility === "hidden";
+      setAdBlockDetected(blocked);
+      bait.remove();
     };
 
-    window.addEventListener("message", handleAdStatus);
-    return () => window.removeEventListener("message", handleAdStatus);
-  }, []);
+    const timer = window.setTimeout(detectAdBlocker, 150);
+    return () => {
+      window.clearTimeout(timer);
+      bait.remove();
+    };
+  }, [isAdminPage, location.pathname]);
 
-  const retryAfterAllowingAds = () => {
-    try {
-      sessionStorage.removeItem("pixelpop_adblock_detected");
-    } catch {
-      // Continue with a reload when storage is disabled.
-    }
+  const retryAfterDisablingAdBlocker = () => {
+    // Do not clear a stored bypass flag: detection is re-run on every route load.
     window.location.reload();
   };
 
@@ -289,30 +278,31 @@ function RootComponent() {
         >
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
             <h2 id="adblock-gate-title" className="text-xl font-bold text-foreground">
-              දැන්වීම් පූරණය වුණේ නැහැ
+              Adblocker එක ක්‍රියාත්මකයි
             </h2>
             <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
-              PixelPopLK නොමිලේ පවත්වාගෙන යාමට දැන්වීම්වලින් ලැබෙන ආදායම උපකාරී වෙනවා. නමුත් දැන්වීම් script එකක්
-              අවහිර වී හෝ ජාල සම්බන්ධතා දෝෂයක් නිසා පූරණය නොවී තිබිය හැක.
+              PixelPopLK පවත්වාගෙන යාමට දැන්වීම් උපකාරී වෙනවා. ඔබගේ browser එකේ හෝ ad-blocking extension එකේ
+              දැන්වීම් අවහිර කිරීම අක්‍රිය කර නැවත උත්සාහ කරන්න.
             </p>
             <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 text-left text-sm leading-6 text-muted-foreground">
-              <p className="font-semibold text-foreground">ඉදිරියට යාමට කළ හැකි දේ</p>
+              <p className="font-semibold text-foreground">Adblocker එක අක්‍රිය කරන්නේ කෙසේද?</p>
               <p className="mt-2">
-                PixelPopLK වෙබ් අඩවිය සඳහා ඔබේ ad-blocker එකේ “Allow ads” හෝ “Whitelist this site” තෝරන්න.
-                ඉන්පසු පහළ බොත්තම ඔබා පිටුව නැවත පූරණය කරන්න.
+                uBlock Origin හෝ AdGuard භාවිතා කරනවා නම් PixelPopLK සඳහා blocking එක අක්‍රිය කරන්න.
+                Brave භාවිතා කරනවා නම් Shields සකස් කරන්න. Firefox භාවිතා කරනවා නම් මෙම වෙබ් අඩවිය සඳහා
+                Enhanced Tracking Protection සැකසුම පරීක්ෂා කරන්න. ඉන්පසු නැවත පූරණය කරන්න.
               </p>
               <p className="mt-2">
-                Firefox Enhanced Tracking Protection, Brave Shields, uBlock Origin, AdGuard හෝ DNS/ජාල පෙරහනක්
-                නිසා දැන්වීම් අවහිර විය හැක. මේ පරීක්ෂාව සම්පූර්ණයෙන්ම නිවැරදි නොවන නිසා සාමාන්‍ය ජාල දෝෂයක්
-                වුණත් මෙම පණිවිඩය පෙන්විය හැක.
+                මෙම පරීක්ෂාව browser එකේ ad-blocking filter එකක් හඳුනාගැනීමට උත්සාහ කරනවා. සියලුම blockers
+                හඳුනාගැනීම සහතික කළ නොහැකි අතර, සාමාන්‍ය ජාල දෝෂයක් පමණක් නිසා මෙම පණිවිඩය නොපෙන්වීමට
+                ad-script load failure එක මත පදනම් නොවේ.
               </p>
             </div>
             <button
               type="button"
-              onClick={retryAfterAllowingAds}
+              onClick={retryAfterDisablingAdBlocker}
               className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              දැන්වීම් ඉඩ දුන්නා — නැවත උත්සාහ කරන්න
+              Adblocker ඕෆ් කර නැවත උත්සාහ කරන්න
             </button>
           </div>
         </div>
