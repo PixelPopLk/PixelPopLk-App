@@ -653,7 +653,7 @@ function Hero({
               <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                 Overview
               </h3>
-              <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line break-words">
+              <p className="text-[15px] leading-relaxed text-foreground/85 whitespace-pre-line break-words text-justify [text-align-last:left]">
                 {description}
               </p>
             </div>
