@@ -8,14 +8,11 @@ import {
   Scripts,
   useLocation,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
-
-const AD_URL = "https://acorntar.com/mavhdyhj78?key=dc67dd9ce96dd9a20b59e14a01a6a093";
-const COOLDOWN_TIME = 3000;
 
 function NotFoundComponent() {
   return (
@@ -148,9 +145,6 @@ const websiteSchema = {
 };
 
 function RootShell({ children }: { children: ReactNode }) {
-  const location = useLocation();
-  const isAdminPage = location.pathname.startsWith("/manage-admin");
-
   return (
     <html lang="si" className="dark">
       <head>
@@ -224,78 +218,92 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const location = useLocation();
-  const isAdminPage = location.pathname.startsWith("/manage-admin");
+  const isAdminPage =
+    location.pathname === "/manage-admin" ||
+    location.pathname.startsWith("/manage-admin/");
+  const [adBlockDetected, setAdBlockDetected] = useState(false);
 
   useEffect(() => {
-    if (isAdminPage) return;
+    if (isAdminPage) {
+      setAdBlockDetected(false);
+      return;
+    }
 
-    const handleGlobalClick = (event: MouseEvent) => {
-      if (window.location.pathname.startsWith("/manage-admin")) return;
+    // Use a local CSS bait test instead of ad-script network errors. This avoids
+    // blocking users whose ordinary internet connection cannot reach an ad host.
+    const bait = document.createElement("div");
+    bait.className = "adsbox ad-placement ad-banner adsbygoogle text-ad";
+    bait.setAttribute("aria-hidden", "true");
+    bait.style.cssText =
+      "position:absolute;top:-10000px;left:-10000px;width:10px;height:10px;pointer-events:none;";
+    document.body.appendChild(bait);
 
-      const target = event.target as HTMLElement;
-      if (!target) return;
-
-      const isInsidePopup = target.closest(
-        '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
-        '.modal, .dialog, .popup, [data-radix-dialog-content], ' +
-        '[data-sonner-toast], [data-toast], .toast, [role="alert"], ' +
-        '[class*="overlay"], [class*="backdrop"], [data-no-ad="true"]'
-      );
-      if (isInsidePopup) return;
-
-      const clickable = target.closest("a, button, [role='button'], [data-clickable='true']") as HTMLElement | null;
-      if (!clickable) return;
-
-      const linkElement = clickable.closest("a") as HTMLAnchorElement | null;
-      const targetUrl = linkElement ? linkElement.href : null;
-
-      const isDownloadButton =
-        clickable.hasAttribute("download") ||
-        Boolean(clickable.closest("[download], [data-download], [data-no-ad]")) ||
-        (typeof clickable.className === "string" && /download/i.test(clickable.className)) ||
-        (clickable.id && /download/i.test(clickable.id)) ||
-        (clickable.textContent && /download|බාගන්න/i.test(clickable.textContent)) ||
-        (targetUrl && (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) || /download/i.test(targetUrl)));
-
-      const isTelegramButton =
-        Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
-        Boolean(clickable.textContent && /telegram|ටෙලිග්‍රෑම්/i.test(clickable.textContent)) ||
-        (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
-        (clickable.id && /telegram/i.test(clickable.id));
-
-      if (isDownloadButton || isTelegramButton) return;
-
-      const now = Date.now();
-      const lastGlobalAdTime = Number(sessionStorage.getItem("last_global_ad_time") || 0);
-      if (now - lastGlobalAdTime < COOLDOWN_TIME) return;
-
-      sessionStorage.setItem("last_global_ad_time", String(now));
-
-      try {
-        const adWindow = window.open(AD_URL, "_blank");
-        if (adWindow) {
-          adWindow.blur();
-          window.focus();
-        }
-      } catch (e) {
-        const a = document.createElement("a");
-        a.href = AD_URL;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
+    const detectAdBlocker = () => {
+      const style = window.getComputedStyle(bait);
+      const blocked =
+        bait.offsetHeight === 0 ||
+        bait.offsetWidth === 0 ||
+        style.display === "none" ||
+        style.visibility === "hidden";
+      setAdBlockDetected(blocked);
+      bait.remove();
     };
 
-    document.addEventListener("click", handleGlobalClick);
-    return () => document.removeEventListener("click", handleGlobalClick);
-  }, [isAdminPage]);
+    const timer = window.setTimeout(detectAdBlocker, 150);
+    return () => {
+      window.clearTimeout(timer);
+      bait.remove();
+    };
+  }, [isAdminPage, location.pathname]);
+
+  const retryAfterDisablingAdBlocker = () => {
+    // Do not clear a stored bypass flag: detection is re-run on every route load.
+    window.location.reload();
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
       <PwaInstallPrompt />
       <Outlet />
+      {adBlockDetected && !isAdminPage && (
+        <div
+          className="fixed inset-0 z-[100000] flex min-h-screen items-center justify-center overflow-y-auto bg-background/95 px-4 py-8 backdrop-blur-sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="adblock-gate-title"
+          aria-describedby="adblock-gate-description"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+            <h2 id="adblock-gate-title" className="text-xl font-bold text-foreground">
+              Adblocker එක ක්‍රියාත්මකයි
+            </h2>
+            <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
+              PixelPopLK පවත්වාගෙන යාමට දැන්වීම් උපකාරී වෙනවා. ඔබගේ browser එකේ හෝ ad-blocking extension එකේ
+              දැන්වීම් අවහිර කිරීම අක්‍රිය කර නැවත උත්සාහ කරන්න.
+            </p>
+            <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 text-left text-sm leading-6 text-muted-foreground">
+              <p className="font-semibold text-foreground">Adblocker එක අක්‍රිය කරන්නේ කෙසේද?</p>
+              <p className="mt-2">
+                uBlock Origin හෝ AdGuard භාවිතා කරනවා නම් PixelPopLK සඳහා blocking එක අක්‍රිය කරන්න.
+                Brave භාවිතා කරනවා නම් Shields සකස් කරන්න. Firefox භාවිතා කරනවා නම් මෙම වෙබ් අඩවිය සඳහා
+                Enhanced Tracking Protection සැකසුම පරීක්ෂා කරන්න. ඉන්පසු නැවත පූරණය කරන්න.
+              </p>
+              <p className="mt-2">
+                මෙම පරීක්ෂාව browser එකේ ad-blocking filter එකක් හඳුනාගැනීමට උත්සාහ කරනවා. සියලුම blockers
+                හඳුනාගැනීම සහතික කළ නොහැකි අතර, සාමාන්‍ය ජාල දෝෂයක් පමණක් නිසා මෙම පණිවිඩය නොපෙන්වීමට
+                ad-script load failure එක මත පදනම් නොවේ.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={retryAfterDisablingAdBlocker}
+              className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Adblocker ඕෆ් කර නැවත උත්සාහ කරන්න
+            </button>
+          </div>
+        </div>
+      )}
     </QueryClientProvider>
   );
 }

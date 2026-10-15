@@ -121,6 +121,7 @@ export function DownloadButton({
   // 🟢 100% Isolated Storage Keys (Subtitle ID + Title + Variant)
   const timeStorageKey = `pxl_timer_${subId}_${titleSlug}_${normalizedVariant}`;
   const lockExpiryKey = `pxl_relock_${subId}_${titleSlug}_${normalizedVariant}`;
+  const sessionTokenKey = `pxl_session_${subId}_${titleSlug}_${normalizedVariant}`;
 
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
@@ -133,15 +134,17 @@ export function DownloadButton({
 
   // Link එක public Supabase client එකෙන් නොගෙන, server endpoint එකෙන් පමණක් ගනී.
   // Service-role key එක browser bundle එකට යන්නේ නැත.
-  const fetchLink = useCallback(async (): Promise<DownloadLinkResult> => {
+  const fetchLink = useCallback(async (sessionToken: string): Promise<DownloadLinkResult> => {
     if (!subtitleId) return { link: null };
     try {
       const response = await fetch("/api/download-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "claim",
           subtitleId: Number(subtitleId),
           variant: normalizedVariant,
+          sessionToken,
         }),
       });
 
@@ -187,14 +190,15 @@ export function DownloadButton({
     try {
       localStorage.removeItem(timeStorageKey);
       localStorage.removeItem(lockExpiryKey);
+      localStorage.removeItem(sessionTokenKey);
     } catch {
       /* noop */
     }
-  }, [timeStorageKey, lockExpiryKey]);
+  }, [timeStorageKey, lockExpiryKey, sessionTokenKey]);
 
   // Live Ticker
   const startLiveCountdown = useCallback(
-    (startTime: number) => {
+    (startTime: number, sessionToken: string) => {
       if (tickerRef.current) clearInterval(tickerRef.current);
 
       const tick = () => {
@@ -209,7 +213,7 @@ export function DownloadButton({
           if (tickerRef.current) clearInterval(tickerRef.current);
           // Link එක countdown ආරම්භ වන විට fetch නොකර මෙතැනදී පමණක් ඉල්ලයි.
           // එම නිසා network tab එකකින් ad timer එක අතරතුර link එක ලබාගත නොහැක.
-          void fetchLink().then(({ link, error }) => {
+          void fetchLink(sessionToken).then(({ link, error }) => {
             if (!link || !isSafeUrl(link)) {
               setErrorMsg(
                 error ||
@@ -241,6 +245,7 @@ export function DownloadButton({
   // Ad Time Verify කිරීම
   const verifyAdTime = useCallback(async () => {
     try {
+      const sessionToken = localStorage.getItem(sessionTokenKey);
       const expireAtStr = localStorage.getItem(lockExpiryKey);
       if (expireAtStr) {
         const expireAt = parseInt(expireAtStr, 10);
@@ -257,7 +262,7 @@ export function DownloadButton({
       }
 
       const startTimeStr = localStorage.getItem(timeStorageKey);
-      if (!startTimeStr) return;
+      if (!startTimeStr || !sessionToken) return;
 
       const startTime = parseInt(startTimeStr, 10);
       const elapsedMs = Date.now() - startTime;
@@ -269,11 +274,16 @@ export function DownloadButton({
       }
 
       if (elapsedMs >= REQUIRED_AD_SECONDS * 1000) {
-        setState("ready");
-        const link = await fetchLink();
-        if (link && isSafeUrl(link)) {
-          setDownloadLink(link);
+        setState("verifying");
+        const result = await fetchLink(sessionToken);
+        if (!result.link || !isSafeUrl(result.link)) {
+          setErrorMsg(result.error || "Verification කල් ඉකුත් වී ඇත. නැවත උත්සාහ කරන්න.");
+          resetToLocked();
+          setTimeout(() => setErrorMsg(""), 6000);
+          return;
         }
+        setDownloadLink(result.link);
+        setState("ready");
 
         // ඉතිරිව ඇති තත්පර ගණනට validity timer එක සැකසීම
         const remainingValidity = MAX_UNLOCK_VALIDITY_MS - elapsedMs;
@@ -283,7 +293,7 @@ export function DownloadButton({
         }, remainingValidity);
       } else {
         setState("verifying");
-        startLiveCountdown(startTime);
+        startLiveCountdown(startTime, sessionToken);
       }
     } catch {
       /* noop */
@@ -291,6 +301,7 @@ export function DownloadButton({
   }, [
     lockExpiryKey,
     timeStorageKey,
+    sessionTokenKey,
     resetToLocked,
     fetchLink,
     startLiveCountdown,
@@ -321,13 +332,6 @@ export function DownloadButton({
     e.stopPropagation();
 
     if (state === "locked") {
-      const now = Date.now();
-      try {
-        localStorage.setItem(timeStorageKey, String(now));
-      } catch {
-        /* noop */
-      }
-
       const activeAdUrl = getRandomAdUrl();
       try {
         const w = window.open(activeAdUrl, "_blank", "noopener");
@@ -336,8 +340,34 @@ export function DownloadButton({
         /* noop */
       }
 
-      setState("verifying");
-      startLiveCountdown(now);
+      // A browser countdown alone is bypassable. Ask the server for a short-lived
+      // one-use session before starting the UI timer.
+      try {
+        const response = await fetch("/api/download-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "start",
+            subtitleId: Number(subtitleId),
+            variant: normalizedVariant,
+          }),
+        });
+        const data = (await response.json()) as { sessionToken?: unknown; error?: unknown };
+        if (!response.ok || typeof data.sessionToken !== "string") {
+          setErrorMsg(typeof data.error === "string" ? data.error : "Verification ආරම්භ කළ නොහැක. නැවත උත්සාහ කරන්න.");
+          setTimeout(() => setErrorMsg(""), 6000);
+          return;
+        }
+
+        const now = Date.now();
+        localStorage.setItem(timeStorageKey, String(now));
+        localStorage.setItem(sessionTokenKey, data.sessionToken);
+        setState("verifying");
+        startLiveCountdown(now, data.sessionToken);
+      } catch {
+        setErrorMsg("Verification සේවාවට සම්බන්ධ විය නොහැක. නැවත උත්සාහ කරන්න.");
+        setTimeout(() => setErrorMsg(""), 6000);
+      }
       return;
     }
 
