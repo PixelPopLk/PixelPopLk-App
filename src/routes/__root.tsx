@@ -241,7 +241,6 @@ function RootComponent() {
     const detectAdBlocker = () => {
       const style = window.getComputedStyle(bait);
       const blocked =
-        bait.offsetParent === null ||
         bait.offsetHeight === 0 ||
         bait.offsetWidth === 0 ||
         style.display === "none" ||
