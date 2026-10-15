@@ -14,6 +14,16 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
+const MONETAG_CLICK_AD_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
+const ADSTERRA_CLICK_AD_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+const CLICK_AD_COOLDOWN_MS = 15_000;
+// Shared with Sidebar.tsx so one click cannot open two sponsor tabs.
+const LAST_CLICK_AD_STORAGE_KEY = "pxl_sidebar_last_ad_time";
+
+function getClickAdUrl() {
+  return Math.random() < 0.5 ? MONETAG_CLICK_AD_URL : ADSTERRA_CLICK_AD_URL;
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -229,32 +239,138 @@ function RootComponent() {
       return;
     }
 
-    // Use a local CSS bait test instead of ad-script network errors. This avoids
-    // blocking users whose ordinary internet connection cannot reach an ad host.
-    const bait = document.createElement("div");
-    bait.className = "adsbox ad-placement ad-banner adsbygoogle text-ad";
-    bait.setAttribute("aria-hidden", "true");
-    bait.style.cssText =
-      "position:absolute;top:-10000px;left:-10000px;width:10px;height:10px;pointer-events:none;";
-    document.body.appendChild(bait);
+    // Several common CSS bait selectors improve coverage across blocker lists.
+    // No ad-network request is used as a signal, so a simple network outage
+    // alone will not incorrectly lock a visitor out.
+    const baitClasses = [
+      "adsbox",
+      "ad-placement",
+      "ad-banner",
+      "adsbygoogle",
+      "text-ad",
+      "ad-unit",
+      "ad-slot",
+      "advertisement",
+      "sponsored-content",
+    ];
+    const baits = baitClasses.map((className) => {
+      const bait = document.createElement("div");
+      bait.className = className;
+      bait.setAttribute("aria-hidden", "true");
+      bait.style.cssText =
+        "position:absolute;top:-10000px;left:-10000px;width:10px;height:10px;pointer-events:none;";
+      document.body.appendChild(bait);
+      return bait;
+    });
 
     const detectAdBlocker = () => {
-      const style = window.getComputedStyle(bait);
-      const blocked =
-        bait.offsetHeight === 0 ||
-        bait.offsetWidth === 0 ||
-        style.display === "none" ||
-        style.visibility === "hidden";
+      const blocked = baits.some((bait) => {
+        const style = window.getComputedStyle(bait);
+        return (
+          bait.offsetHeight === 0 ||
+          bait.offsetWidth === 0 ||
+          style.display === "none" ||
+          style.visibility === "hidden"
+        );
+      });
       setAdBlockDetected(blocked);
-      bait.remove();
+      baits.forEach((bait) => bait.remove());
     };
 
     const timer = window.setTimeout(detectAdBlocker, 150);
     return () => {
       window.clearTimeout(timer);
-      bait.remove();
+      baits.forEach((bait) => bait.remove());
     };
   }, [isAdminPage, location.pathname]);
+
+  // Restore the site-wide smartlink trigger removed in the previous change.
+  // Keep it limited by a cooldown and exclude download, Telegram, modal and
+  // admin interactions. Sidebar.tsx shares the same key to avoid double opens.
+  useEffect(() => {
+    if (isAdminPage || adBlockDetected) return;
+
+    const handleGlobalClick = (event: MouseEvent) => {
+      if (
+        window.location.pathname === "/manage-admin" ||
+        window.location.pathname.startsWith("/manage-admin/")
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const isInsidePopup = target.closest(
+        '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
+          ".modal, .dialog, .popup, [data-radix-dialog-content], " +
+          "[data-sonner-toast], [data-toast], .toast, [role='alert'], " +
+          '[class*="overlay"], [class*="backdrop"], [data-no-ad="true"]',
+      );
+      if (isInsidePopup) return;
+
+      const clickable = target.closest(
+        "a, button, [role='button'], [data-clickable='true']",
+      ) as HTMLElement | null;
+      if (!clickable) return;
+
+      const linkElement = clickable.closest("a") as HTMLAnchorElement | null;
+      const targetUrl = linkElement?.href ?? null;
+
+      if (targetUrl) {
+        try {
+          const targetPath = new URL(targetUrl, window.location.href).pathname;
+          if (
+            targetPath === "/manage-admin" ||
+            targetPath.startsWith("/manage-admin/")
+          ) {
+            return;
+          }
+        } catch {
+          // Ignore malformed link targets and continue with the normal checks.
+        }
+      }
+
+      const clickableText = clickable.textContent ?? "";
+      const isDownloadButton =
+        clickable.hasAttribute("download") ||
+        Boolean(clickable.closest("[download], [data-download], [data-no-ad='true']")) ||
+        (typeof clickable.className === "string" && /download/i.test(clickable.className)) ||
+        Boolean(clickable.id && /download/i.test(clickable.id)) ||
+        /download|බාගන්න/i.test(clickableText) ||
+        Boolean(
+          targetUrl &&
+            (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) ||
+              /download/i.test(targetUrl)),
+        );
+
+      const isTelegramButton =
+        Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
+        /telegram|ටෙලිග්‍රෑම්/i.test(clickableText) ||
+        (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
+        Boolean(clickable.id && /telegram/i.test(clickable.id));
+
+      if (isDownloadButton || isTelegramButton) return;
+
+      const now = Date.now();
+      try {
+        const lastAdTime = Number(localStorage.getItem(LAST_CLICK_AD_STORAGE_KEY) || 0);
+        if (Number.isFinite(lastAdTime) && now - lastAdTime < CLICK_AD_COOLDOWN_MS) {
+          return;
+        }
+        localStorage.setItem(LAST_CLICK_AD_STORAGE_KEY, String(now));
+      } catch {
+        // If storage is disabled, the popup is still only attempted on a click.
+      }
+
+      // The real click keeps this user-initiated. Do not disguise or proxy the
+      // destination: extensions may still block this URL, which is expected.
+      window.open(getClickAdUrl(), "_blank", "noopener,noreferrer");
+    };
+
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  }, [isAdminPage, adBlockDetected]);
 
   const retryAfterDisablingAdBlocker = () => {
     // Do not clear a stored bypass flag: detection is re-run on every route load.
