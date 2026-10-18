@@ -46,6 +46,8 @@ import {
   EyeOff,
   RotateCcw,
   FastForward,
+  Link2,
+  ExternalLink,
 } from "lucide-react";
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
 import { splitGenres, genreBadgeClass, buildGridItems, parseTitle, cleanShowName } from "@/lib/subtitles";
@@ -453,7 +455,12 @@ type Status =
 
 function Dashboard() {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"subtitles" | "requests" | "analytics">("subtitles");
+  const [activeTab, setActiveTab] = useState<"subtitles" | "links" | "requests" | "analytics">("subtitles");
+  const [linkSearch, setLinkSearch] = useState("");
+  const [linkEditId, setLinkEditId] = useState<Subtitle["id"] | null>(null);
+  const [linkDraft, setLinkDraft] = useState({ download_link: "", telegram_link: "" });
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkStatus, setLinkStatus] = useState<Status>({ type: "idle" });
   const [form, setForm] = useState<FormState>(EMPTY);
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [search, setSearch] = useState("");
@@ -1259,6 +1266,16 @@ function Dashboard() {
             <Plus className="w-4 h-4" /> Add & Manage Subtitles
           </button>
           <button
+            onClick={() => setActiveTab("links")}
+            className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${
+              activeTab === "links"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Link2 className="w-4 h-4" /> Link Manager
+          </button>
+          <button
             onClick={() => setActiveTab("analytics")}
             className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${
               activeTab === "analytics"
@@ -1974,6 +1991,174 @@ function Dashboard() {
         )}
 
         {/* 🟢 ADVANCED INTELLIGENCE & ANALYTICS SUITE */}
+        {activeTab === "links" && (
+          <section className="space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight">Link Manager</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Find a movie or episode, update its download/Telegram links, or remove an outdated entry.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("subtitles");
+                  setForm(EMPTY);
+                  setStatus({ type: "idle" });
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" /> Add new subtitle / link
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card-elevated p-4 sm:p-5 space-y-4">
+              <label className="relative block">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={linkSearch}
+                  onChange={(e) => setLinkSearch(e.target.value)}
+                  placeholder="Search title, show, or episode…"
+                  className="w-full rounded-xl border border-border bg-muted/50 py-3 pl-10 pr-4 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>{(rows ?? []).filter((r: any) => !linkSearch.trim() || String(r.title ?? "").toLowerCase().includes(linkSearch.trim().toLowerCase())).length} entries</span>
+                <span>Changes are saved directly to the database.</span>
+              </div>
+              {linkStatus.type === "success" && <p className="text-sm text-emerald-500">{linkStatus.msg}</p>}
+              {linkStatus.type === "error" && <p className="text-sm text-destructive">{linkStatus.msg}</p>}
+
+              <div className="space-y-3">
+                {(rows ?? [])
+                  .filter((r: any) => !linkSearch.trim() || String(r.title ?? "").toLowerCase().includes(linkSearch.trim().toLowerCase()))
+                  .slice(0, 250)
+                  .map((r: any) => {
+                    const editingLinks = String(linkEditId) === String(r.id);
+                    return (
+                      <article key={String(r.id)} className="rounded-xl border border-border/80 bg-background/50 p-3 sm:p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="break-words text-sm font-bold">{r.title}</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {r.season != null || r.episode != null ? `Season ${r.season ?? "?"} · Episode ${r.episode ?? "?"}` : "Movie / standalone"}
+                              {" · ID "}{String(r.id)}
+                            </p>
+                          </div>
+                          {!editingLinks && (
+                            <div className="flex shrink-0 flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLinkEditId(r.id);
+                                  setLinkDraft({ download_link: String(r.download_link ?? ""), telegram_link: String(r.telegram_link ?? "") });
+                                  setLinkStatus({ type: "idle" });
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
+                              >
+                                <Pencil className="h-3.5 w-3.5" /> Edit links
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void remove(r)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete entry
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {editingLinks ? (
+                          <div className="mt-4 grid gap-3">
+                            <label className="block text-xs font-semibold">
+                              Download link
+                              <input
+                                type="url"
+                                value={linkDraft.download_link}
+                                onChange={(e) => setLinkDraft((v) => ({ ...v, download_link: e.target.value }))}
+                                placeholder="https://…"
+                                required
+                                className="mt-1.5 w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-sm font-normal outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="block text-xs font-semibold">
+                              Telegram link (optional)
+                              <input
+                                type="url"
+                                value={linkDraft.telegram_link}
+                                onChange={(e) => setLinkDraft((v) => ({ ...v, telegram_link: e.target.value }))}
+                                placeholder="https://t.me/…"
+                                className="mt-1.5 w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-sm font-normal outline-none focus:border-primary"
+                              />
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={linkSaving || !/^https?:\/\//i.test(linkDraft.download_link.trim()) || (!!linkDraft.telegram_link.trim() && !/^https?:\/\//i.test(linkDraft.telegram_link.trim()))}
+                                onClick={async () => {
+                                  setLinkSaving(true);
+                                  setLinkStatus({ type: "idle" });
+                                  const { error } = await supabase.from(SUBTITLES_TABLE)
+                                    .update({
+                                      download_link: linkDraft.download_link.trim(),
+                                      telegram_link: linkDraft.telegram_link.trim() || null,
+                                    })
+                                    .eq("id", r.id);
+                                  setLinkSaving(false);
+                                  if (error) {
+                                    setLinkStatus({ type: "error", msg: `Could not update ${r.title}: ${error.message}` });
+                                    return;
+                                  }
+                                  setLinkStatus({ type: "success", msg: `Links updated for “${r.title}”.` });
+                                  setLinkEditId(null);
+                                  qc.invalidateQueries({ queryKey: ["subtitles"] });
+                                  await refetch();
+                                }}
+                                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                              >
+                                {linkSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                Save links
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setLinkEditId(null)}
+                                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold hover:bg-muted"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                            <div className="min-w-0 rounded-lg bg-muted/40 p-2.5">
+                              <p className="mb-1 font-semibold text-muted-foreground">Download</p>
+                              {r.download_link ? (
+                                <a href={r.download_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 break-all text-primary hover:underline">
+                                  <ExternalLink className="h-3 w-3 shrink-0" /> {String(r.download_link)}
+                                </a>
+                              ) : <span className="text-amber-500">Missing download link</span>}
+                            </div>
+                            <div className="min-w-0 rounded-lg bg-muted/40 p-2.5">
+                              <p className="mb-1 font-semibold text-muted-foreground">Telegram</p>
+                              {r.telegram_link ? (
+                                <a href={r.telegram_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 break-all text-primary hover:underline">
+                                  <ExternalLink className="h-3 w-3 shrink-0" /> {String(r.telegram_link)}
+                                </a>
+                              ) : <span className="text-muted-foreground">No Telegram link</span>}
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                {(rows ?? []).filter((r: any) => !linkSearch.trim() || String(r.title ?? "").toLowerCase().includes(linkSearch.trim().toLowerCase())).length > 250 && (
+                  <p className="text-center text-xs text-muted-foreground">Showing the first 250 matches. Search to narrow the list.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {activeTab === "analytics" && (
           <section className="space-y-6">
             {/* Header & Sub-Tab Switcher */}
