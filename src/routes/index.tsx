@@ -1139,7 +1139,7 @@ function FilterTabs({ active, onChange }: { active: Category; onChange: (c: Cate
   );
 }
 
-const ROW_PAGE_SIZE = 24;
+const ROW_PAGE_SIZE = 18;
 
 function Row({ 
   title, 
@@ -1190,7 +1190,10 @@ function Row({
   const visibleItems = items.slice(0, visibleCount);
 
   return (
-    <div className="group/row relative">
+    <div
+      className="group/row relative"
+      style={{ contentVisibility: "auto", containIntrinsicSize: "0 520px" }}
+    >
       <div className="flex items-end justify-between mb-3 px-0.5">
         <h3 className="flex items-center gap-2 text-lg sm:text-xl font-bold tracking-tight">
           <span className="text-primary">{icon}</span>
