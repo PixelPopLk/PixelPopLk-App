@@ -82,7 +82,7 @@ export function AdvertisingPromotion() {
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-[100000] flex items-center justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm"
+          className="fixed inset-0 z-[100000] flex items-center justify-center overflow-y-auto modal-backdrop px-3 py-5 backdrop-blur-sm"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) close();
