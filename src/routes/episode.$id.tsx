@@ -23,6 +23,7 @@ import {
 
 import { ShareCardModal } from "@/components/ShareCardModal";
 import { DmcaModal } from "@/components/DmcaModal";
+import { AdvertisingPromotion } from "@/components/AdvertisingPromotion";
 import { FacebookIcon, TelegramIcon } from "@/components/SocialIcons";
 
 import {
@@ -605,53 +606,7 @@ function EpisodePage() {
                   </div>
                 )}
 
-                {/* 🟢 Technical Subtitle Details & Compatibility Box (Fights Thin-Page Penalty) */}
-                <div className="mt-6 p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" /> Subtitle Specifications
-                    &amp; Compatibility
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                    <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                      <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-                        Format
-                      </span>
-                      <span className="font-bold text-foreground">
-                        .SRT (in .ZIP)
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                      <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-                        Language
-                      </span>
-                      <span className="font-bold text-foreground">
-                        සිංහල (Sinhala)
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                      <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-                        Episode
-                      </span>
-                      <span className="font-bold text-foreground">
-                        S{String(ep.season).padStart(2, "0")}E
-                        {String(ep.episode).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                      <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-                        Encoding
-                      </span>
-                      <span className="font-bold text-foreground">
-                        UTF-8 Clean
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
-                    මෙම කථාංගයේ උපසිරැසිය VLC Media Player, MX Player, Smart TV
-                    ඇතුළු ඕනෑම player එකක පැහැදිලි සිංහල අකුරු සහිතව ධාවනය වේ.
-                    වීඩියෝ ගොනුවේ නම සහ උපසිරැසි ගොනුවේ නම (.srt) සමානව තබන්න.
-                  </p>
-                </div>
+                <AdvertisingPromotion />
 
                 {/* 🟢 Ad 1: 300x250 Ad Banner */}
                 <div className="my-4">
