@@ -61,8 +61,11 @@ const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
+  // Accept only plain positive decimal IDs. Number() alone also accepts
+  // values such as hexadecimal or scientific notation that are not route IDs.
+  if (!/^\\d+$/.test(id)) throw notFound();
   const numericId = Number(id);
-  if (!Number.isInteger(numericId) || numericId <= 0) throw notFound();
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) throw notFound();
 
   let targetItem: any = null;
   let firstError: any = null;
