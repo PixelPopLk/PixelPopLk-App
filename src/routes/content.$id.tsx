@@ -601,7 +601,7 @@ function Hero({
             decoding="async"
             className="w-full h-full object-cover blur-lg scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95 media-shade" />
         </div>
       )}
       <div className="relative grid md:grid-cols-[320px_1fr] gap-0 w-full min-w-0">
@@ -1032,7 +1032,7 @@ function RelatedContentSection({ currentItem }: { currentItem: GridItem }) {
                 decoding="async"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
-              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/95 via-black/60 to-transparent">
+              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/95 via-black/60 to-transparent media-shade">
                 <p className="text-[11px] font-bold text-white truncate">
                   {itemTitle(it)}
                 </p>
