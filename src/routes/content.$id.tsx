@@ -1096,7 +1096,7 @@ function SeoTagsCloud({
           <Link
             key={tag}
             to="/"
-            search={{ q: cleanTitle }}
+            search={{ q: tag }}
             className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground border border-border/60 transition"
           >
             #{tag}
