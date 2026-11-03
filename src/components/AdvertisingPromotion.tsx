@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Megaphone, X, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Megaphone, X, Send, ArrowUpRight, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 type Placement = "Website" | "Telegram Channel" | "Website + Telegram";
 
@@ -52,27 +52,32 @@ export function AdvertisingPromotion() {
 
   return (
     <>
-      <section className="mt-6 rounded-2xl border border-primary/25 bg-card p-5 shadow-sm sm:p-6">
-        <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-            <Megaphone className="h-5 w-5" />
+      <section className="relative mt-6 overflow-hidden rounded-3xl border border-violet-400/20 bg-gradient-to-br from-violet-500/[0.10] via-card to-indigo-500/[0.08] px-5 py-7 text-center shadow-[0_12px_36px_rgba(79,70,229,0.08)] sm:px-8 sm:py-8">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-violet-500/[0.08] blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-12 h-40 w-40 rounded-full bg-indigo-500/[0.08] blur-3xl" />
+        <div className="relative mx-auto flex max-w-xl flex-col items-center">
+          <div className="grid h-14 w-14 place-items-center rounded-2xl border border-violet-300/20 bg-violet-500/10 text-violet-400 shadow-inner shadow-violet-500/10">
+            <Megaphone className="h-6 w-6" />
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-bold leading-snug text-foreground sm:text-lg">
-              ඔබගේ දැන්වීම් ප්‍රචාරය කරගන්න කැමතිද?
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              අපගේ Telegram Channel එක සහ Website එක හරහා ඔබගේ දැන්වීම් පළකරවා ගැනීමට අවශ්‍යද?
-            </p>
-            <button
-              type="button"
-              onClick={() => setIsOpen(true)}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:w-auto"
-            >
-              <Send className="h-4 w-4" />
-              ඔව්! දැන්වීමක් පළකරන්න
-            </button>
-          </div>
+          <h2 className="mt-4 text-lg font-extrabold leading-snug tracking-tight text-foreground sm:text-xl">
+            ඔබගේ දැන්වීම් ප්‍රචාරය කරගන්න කැමතිද?
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground sm:text-[15px]">
+            අපගේ Telegram Channel එක සහ Website එක හරහා ඔබගේ දැන්වීම් පළකරවා ගැනීමට අවශ්‍යද?
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="group mt-6 inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-violet-300/25 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_14px_32px_rgba(99,102,241,0.34)] active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 sm:w-auto sm:min-w-72"
+          >
+            <span>ඔව්! දැන්වීමක් පළකරන්න</span>
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/15 transition-transform group-hover:translate-x-0.5">
+              <ArrowUpRight className="h-4 w-4" />
+            </span>
+          </button>
+          <p className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground/75">
+            WEBSITE  •  TELEGRAM CHANNEL
+          </p>
         </div>
       </section>
 
