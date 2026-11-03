@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Download, X, Smartphone, Sparkles, Megaphone, Send } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
