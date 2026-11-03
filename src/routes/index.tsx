@@ -994,8 +994,8 @@ function Hero({
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = "0")}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/10 media-shade" />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent media-shade" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent" />
 
               <div className="relative h-full flex items-end sm:items-center">
                 <div className="p-6 sm:p-10 max-w-2xl">
@@ -1325,7 +1325,7 @@ function SubtitleCard({
               </span>
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition media-shade">
+          <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-white">
               <Download className="w-3.5 h-3.5 text-primary" /> View details
             </div>
