@@ -300,7 +300,7 @@ function SeriesCard({ item }: { item: Extract<GridItem, { kind: "series" }> }) {
             {seasonCount} S · {item.episodes.length} EP
           </span>
         </div>
-        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition media-shade">
+        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-white">
             <Download className="w-3.5 h-3.5 text-primary" /> View Episodes
           </div>
