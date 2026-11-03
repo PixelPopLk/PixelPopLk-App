@@ -71,7 +71,7 @@ export function AdvertisingRequestCard() {
 
       {isFormOpen && (
         <div
-          className="fixed inset-0 z-[100002] flex items-center justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-5"
+          className="fixed inset-0 z-[100002] flex items-center justify-center overflow-y-auto modal-backdrop p-3 backdrop-blur-sm sm:p-5"
           role="dialog"
           aria-modal="true"
           aria-labelledby="advertising-request-title"
