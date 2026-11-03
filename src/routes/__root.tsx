@@ -156,19 +156,21 @@ const websiteSchema = {
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="si" className="dark">
+    <html lang="si">
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               try {
                 var theme = localStorage.getItem('theme');
-                if (theme === 'light') {
-                  document.documentElement.classList.remove('dark');
-                } else if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  document.documentElement.classList.add('dark');
-                }
-              } catch (e) {}
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.classList.toggle(
+                  'dark',
+                  theme === 'dark' || (!theme && prefersDark)
+                );
+              } catch (e) {
+                document.documentElement.classList.remove('dark');
+              }
             `,
           }}
         />

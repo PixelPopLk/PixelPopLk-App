@@ -416,23 +416,32 @@ export function DownloadButton({
       case "locked":
         return (
           <>
-            <Lock className="w-4 h-4" />
-            <span>
-              {normalizedVariant === "telegram"
-                ? "🔓 Unlock Video File (Telegram)"
-                : "🔓 Unlock Sinhala Subtitle (.zip)"}
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15 ring-1 ring-white/20">
+              <Lock className="h-5 w-5" />
             </span>
+            <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
+              <span className="text-sm font-extrabold leading-tight sm:text-base">
+                {normalizedVariant === "telegram" ? "Unlock Video File" : "Unlock Sinhala Subtitles"}
+              </span>
+              <span className="text-[11px] font-medium leading-tight opacity-80">
+                {normalizedVariant === "telegram" ? "Open video through Telegram" : "Download subtitle package (.ZIP)"}
+              </span>
+            </span>
+            <span className="shrink-0 rounded-lg bg-white/15 px-2.5 py-1.5 text-[11px] font-bold ring-1 ring-white/15">UNLOCK</span>
           </>
         );
 
       case "verifying":
         return (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>
-              {remainingSec > 0
-                ? `⏳ Unlocking... ${remainingSec}s`
-                : "Preparing Link..."}
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col items-start text-left">
+              <span className="text-sm font-extrabold">Preparing your link</span>
+              <span className="text-[11px] font-medium opacity-80">
+                {remainingSec > 0 ? `Please wait ${remainingSec}s` : "Almost ready..."}
+              </span>
             </span>
           </>
         );
@@ -440,54 +449,54 @@ export function DownloadButton({
       case "ready":
         return (
           <>
-            {normalizedVariant === "telegram" ? (
-              <Send className="w-4 h-4" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            <span className="font-extrabold">
-              {label ||
-                (normalizedVariant === "telegram"
-                  ? "Get Video File (Telegram)"
-                  : "Download Subtitle (.zip)")}
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15 ring-1 ring-white/20">
+              {normalizedVariant === "telegram" ? <Send className="h-5 w-5" /> : <Download className="h-5 w-5" />}
             </span>
+            <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
+              <span className="text-sm font-extrabold leading-tight sm:text-base">
+                {label || (normalizedVariant === "telegram" ? "Open Video in Telegram" : "Download Sinhala Subtitles")}
+              </span>
+              <span className="text-[11px] font-medium leading-tight opacity-80">Your link is ready</span>
+            </span>
+            <CheckCircle2 className="h-5 w-5 shrink-0" />
           </>
         );
 
       case "downloading":
         return (
           <>
-            <CheckCircle2 className="w-4 h-4 text-white animate-pulse" />
-            <span>Starting Download...</span>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15">
+              <CheckCircle2 className="h-5 w-5 animate-pulse" />
+            </span>
+            <span className="flex flex-1 flex-col items-start text-left">
+              <span className="text-sm font-extrabold">Starting download...</span>
+              <span className="text-[11px] font-medium opacity-80">Please wait</span>
+            </span>
           </>
         );
     }
   };
 
   const getButtonClass = () => {
-    const base =
-      "inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-bold text-sm transition-all duration-300 cursor-pointer shadow-lg active:scale-95 select-none";
-
+    const base = "group relative inline-flex min-h-[76px] w-full max-w-md items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3.5 text-left font-semibold transition-all duration-200 active:scale-[0.985] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
     switch (state) {
       case "locked":
         return normalizedVariant === "telegram"
-          ? `${base} bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_4px_15px_rgba(14,165,233,0.35)] hover:opacity-95`
-          : `${base} bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95`;
-
+          ? base + " border-sky-400/30 bg-gradient-to-r from-sky-600 via-blue-600 to-blue-700 text-white focus-visible:ring-sky-400"
+          : base + " border-rose-400/30 bg-gradient-to-r from-rose-600 via-rose-600 to-red-700 text-white focus-visible:ring-rose-400";
       case "verifying":
-        return `${base} bg-indigo-600 text-white animate-pulse border border-indigo-400/30`;
-
+        return base + " border-indigo-300/30 bg-gradient-to-r from-indigo-600 to-violet-700 text-white focus-visible:ring-indigo-400";
       case "ready":
       case "downloading":
-        return `${base} bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_4px_20px_rgba(16,185,129,0.45)] hover:scale-105`;
+        return base + " border-emerald-300/30 bg-gradient-to-r from-emerald-600 to-teal-700 text-white focus-visible:ring-emerald-400";
     }
   };
 
   return (
-    <div className="flex flex-col items-center gap-1.5 w-full">
-      <span className="text-[11px] sm:text-xs text-muted-foreground/90 font-medium flex items-center justify-center gap-1.5 px-2 py-0.5 text-center select-none">
-        <Info className="w-3.5 h-3.5 text-primary shrink-0" />
-        Unlock ක්ලික් කර තත්පර 5ක් රැඳී සිට නැවත මෙහි එන්න (Back වෙන්න)
+    <div className="flex w-full flex-col items-center gap-2.5">
+      <span className="flex items-center justify-center gap-1.5 px-2 text-center text-[11px] font-medium leading-relaxed text-muted-foreground/90 select-none sm:text-xs">
+        <Info className="h-3.5 w-3.5 shrink-0 text-primary" />
+        Unlock කර තත්පර 5ක් රැඳී සිට නැවත මෙම පිටුවට එන්න
       </span>
 
       <button

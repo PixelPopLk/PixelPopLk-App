@@ -29,6 +29,7 @@ import {
 
 import { ShareCardModal } from "@/components/ShareCardModal";
 import { DmcaModal } from "@/components/DmcaModal";
+import { AdvertisingPromotion } from "@/components/AdvertisingPromotion";
 import { FacebookIcon, TelegramIcon } from "@/components/SocialIcons";
 
 import {
@@ -591,7 +592,7 @@ function Hero({
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border shadow-card w-full">
       {poster && (
-        <div className="pointer-events-none absolute inset-0 opacity-30">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.06] dark:opacity-30">
           <img
             src={poster}
             alt=""
@@ -600,7 +601,7 @@ function Hero({
             decoding="async"
             className="w-full h-full object-cover blur-lg scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/90 to-white/95 dark:from-black/60 dark:via-black/85 dark:to-black/95" />
         </div>
       )}
       <div className="relative grid md:grid-cols-[320px_1fr] gap-0 w-full min-w-0">
@@ -733,44 +734,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(movieSchema) }}
       />
 
-      {/* 🟢 Technical Subtitle Details & Compatibility Box (Fights Thin-Page Penalty) */}
-      <div className="mt-6 p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" /> Subtitle Specifications &amp;
-          Compatibility
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-              Format
-            </span>
-            <span className="font-bold text-foreground">.SRT (in .ZIP)</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-              Language
-            </span>
-            <span className="font-bold text-foreground">සිංහල (Sinhala)</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-              Sync Version
-            </span>
-            <span className="font-bold text-foreground">BluRay / WEB-DL</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block uppercase font-medium">
-              Encoding
-            </span>
-            <span className="font-bold text-foreground">UTF-8 Clean</span>
-          </div>
-        </div>
-        <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
-          මෙම උපසිරැසිය VLC Media Player, MX Player, Smart TV ඇතුළු ඕනෑම player
-          එකක පැහැදිලි සිංහල අකුරු සහිතව ක්‍රියාත්මක වේ. වීඩියෝව සහ උපසිරැසි
-          ගොනුව (.srt) එකම නමකින් තබා ධාවනය කරන්න.
-        </p>
-      </div>
+      <AdvertisingPromotion />
 
       {/* 💡 Download Options Guide (Subtitle vs Video Explanation) */}
       <div className="mt-4 p-4 rounded-2xl bg-card border border-border/70 shadow-sm flex flex-col gap-2.5 text-xs">
