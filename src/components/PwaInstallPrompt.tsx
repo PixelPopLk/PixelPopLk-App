@@ -51,7 +51,7 @@ function AdvertisingPromotionPopup() {
   return (
     <div
       data-no-ad="true"
-      className="fixed inset-0 z-[100001] flex items-center justify-center overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-md animate-in fade-in duration-300"
+      className="fixed inset-0 z-[100001] flex items-center justify-center overflow-y-auto modal-backdrop px-4 py-6 backdrop-blur-md animate-in fade-in duration-300"
       role="dialog"
       aria-modal="true"
       aria-labelledby="ad-promotion-title"
