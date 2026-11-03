@@ -52,7 +52,7 @@ export function AdvertisingPromotion() {
 
   return (
     <>
-      <section className="relative mt-6 overflow-hidden rounded-3xl border border-violet-200 bg-white px-5 py-7 text-center sm:px-8 sm:py-8 dark:border-violet-400/20 dark:bg-gradient-to-br dark:from-violet-500/[0.10] dark:via-card dark:to-indigo-500/[0.08]">
+      <section className="relative mt-6 overflow-hidden rounded-3xl border border-violet-200 bg-white px-5 py-7 text-center sm:px-8 sm:py-8 dark:border-border dark:bg-card">
         <div className="relative mx-auto flex max-w-xl flex-col items-center">
           <div className="grid h-14 w-14 place-items-center rounded-2xl border border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-300/20 dark:bg-violet-500/10 dark:text-violet-400">
             <Megaphone className="h-6 w-6" />
