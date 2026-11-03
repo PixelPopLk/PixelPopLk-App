@@ -752,17 +752,17 @@ function EpisodePage() {
             </h4>
             <div className="flex flex-wrap gap-2">
               {[
-                `${series.showName} S${ep.season}E${ep.episode} Sinhala Sub`,
-                `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitles`,
-                `${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Sub`,
-                `${series.showName} S${ep.season}E${ep.episode} Subtitle Download`,
-                `${series.showName} S${ep.season}E${ep.episode} SRT`,
-                `${series.showName} Sinhala Subtitles TV Series`,
+                `${series.showName} Sinhala Sub`,
+                `${series.showName} Sinhala Subtitles`,
+                `${series.showName} Sinhala Subtitle Download`,
+                `${series.showName} TV Series Sinhala Sub`,
+                `${series.showName} Sinhala Subtitles All Episodes`,
+                `${series.showName} Sinhala Subtitle SRT`,
               ].map((tag) => (
                 <Link
                   key={tag}
                   to="/"
-                  search={{ q: series.showName }}
+                  search={{ q: tag }}
                   className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground border border-border/60 transition"
                 >
                   #{tag}
