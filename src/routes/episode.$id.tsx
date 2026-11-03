@@ -516,7 +516,7 @@ function EpisodePage() {
                   decoding="async"
                   className="w-full h-full object-cover blur-lg scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95 media-shade" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
               </div>
             )}
             <div className="relative grid md:grid-cols-[320px_1fr] gap-0">
