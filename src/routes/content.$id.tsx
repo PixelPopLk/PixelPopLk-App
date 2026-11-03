@@ -216,7 +216,7 @@ function buildContentHead({
         ? String(s.year)
         : new Date(s.created_at).getFullYear().toString();
     const telegramTitleSuffix = s.has_telegram ? " | Telegram Link" : "";
-    const titleText = `${s.title} (${year}) Sinhala Subtitles${telegramTitleSuffix} | PixelPopLK`;
+    const titleText = `${s.title} Sinhala Subtitles${telegramTitleSuffix} | PixelPopLK`;
     const descText = buildSeoDescription({
       metatags: s.metatags,
       description: s.description,
@@ -715,7 +715,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       : {}),
     workFeaturedBy: {
       "@type": "DataDownload",
-      name: `${s.title} Sinhala Subtitle`,
+      name: `${s.title} Sinhala Subtitles`,
       encodingFormat: "application/zip",
       description: `Download Sinhala Subtitle (.zip) for ${s.title}`,
     },
@@ -724,7 +724,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
   return (
     <Hero
       poster={s.image_url}
-      title={`${s.title} (${year}) Sinhala Subtitle`}
+      title={`${s.title} Sinhala Subtitles`}
       year={year}
       rating={formatRating(s.rating)}
       genres={genres}
