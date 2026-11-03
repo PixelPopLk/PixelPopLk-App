@@ -63,7 +63,7 @@ const SAFE_COLUMNS =
 async function fetchContentData(id: string): Promise<Subtitle[]> {
   // Accept only plain positive decimal IDs. Number() alone also accepts
   // values such as hexadecimal or scientific notation that are not route IDs.
-  if (!/^\\d+$/.test(id)) throw notFound();
+  if (!/^\d+$/.test(id)) throw notFound();
   const numericId = Number(id);
   if (!Number.isSafeInteger(numericId) || numericId <= 0) throw notFound();
 
