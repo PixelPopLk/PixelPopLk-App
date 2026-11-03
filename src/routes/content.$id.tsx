@@ -592,7 +592,7 @@ function Hero({
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border shadow-card w-full">
       {poster && (
-        <div className="pointer-events-none absolute inset-0 opacity-30">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.06] dark:opacity-30">
           <img
             src={poster}
             alt=""
@@ -601,7 +601,7 @@ function Hero({
             decoding="async"
             className="w-full h-full object-cover blur-lg scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/85 to-black/95" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/90 to-white/95 dark:from-black/60 dark:via-black/85 dark:to-black/95" />
         </div>
       )}
       <div className="relative grid md:grid-cols-[320px_1fr] gap-0 w-full min-w-0">
