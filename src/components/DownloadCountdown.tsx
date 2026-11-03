@@ -482,13 +482,13 @@ export function DownloadButton({
     switch (state) {
       case "locked":
         return normalizedVariant === "telegram"
-          ? base + " border-sky-400/30 bg-gradient-to-r from-sky-600 via-blue-600 to-blue-700 text-white shadow-[0_8px_24px_rgba(37,99,235,0.22)] hover:brightness-110 focus-visible:ring-sky-400"
-          : base + " border-rose-400/30 bg-gradient-to-r from-rose-600 via-rose-600 to-red-700 text-white shadow-[0_8px_24px_rgba(225,29,72,0.2)] hover:brightness-110 focus-visible:ring-rose-400";
+          ? base + " border-sky-400/30 bg-gradient-to-r from-sky-600 via-blue-600 to-blue-700 text-white focus-visible:ring-sky-400"
+          : base + " border-rose-400/30 bg-gradient-to-r from-rose-600 via-rose-600 to-red-700 text-white focus-visible:ring-rose-400";
       case "verifying":
-        return base + " border-indigo-300/30 bg-gradient-to-r from-indigo-600 to-violet-700 text-white shadow-lg focus-visible:ring-indigo-400";
+        return base + " border-indigo-300/30 bg-gradient-to-r from-indigo-600 to-violet-700 text-white focus-visible:ring-indigo-400";
       case "ready":
       case "downloading":
-        return base + " border-emerald-300/30 bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-[0_8px_24px_rgba(16,185,129,0.2)] hover:brightness-110 focus-visible:ring-emerald-400";
+        return base + " border-emerald-300/30 bg-gradient-to-r from-emerald-600 to-teal-700 text-white focus-visible:ring-emerald-400";
     }
   };
 
