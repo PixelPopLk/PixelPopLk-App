@@ -611,11 +611,6 @@ function EpisodePage() {
 
                 <AdvertisingPromotion />
 
-                {/* 🟢 Ad 1: 300x250 Ad Banner */}
-                <div className="my-4">
-                  <AdBanner type="300x250" />
-                </div>
-
                 {/* 🟢 Download Options Guide (Subtitle vs Telegram Video) */}
                 <div className="mt-4 p-4 rounded-2xl bg-card/80 border border-border shadow-sm text-xs text-muted-foreground space-y-2.5">
                   <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
@@ -648,6 +643,11 @@ function EpisodePage() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* 🟢 Banner Ad: Download Guide එකට පහළින් */}
+                <div className="my-4">
+                  <AdBanner type="300x250" />
                 </div>
 
                 {/* 🟢 Secure Blob Download Buttons */}
