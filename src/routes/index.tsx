@@ -53,7 +53,7 @@ const HOMEPAGE_CATALOG_LIMIT = 200;
 const HOMEPAGE_MOVIE_LIMIT = 48;
 const HOMEPAGE_SERIES_LIMIT = 24;
 const HOMEPAGE_SUBTITLE_COLUMNS =
-  "id, created_at, title, image_url, genre, description, rating, year, season, episode";
+  "id, created_at, title, image_url, genre, description, rating, year, season, episode, metatags";
 
 async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>): Promise<Subtitle[]> {
   const queryText = search.q?.trim() || null;
@@ -67,6 +67,26 @@ async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>):
       : null;
   const genre = search.genre?.trim() || null;
   const type = search.type ?? "all";
+
+  // Search must cover the entire catalogue, not only the homepage's
+  // deliberately limited latest-movies/latest-series feed. Fetch in pages so
+  // older titles and episodes remain searchable without a 1,000-row cap.
+  if (queryText) {
+    const pageSize = 1000;
+    const allRows: Subtitle[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from(SUBTITLES_TABLE)
+        .select(SAFE_SUBTITLE_COLUMNS)
+        .order("created_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as Subtitle[];
+      allRows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return allRows;
+  }
 
   // One DB call returns:
   // - latest movies as individual rows
@@ -436,9 +456,10 @@ function HomePage() {
         ...it,
         title: itemTitle(it),
         epTitle: it.kind === "series" ? it.episodes.map((e) => e.epTitle || e.title).join(" ") : null,
-        genre: it.kind === "movie" ? it.sub.genre : it.episodes[0]?.genre,
+        genre: it.kind === "movie" ? it.sub.genre : it.episodes.map((e) => e.genre).filter(Boolean).join(" "),
         year: getItemYear(it),
-        description: it.kind === "movie" ? it.sub.description : it.episodes[0]?.description,
+        tags: it.kind === "movie" ? it.sub.metatags : it.episodes.map((e) => e.metatags).filter(Boolean).join(" "),
+        description: it.kind === "movie" ? it.sub.description : it.episodes.map((e) => e.description).filter(Boolean).join(" "),
       }));
       result = searchFuzzy(candidates, query);
     }
