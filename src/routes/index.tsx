@@ -751,6 +751,7 @@ function HomePage() {
             {type !== "series" && (
               <Row
                 title={genre ? `${genre} Movies` : "Movies"}
+                viewAllType="movie"
                 icon={<Film className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "movie")}
                 resetKey={rowResetKey}
@@ -762,6 +763,7 @@ function HomePage() {
             {type !== "movie" && (
               <Row
                 title={genre ? `${genre} TV Series` : "TV Series"}
+                viewAllType="series"
                 icon={<Tv className="w-4 h-4" />}
                 items={filtered.filter((it) => it.kind === "series")}
                 resetKey={rowResetKey}
@@ -1170,8 +1172,10 @@ function Row({
   savedIds,
   onToggleSaved,
   onItemOpen,
+  viewAllType,
 }: { 
   title: string; 
+  viewAllType?: "movie" | "series";
   icon?: React.ReactNode; 
   items: GridItem[]; 
   resetKey: string;
@@ -1218,6 +1222,15 @@ function Row({
           {title}
           <span className="text-xs font-medium text-muted-foreground ml-1">({items.length})</span>
         </h3>
+        {viewAllType && (
+          <Link
+            to="/search"
+            search={{ type: viewAllType }}
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary hover:underline whitespace-nowrap"
+          >
+            View All <ChevronRight className="w-4 h-4" />
+          </Link>
+        )}
       </div>
 
       <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
