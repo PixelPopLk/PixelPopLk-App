@@ -80,6 +80,7 @@ const GENRES = ["All", "Action", "Sci-Fi", "Horror", "Thriller", "Comedy", "Dram
 function MoviesPage() {
   const data = Route.useLoaderData();
   const [selectedGenre, setSelectedGenre] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const allMovies = useMemo(() => {
     return buildGridItems(data ?? []).filter((it) => it.kind === "movie");
@@ -178,7 +179,7 @@ function MoviesPage() {
               <button
                 key={g}
                 type="button"
-                onClick={() => setSelectedGenre(g)}
+                onClick={() => { setSelectedGenre(g); setVisibleCount(24); }}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                   active
                     ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
@@ -214,9 +215,17 @@ function MoviesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 items-stretch">
-            {filteredMovies.map((it) => (
+            {filteredMovies.slice(0, visibleCount).map((it) => (
               <MovieCard key={it.key} item={it as Extract<GridItem, { kind: "movie" }>} />
             ))}
+          </div>
+        )}
+        {filteredMovies.length > visibleCount && (
+          <div className="mt-8 flex justify-center">
+            <button type="button" onClick={() => setVisibleCount((count) => count + 24)}
+              className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold hover:border-primary/50 hover:text-primary transition">
+              Load More Movies ({filteredMovies.length - visibleCount} remaining)
+            </button>
           </div>
         )}
 
