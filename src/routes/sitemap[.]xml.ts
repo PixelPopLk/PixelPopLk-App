@@ -111,6 +111,10 @@ export const Route = createFileRoute("/sitemap.xml")({
         const movieEntries: any[] = [];
 
         for (const sub of subtitles ?? []) {
+          // Only publish concrete database IDs, never route-template placeholders.
+          const numericId = Number(sub.id);
+          if (!Number.isSafeInteger(numericId) || numericId <= 0) continue;
+
           const isEp = isSeriesRow(sub);
           const date =
             sitemapDate(sub.updated_at) ?? sitemapDate(sub.created_at);

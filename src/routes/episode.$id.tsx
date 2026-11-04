@@ -52,8 +52,11 @@ const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchEpisodeData(id: string): Promise<Subtitle[]> {
+  // Accept only plain positive decimal IDs. Number() alone also accepts
+  // values such as hexadecimal or scientific notation that are not route IDs.
+  if (!/^\d+$/.test(id)) throw notFound();
   const numericId = Number(id);
-  if (!Number.isInteger(numericId) || numericId <= 0) throw notFound();
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) throw notFound();
 
   let targetItem: any = null;
   let firstError: any = null;
@@ -608,11 +611,6 @@ function EpisodePage() {
 
                 <AdvertisingPromotion />
 
-                {/* 🟢 Ad 1: 300x250 Ad Banner */}
-                <div className="my-4">
-                  <AdBanner type="300x250" />
-                </div>
-
                 {/* 🟢 Download Options Guide (Subtitle vs Telegram Video) */}
                 <div className="mt-4 p-4 rounded-2xl bg-card/80 border border-border shadow-sm text-xs text-muted-foreground space-y-2.5">
                   <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
@@ -645,6 +643,11 @@ function EpisodePage() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* 🟢 Banner Ad: Download Guide එකට පහළින් */}
+                <div className="my-4">
+                  <AdBanner type="300x250" />
                 </div>
 
                 {/* 🟢 Secure Blob Download Buttons */}
@@ -752,17 +755,17 @@ function EpisodePage() {
             </h4>
             <div className="flex flex-wrap gap-2">
               {[
-                `${series.showName} S${ep.season}E${ep.episode} Sinhala Sub`,
-                `${series.showName} S${ep.season}E${ep.episode} Sinhala Subtitles`,
-                `${series.showName} Season ${ep.season} Episode ${ep.episode} Sinhala Sub`,
-                `${series.showName} S${ep.season}E${ep.episode} Subtitle Download`,
-                `${series.showName} S${ep.season}E${ep.episode} SRT`,
-                `${series.showName} Sinhala Subtitles TV Series`,
+                `${series.showName} Sinhala Sub`,
+                `${series.showName} Sinhala Subtitles`,
+                `${series.showName} Sinhala Subtitle Download`,
+                `${series.showName} TV Series Sinhala Sub`,
+                `${series.showName} Sinhala Subtitles All Episodes`,
+                `${series.showName} Sinhala Subtitle SRT`,
               ].map((tag) => (
                 <Link
                   key={tag}
                   to="/"
-                  search={{ q: series.showName }}
+                  search={{ q: tag }}
                   className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground border border-border/60 transition"
                 >
                   #{tag}
