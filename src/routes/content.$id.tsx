@@ -663,11 +663,6 @@ function Hero({
             </div>
           ) : null}
 
-          {/* 🟢 Ad 1: Overview යටින් 300x250 Ad Banner එක */}
-          <div className="my-4">
-            <AdBanner type="300x250" />
-          </div>
-
           {children}
 
           <ShareBar
@@ -773,6 +768,11 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         </div>
       </div>
 
+      {/* 🟢 Banner Ad: Download Guide එකට පහළින් */}
+      <div className="my-4">
+        <AdBanner type="300x250" />
+      </div>
+
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
       <div
         className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0"
@@ -791,6 +791,11 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
             variant="telegram"
           />
         )}
+      </div>
+
+      {/* 🟢 Second Banner Ad: Download Buttons වලට පහළින් */}
+      <div className="my-5 flex justify-center w-full">
+        <AdBanner type="160x300" />
       </div>
 
       <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
