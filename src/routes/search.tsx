@@ -24,12 +24,22 @@ const searchParamsSchema = z.object({
 export const Route = createFileRoute("/search")({
   validateSearch: (search) => searchParamsSchema.parse(search),
   loader: async () => {
-    const { data } = await supabase
-      .from(SUBTITLES_TABLE)
-      .select(SAFE_SUBTITLE_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    return (data ?? []) as Subtitle[];
+    // Fetch the full catalog in pages. A single .limit(100) silently hid every
+    // older movie/episode from this dedicated search page.
+    const pageSize = 1000;
+    const allRows: Subtitle[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from(SUBTITLES_TABLE)
+        .select(SAFE_SUBTITLE_COLUMNS)
+        .order("created_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as Subtitle[];
+      allRows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return allRows;
   },
   head: () => ({
     meta: [
@@ -67,8 +77,10 @@ function SearchPage() {
       ...it,
       title: itemTitle(it),
       epTitle: it.kind === "series" ? it.episodes.map((e) => e.epTitle || e.title).join(" ") : null,
-      genre: it.kind === "movie" ? it.sub.genre : it.episodes[0]?.genre,
-      description: it.kind === "movie" ? it.sub.description : it.episodes[0]?.description,
+      genre: it.kind === "movie" ? it.sub.genre : it.episodes.map((e) => e.genre).filter(Boolean).join(" "),
+      year: it.kind === "movie" ? it.sub.year : it.episodes.map((e) => e.year).filter(Boolean).join(" "),
+      tags: it.kind === "movie" ? it.sub.metatags : it.episodes.map((e) => e.metatags).filter(Boolean).join(" "),
+      description: it.kind === "movie" ? it.sub.description : it.episodes.map((e) => e.description).filter(Boolean).join(" "),
     }));
     return searchFuzzy(candidates, searchTerm);
   }, [allItems, searchTerm]);
