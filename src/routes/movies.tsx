@@ -17,15 +17,26 @@ import { useState, useMemo } from "react";
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 async function fetchLatestMovies(): Promise<Subtitle[]> {
-  const { data, error } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_SUBTITLE_COLUMNS)
-    .is("season", null)
-    .order("created_at", { ascending: false })
-    .limit(48);
+  // Fetch the complete catalogue; one fixed LIMIT silently hid older titles.
+  // Keep the ordering stable so offset pagination cannot skip tied timestamps.
+  const pageSize = 1000;
+  const allRows: Subtitle[] = [];
 
-  if (error) throw error;
-  return (data ?? []) as Subtitle[];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_SUBTITLE_COLUMNS)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as Subtitle[];
+    allRows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return allRows;
 }
 
 export const Route = createFileRoute("/movies")({
