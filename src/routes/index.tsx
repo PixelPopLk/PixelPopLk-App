@@ -49,86 +49,29 @@ const homeSearchSchema = z.object({
 
 // Homepage does not need the entire catalog on first load.
 // Keep this bounded and fetch only fields actually used by the homepage.
-const HOMEPAGE_CATALOG_LIMIT = 200;
-const HOMEPAGE_MOVIE_LIMIT = 48;
-const HOMEPAGE_SERIES_LIMIT = 24;
-const HOMEPAGE_SUBTITLE_COLUMNS =
-  "id, created_at, title, image_url, genre, description, rating, year, season, episode, metatags";
 
 async function fetchHomepageSubtitles(search: z.infer<typeof homeSearchSchema>): Promise<Subtitle[]> {
-  const queryText = search.q?.trim() || null;
-  const year =
-    search.year && (/^\d{4}$/.test(search.year) || search.year === "Older")
-      ? search.year
-      : null;
-  const rating =
-    search.rating && /^\d+(?:\.\d+)?\+$/.test(search.rating)
-      ? Number.parseFloat(search.rating)
-      : null;
-  const genre = search.genre?.trim() || null;
-  const type = search.type ?? "all";
+  // Load every catalogue row in stable pages. The old RPC returned only a small
+  // latest-items sample (24 series / 48 movies), hiding older catalogue entries.
+  // Pagination also avoids Supabase's default 1,000-row response cap.
+  const pageSize = 1000;
+  const allRows: Subtitle[] = [];
 
-  // Search must cover the entire catalogue, not only the homepage's
-  // deliberately limited latest-movies/latest-series feed. Fetch in pages so
-  // older titles and episodes remain searchable without a 1,000-row cap.
-  if (queryText) {
-    const pageSize = 1000;
-    const allRows: Subtitle[] = [];
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await supabase
-        .from(SUBTITLES_TABLE)
-        .select(SAFE_SUBTITLE_COLUMNS)
-        .order("created_at", { ascending: false })
-        .range(from, from + pageSize - 1);
-      if (error) throw error;
-      const page = (data ?? []) as Subtitle[];
-      allRows.push(...page);
-      if (page.length < pageSize) break;
-    }
-    return allRows;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_SUBTITLE_COLUMNS)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as Subtitle[];
+    allRows.push(...page);
+    if (page.length < pageSize) break;
   }
 
-  // One DB call returns:
-  // - latest movies as individual rows
-  // - latest unique series as complete episode groups
-  // - matching series even when the query hits an episode title
-  // This prevents a raw-row LIMIT from splitting a TV series across requests.
-  const rpc = await supabase.rpc("search_homepage_subtitles", {
-    p_query: queryText,
-    p_type: type,
-    p_genre: genre,
-    p_year: year,
-    p_rating: rating,
-    p_movie_limit: HOMEPAGE_MOVIE_LIMIT,
-    p_series_limit: HOMEPAGE_SERIES_LIMIT,
-  });
-
-  if (!rpc.error) {
-    return (rpc.data ?? []) as Subtitle[];
-  }
-
-  // Safe fallback for deployments where the migration has not been applied yet.
-  // The production path should use the RPC above so series stay complete.
-  let query = supabase
-    .from(SUBTITLES_TABLE)
-    .select(HOMEPAGE_SUBTITLE_COLUMNS)
-    .order("created_at", { ascending: false })
-    .limit(HOMEPAGE_CATALOG_LIMIT);
-
-  if (queryText) {
-    const q = queryText.replace(/[%_]/g, "");
-    if (q) query = query.ilike("title", `%${q}%`);
-  }
-  if (genre) {
-    const cleanGenre = genre.replace(/[%_]/g, "");
-    if (cleanGenre) query = query.ilike("genre", `%${cleanGenre}%`);
-  }
-  if (year) query = year === "Older" ? query.lte("year", "2022") : query.eq("year", year);
-  if (rating != null) query = query.gte("rating", rating);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as Subtitle[];
+  return allRows;
 }
 
 export const Route = createFileRoute("/")({
@@ -1225,7 +1168,7 @@ function Row({
         {viewAllType && (
           <Link
             to="/search"
-            search={{ type: viewAllType }}
+            to={viewAllType === "series" ? "/tv-series" : "/movies"}
             className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary hover:underline whitespace-nowrap"
           >
             View All <ChevronRight className="w-4 h-4" />
