@@ -17,30 +17,26 @@ import { useState, useMemo } from "react";
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 async function fetchLatestTVSeries(): Promise<Subtitle[]> {
-  const rpc = await supabase.rpc("search_homepage_subtitles", {
-    p_query: null,
-    p_type: "series",
-    p_genre: null,
-    p_year: null,
-    p_rating: null,
-    p_movie_limit: 0,
-    p_series_limit: 48,
-  });
+  // Fetch the complete catalogue; one fixed LIMIT silently hid older titles.
+  // Keep the ordering stable so offset pagination cannot skip tied timestamps.
+  const pageSize = 1000;
+  const allRows: Subtitle[] = [];
 
-  if (!rpc.error) {
-    return (rpc.data ?? []) as Subtitle[];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_SUBTITLE_COLUMNS)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as Subtitle[];
+    allRows.push(...page);
+    if (page.length < pageSize) break;
   }
 
-  // Fallback until the homepage search RPC migration is applied in Supabase.
-  const { data, error } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_SUBTITLE_COLUMNS)
-    .not("season", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) throw error;
-  return (data ?? []) as Subtitle[];
+  return allRows;
 }
 
 export const Route = createFileRoute("/tv-series")({
