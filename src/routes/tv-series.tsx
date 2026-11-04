@@ -80,6 +80,7 @@ const TV_GENRES = ["All", "Action", "Drama", "Mystery", "Sci-Fi", "Crime", "Anim
 function TVSeriesPage() {
   const data = Route.useLoaderData();
   const [selectedGenre, setSelectedGenre] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const allSeries = useMemo(() => {
     return buildGridItems(data ?? []).filter((it) => it.kind === "series");
@@ -181,7 +182,7 @@ function TVSeriesPage() {
               <button
                 key={g}
                 type="button"
-                onClick={() => setSelectedGenre(g)}
+                onClick={() => { setSelectedGenre(g); setVisibleCount(24); }}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                   active
                     ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
@@ -213,9 +214,17 @@ function TVSeriesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 items-stretch">
-            {filteredSeries.map((it) => (
+            {filteredSeries.slice(0, visibleCount).map((it) => (
               <SeriesCard key={it.key} item={it as Extract<GridItem, { kind: "series" }>} />
             ))}
+          </div>
+        )}
+        {filteredSeries.length > visibleCount && (
+          <div className="mt-8 flex justify-center">
+            <button type="button" onClick={() => setVisibleCount((count) => count + 24)}
+              className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold hover:border-primary/50 hover:text-primary transition">
+              Load More TV Series ({filteredSeries.length - visibleCount} remaining)
+            </button>
           </div>
         )}
 
