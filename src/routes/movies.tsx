@@ -17,15 +17,26 @@ import { useState, useMemo } from "react";
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 async function fetchLatestMovies(): Promise<Subtitle[]> {
-  const { data, error } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_SUBTITLE_COLUMNS)
-    .is("season", null)
-    .order("created_at", { ascending: false })
-    .limit(48);
+  // Fetch the complete catalogue; one fixed LIMIT silently hid older titles.
+  // Keep the ordering stable so offset pagination cannot skip tied timestamps.
+  const pageSize = 1000;
+  const allRows: Subtitle[] = [];
 
-  if (error) throw error;
-  return (data ?? []) as Subtitle[];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_SUBTITLE_COLUMNS)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as Subtitle[];
+    allRows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return allRows;
 }
 
 export const Route = createFileRoute("/movies")({
@@ -69,6 +80,7 @@ const GENRES = ["All", "Action", "Sci-Fi", "Horror", "Thriller", "Comedy", "Dram
 function MoviesPage() {
   const data = Route.useLoaderData();
   const [selectedGenre, setSelectedGenre] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const allMovies = useMemo(() => {
     return buildGridItems(data ?? []).filter((it) => it.kind === "movie");
@@ -167,7 +179,7 @@ function MoviesPage() {
               <button
                 key={g}
                 type="button"
-                onClick={() => setSelectedGenre(g)}
+                onClick={() => { setSelectedGenre(g); setVisibleCount(24); }}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                   active
                     ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
@@ -203,9 +215,17 @@ function MoviesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 items-stretch">
-            {filteredMovies.map((it) => (
+            {filteredMovies.slice(0, visibleCount).map((it) => (
               <MovieCard key={it.key} item={it as Extract<GridItem, { kind: "movie" }>} />
             ))}
+          </div>
+        )}
+        {filteredMovies.length > visibleCount && (
+          <div className="mt-8 flex justify-center">
+            <button type="button" onClick={() => setVisibleCount((count) => count + 24)}
+              className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold hover:border-primary/50 hover:text-primary transition">
+              Load More Movies ({filteredMovies.length - visibleCount} remaining)
+            </button>
           </div>
         )}
 

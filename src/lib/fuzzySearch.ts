@@ -148,6 +148,7 @@ export interface FuzzySearchCandidate {
   genre?: string | null;
   description?: string | null;
   epTitle?: string | null;
+  tags?: string | null;
   [key: string]: any;
 }
 
@@ -180,6 +181,7 @@ export function searchFuzzy<T extends FuzzySearchCandidate>(items: T[], rawQuery
     const genre = item.genre || "";
     const year = item.year ? String(item.year) : "";
     const desc = item.description || "";
+    const tags = item.tags || "";
 
     const titleTokens = normalizeText(title).split(" ");
     let matchedTokenCount = 0;
@@ -211,7 +213,11 @@ export function searchFuzzy<T extends FuzzySearchCandidate>(items: T[], rawQuery
         maxTokenScore = Math.max(maxTokenScore, 0.85);
       }
 
-      if (desc && desc.toLowerCase().includes(qToken)) {
+      if (tags && fuzzyMatchWord(tags, qToken) > 0.7) {
+        maxTokenScore = Math.max(maxTokenScore, 0.65);
+      }
+
+      if (desc && normalizeText(desc).includes(qToken)) {
         maxTokenScore = Math.max(maxTokenScore, 0.45);
       }
 

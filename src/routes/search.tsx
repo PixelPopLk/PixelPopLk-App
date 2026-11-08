@@ -19,17 +19,28 @@ const BASE_URL = "https://pixelpoplk.pages.dev";
 
 const searchParamsSchema = z.object({
   q: z.string().optional().catch(""),
+  type: z.enum(["movie", "series"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/search")({
   validateSearch: (search) => searchParamsSchema.parse(search),
   loader: async () => {
-    const { data } = await supabase
-      .from(SUBTITLES_TABLE)
-      .select(SAFE_SUBTITLE_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    return (data ?? []) as Subtitle[];
+    // Fetch the full catalog in pages. A single .limit(100) silently hid every
+    // older movie/episode from this dedicated search page.
+    const pageSize = 1000;
+    const allRows: Subtitle[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from(SUBTITLES_TABLE)
+        .select(SAFE_SUBTITLE_COLUMNS)
+        .order("created_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as Subtitle[];
+      allRows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return allRows;
   },
   head: () => ({
     meta: [
@@ -50,7 +61,7 @@ export const Route = createFileRoute("/search")({
 });
 
 function SearchPage() {
-  const { q = "" } = Route.useSearch();
+  const { q = "", type } = Route.useSearch();
   const navigate = useNavigate();
   const data = Route.useLoaderData();
   const [searchTerm, setSearchTerm] = useState(q);
@@ -62,16 +73,19 @@ function SearchPage() {
   const allItems = useMemo(() => buildGridItems(data), [data]);
 
   const searchResults = useMemo(() => {
-    if (!searchTerm.trim()) return allItems.slice(0, 24);
-    const candidates = allItems.map((it) => ({
+    const typedItems = type ? allItems.filter((it) => it.kind === type) : allItems;
+    if (!searchTerm.trim()) return typedItems;
+    const candidates = typedItems.map((it) => ({
       ...it,
       title: itemTitle(it),
       epTitle: it.kind === "series" ? it.episodes.map((e) => e.epTitle || e.title).join(" ") : null,
-      genre: it.kind === "movie" ? it.sub.genre : it.episodes[0]?.genre,
-      description: it.kind === "movie" ? it.sub.description : it.episodes[0]?.description,
+      genre: it.kind === "movie" ? it.sub.genre : it.episodes.map((e) => e.genre).filter(Boolean).join(" "),
+      year: it.kind === "movie" ? it.sub.year : it.episodes.map((e) => e.year).filter(Boolean).join(" "),
+      tags: it.kind === "movie" ? it.sub.metatags : it.episodes.map((e) => e.metatags).filter(Boolean).join(" "),
+      description: it.kind === "movie" ? it.sub.description : it.episodes.map((e) => e.description).filter(Boolean).join(" "),
     }));
     return searchFuzzy(candidates, searchTerm);
-  }, [allItems, searchTerm]);
+  }, [allItems, searchTerm, type]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +102,7 @@ function SearchPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-2xl mx-auto text-center mb-8">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-3">
-            Search <span className="text-gradient">Sinhala Subtitles</span>
+            {type === "series" ? "TV Series" : type === "movie" ? "Movies" : "Search"} <span className="text-gradient">Sinhala Subtitles</span>
           </h1>
           <form onSubmit={handleSearchSubmit} className="relative mt-4">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />

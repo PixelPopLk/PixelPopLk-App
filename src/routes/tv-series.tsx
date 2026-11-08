@@ -17,30 +17,26 @@ import { useState, useMemo } from "react";
 const BASE_URL = "https://pixelpoplk.pages.dev";
 
 async function fetchLatestTVSeries(): Promise<Subtitle[]> {
-  const rpc = await supabase.rpc("search_homepage_subtitles", {
-    p_query: null,
-    p_type: "series",
-    p_genre: null,
-    p_year: null,
-    p_rating: null,
-    p_movie_limit: 0,
-    p_series_limit: 48,
-  });
+  // Fetch the complete catalogue; one fixed LIMIT silently hid older titles.
+  // Keep the ordering stable so offset pagination cannot skip tied timestamps.
+  const pageSize = 1000;
+  const allRows: Subtitle[] = [];
 
-  if (!rpc.error) {
-    return (rpc.data ?? []) as Subtitle[];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(SUBTITLES_TABLE)
+      .select(SAFE_SUBTITLE_COLUMNS)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as Subtitle[];
+    allRows.push(...page);
+    if (page.length < pageSize) break;
   }
 
-  // Fallback until the homepage search RPC migration is applied in Supabase.
-  const { data, error } = await supabase
-    .from(SUBTITLES_TABLE)
-    .select(SAFE_SUBTITLE_COLUMNS)
-    .not("season", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) throw error;
-  return (data ?? []) as Subtitle[];
+  return allRows;
 }
 
 export const Route = createFileRoute("/tv-series")({
@@ -84,6 +80,7 @@ const TV_GENRES = ["All", "Action", "Drama", "Mystery", "Sci-Fi", "Crime", "Anim
 function TVSeriesPage() {
   const data = Route.useLoaderData();
   const [selectedGenre, setSelectedGenre] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const allSeries = useMemo(() => {
     return buildGridItems(data ?? []).filter((it) => it.kind === "series");
@@ -185,7 +182,7 @@ function TVSeriesPage() {
               <button
                 key={g}
                 type="button"
-                onClick={() => setSelectedGenre(g)}
+                onClick={() => { setSelectedGenre(g); setVisibleCount(24); }}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                   active
                     ? "bg-gradient-primary text-primary-foreground border-transparent shadow-glow"
@@ -217,9 +214,17 @@ function TVSeriesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3.5 sm:gap-4 items-stretch">
-            {filteredSeries.map((it) => (
+            {filteredSeries.slice(0, visibleCount).map((it) => (
               <SeriesCard key={it.key} item={it as Extract<GridItem, { kind: "series" }>} />
             ))}
+          </div>
+        )}
+        {filteredSeries.length > visibleCount && (
+          <div className="mt-8 flex justify-center">
+            <button type="button" onClick={() => setVisibleCount((count) => count + 24)}
+              className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold hover:border-primary/50 hover:text-primary transition">
+              Load More TV Series ({filteredSeries.length - visibleCount} remaining)
+            </button>
           </div>
         )}
 

@@ -61,8 +61,11 @@ const SAFE_COLUMNS =
   "id, title, year, image_url, genre, rating, description, season, episode, created_at, updated_at, metatags, has_telegram";
 
 async function fetchContentData(id: string): Promise<Subtitle[]> {
+  // Accept only plain positive decimal IDs. Number() alone also accepts
+  // values such as hexadecimal or scientific notation that are not route IDs.
+  if (!/^\d+$/.test(id)) throw notFound();
   const numericId = Number(id);
-  if (!Number.isInteger(numericId) || numericId <= 0) throw notFound();
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) throw notFound();
 
   let targetItem: any = null;
   let firstError: any = null;
@@ -213,7 +216,7 @@ function buildContentHead({
         ? String(s.year)
         : new Date(s.created_at).getFullYear().toString();
     const telegramTitleSuffix = s.has_telegram ? " | Telegram Link" : "";
-    const titleText = `${s.title} (${year}) Sinhala Subtitles${telegramTitleSuffix} | PixelPopLK`;
+    const titleText = `${s.title} Sinhala Subtitles${telegramTitleSuffix} | PixelPopLK`;
     const descText = buildSeoDescription({
       metatags: s.metatags,
       description: s.description,
@@ -660,11 +663,6 @@ function Hero({
             </div>
           ) : null}
 
-          {/* 🟢 Ad 1: Overview යටින් 300x250 Ad Banner එක */}
-          <div className="my-4">
-            <AdBanner type="300x250" />
-          </div>
-
           {children}
 
           <ShareBar
@@ -712,7 +710,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
       : {}),
     workFeaturedBy: {
       "@type": "DataDownload",
-      name: `${s.title} Sinhala Subtitle`,
+      name: `${s.title} Sinhala Subtitles`,
       encodingFormat: "application/zip",
       description: `Download Sinhala Subtitle (.zip) for ${s.title}`,
     },
@@ -721,7 +719,7 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
   return (
     <Hero
       poster={s.image_url}
-      title={`${s.title} (${year}) Sinhala Subtitle`}
+      title={`${s.title} Sinhala Subtitles`}
       year={year}
       rating={formatRating(s.rating)}
       genres={genres}
@@ -770,6 +768,11 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
         </div>
       </div>
 
+      {/* 🟢 Banner Ad: Download Guide එකට පහළින් */}
+      <div className="my-4">
+        <AdBanner type="300x250" />
+      </div>
+
       {/* 🟢 Secure Blob Download Button (Bucket Link එක HIDE කර Direct Download) */}
       <div
         className="mt-5 flex flex-col sm:flex-row gap-3 min-w-0"
@@ -788,6 +791,11 @@ function MovieView({ item }: { item: Extract<GridItem, { kind: "movie" }> }) {
             variant="telegram"
           />
         )}
+      </div>
+
+      {/* 🟢 Second Banner Ad: Download Buttons වලට පහළින් */}
+      <div className="my-5 flex justify-center w-full">
+        <AdBanner type="160x300" />
       </div>
 
       <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-muted-foreground pt-3 border-t border-border/40">
@@ -1096,7 +1104,7 @@ function SeoTagsCloud({
           <Link
             key={tag}
             to="/"
-            search={{ q: cleanTitle }}
+            search={{ q: tag }}
             className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground border border-border/60 transition"
           >
             #{tag}
