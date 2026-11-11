@@ -313,6 +313,16 @@ function RootComponent() {
       const target = event.target;
       if (!(target instanceof Element)) return;
 
+      // Download controls use their own ad flow; never open the site-wide
+      // five-second smartlink popup for them.
+      if (
+        target.closest(
+          '[data-download="true"], [data-download], [data-no-ad="true"], a[download]',
+        )
+      ) {
+        return;
+      }
+
       const isInsidePopup = target.closest(
         '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
           ".modal, .dialog, .popup, [data-radix-dialog-content], " +
