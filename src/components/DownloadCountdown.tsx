@@ -18,6 +18,8 @@ const ADSTERRA_URL =
 const REQUIRED_AD_SECONDS = 5;
 const RELOCK_DELAY_MS = 4000; // File එක download වූ පසු නැවත Lock වීමට ගතවන කාලය (තත්පර 8)
 const MAX_UNLOCK_VALIDITY_MS = 20 * 1000; // 🟢 Unlock කර තත්පර 20ක් ඇතුළත download නොකළහොත් නැවත auto-lock වේ
+const MIN_AD_RETURN_MS = REQUIRED_AD_SECONDS * 1000;
+const AD_POPUP_FALLBACK_MS = 8 * 1000;
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
@@ -92,7 +94,7 @@ interface DownloadButtonProps {
   variant?: "primary" | "direct" | "telegram";
 }
 
-type ButtonState = "locked" | "verifying" | "ready" | "downloading";
+type ButtonState = "locked" | "awaiting-ad-return" | "verifying" | "ready" | "downloading";
 type DownloadLinkResult = { link: string | null; error?: string };
 
 export function DownloadButton({
@@ -122,15 +124,26 @@ export function DownloadButton({
   const timeStorageKey = `pxl_timer_${subId}_${titleSlug}_${normalizedVariant}`;
   const lockExpiryKey = `pxl_relock_${subId}_${titleSlug}_${normalizedVariant}`;
   const sessionTokenKey = `pxl_session_${subId}_${titleSlug}_${normalizedVariant}`;
+  const adAttemptStorageKey = `pxl_ad_attempt_${subId}_${titleSlug}_${normalizedVariant}`;
+  const adAwayStorageKey = `pxl_ad_away_${subId}_${titleSlug}_${normalizedVariant}`;
 
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
   const [downloadLink, setDownloadLink] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [adWarning, setAdWarning] = useState<string>("");
 
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const validityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const adAttemptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAdAttemptRef = useRef(false);
+  const adAttemptAtRef = useRef<number | null>(null);
+  const adAwayAtRef = useRef<number | null>(null);
+  const returnedAfterAdMsRef = useRef<number | null>(null);
+  const pendingSessionRef = useRef<{ startedAt: number; sessionToken: string } | null>(null);
+  const verifyInFlightRef = useRef(false);
+  const claimInFlightRef = useRef(false);
 
   // Link එක public Supabase client එකෙන් නොගෙන, server endpoint එකෙන් පමණක් ගනී.
   // Service-role key එක browser bundle එකට යන්නේ නැත.
@@ -187,14 +200,25 @@ export function DownloadButton({
       clearTimeout(validityTimerRef.current);
       validityTimerRef.current = null;
     }
+    if (adAttemptTimeoutRef.current) {
+      clearTimeout(adAttemptTimeoutRef.current);
+      adAttemptTimeoutRef.current = null;
+    }
+    pendingAdAttemptRef.current = false;
+    adAttemptAtRef.current = null;
+    adAwayAtRef.current = null;
+    returnedAfterAdMsRef.current = null;
+    pendingSessionRef.current = null;
     try {
       localStorage.removeItem(timeStorageKey);
       localStorage.removeItem(lockExpiryKey);
       localStorage.removeItem(sessionTokenKey);
+      localStorage.removeItem(adAttemptStorageKey);
+      localStorage.removeItem(adAwayStorageKey);
     } catch {
       /* noop */
     }
-  }, [timeStorageKey, lockExpiryKey, sessionTokenKey]);
+  }, [timeStorageKey, lockExpiryKey, sessionTokenKey, adAttemptStorageKey, adAwayStorageKey]);
 
   // Live Ticker
   const startLiveCountdown = useCallback(
@@ -210,40 +234,67 @@ export function DownloadButton({
         setRemainingSec(leftSec);
 
         if (leftSec <= 0) {
-          if (tickerRef.current) clearInterval(tickerRef.current);
-          // Link එක countdown ආරම්භ වන විට fetch නොකර මෙතැනදී පමණක් ඉල්ලයි.
-          // එම නිසා network tab එකකින් ad timer එක අතරතුර link එක ලබාගත නොහැක.
-          void fetchLink(sessionToken).then(({ link, error }) => {
-            if (!link || !isSafeUrl(link)) {
-              setErrorMsg(
-                error ||
-                  "Download link එක සූදානම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-              );
-              resetToLocked();
-              setTimeout(() => setErrorMsg(""), 6000);
-              return;
-            }
+          if (tickerRef.current) {
+            clearInterval(tickerRef.current);
+            tickerRef.current = null;
+          }
+          // A one-use server token must only be claimed once, even when focus,
+          // visibilitychange and pageshow fire close together.
+          if (claimInFlightRef.current) return;
+          claimInFlightRef.current = true;
 
-            setDownloadLink(link);
-            setState("ready");
-            if (validityTimerRef.current)
-              clearTimeout(validityTimerRef.current);
-            validityTimerRef.current = setTimeout(
-              resetToLocked,
-              MAX_UNLOCK_VALIDITY_MS,
-            );
-          });
+          void fetchLink(sessionToken)
+            .then(({ link, error }) => {
+              if (!link || !isSafeUrl(link)) {
+                setErrorMsg(
+                  error ||
+                    "Download link එක සූදානම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+                );
+                resetToLocked();
+                setTimeout(() => setErrorMsg(""), 6000);
+                return;
+              }
+
+              try {
+                localStorage.removeItem(timeStorageKey);
+                localStorage.removeItem(sessionTokenKey);
+                localStorage.removeItem(adAttemptStorageKey);
+                localStorage.removeItem(adAwayStorageKey);
+              } catch {
+                /* noop */
+              }
+
+              setDownloadLink(link);
+              setState("ready");
+              if (validityTimerRef.current)
+                clearTimeout(validityTimerRef.current);
+              validityTimerRef.current = setTimeout(
+                resetToLocked,
+                MAX_UNLOCK_VALIDITY_MS,
+              );
+            })
+            .finally(() => {
+              claimInFlightRef.current = false;
+            });
         }
       };
 
       tick();
-      tickerRef.current = setInterval(tick, 300);
+      // If the user already spent five seconds away, tick() claims immediately.
+      // Do not start a new interval after that immediate claim.
+      if (Date.now() - startTime < REQUIRED_AD_SECONDS * 1000) {
+        tickerRef.current = setInterval(tick, 300);
+      }
     },
-    [fetchLink, resetToLocked],
+    [fetchLink, resetToLocked, timeStorageKey, sessionTokenKey, adAttemptStorageKey, adAwayStorageKey],
   );
 
-  // Ad Time Verify කිරීම
+  // Restore or verify an already accepted session. The refs prevent duplicate
+  // focus/visibility events from claiming the same single-use server token.
   const verifyAdTime = useCallback(async () => {
+    if (verifyInFlightRef.current || claimInFlightRef.current) return;
+    verifyInFlightRef.current = true;
+
     try {
       const sessionToken = localStorage.getItem(sessionTokenKey);
       const expireAtStr = localStorage.getItem(lockExpiryKey);
@@ -267,25 +318,42 @@ export function DownloadButton({
       const startTime = parseInt(startTimeStr, 10);
       const elapsedMs = Date.now() - startTime;
 
-      // ⏱️ තත්පර 20කට වඩා පරණ නම් නැවත Lock කිරීම
-      if (elapsedMs > MAX_UNLOCK_VALIDITY_MS) {
+      if (!Number.isFinite(startTime) || elapsedMs < 0 || elapsedMs > MAX_UNLOCK_VALIDITY_MS) {
         resetToLocked();
         return;
       }
 
       if (elapsedMs >= REQUIRED_AD_SECONDS * 1000) {
         setState("verifying");
-        const result = await fetchLink(sessionToken);
+        claimInFlightRef.current = true;
+        let result: DownloadLinkResult;
+        try {
+          result = await fetchLink(sessionToken);
+        } finally {
+          claimInFlightRef.current = false;
+        }
+
         if (!result.link || !isSafeUrl(result.link)) {
           setErrorMsg(result.error || "Verification කල් ඉකුත් වී ඇත. නැවත උත්සාහ කරන්න.");
           resetToLocked();
           setTimeout(() => setErrorMsg(""), 6000);
           return;
         }
+
+        // The server token is single-use. Remove it as soon as it succeeds so
+        // later focus/pageshow events cannot accidentally claim it again.
+        try {
+          localStorage.removeItem(timeStorageKey);
+          localStorage.removeItem(sessionTokenKey);
+          localStorage.removeItem(adAttemptStorageKey);
+          localStorage.removeItem(adAwayStorageKey);
+        } catch {
+          /* noop */
+        }
+
         setDownloadLink(result.link);
         setState("ready");
 
-        // ඉතිරිව ඇති තත්පර ගණනට validity timer එක සැකසීම
         const remainingValidity = MAX_UNLOCK_VALIDITY_MS - elapsedMs;
         if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
         validityTimerRef.current = setTimeout(() => {
@@ -297,41 +365,201 @@ export function DownloadButton({
       }
     } catch {
       /* noop */
+    } finally {
+      verifyInFlightRef.current = false;
     }
   }, [
     lockExpiryKey,
     timeStorageKey,
     sessionTokenKey,
+    adAttemptStorageKey,
+    adAwayStorageKey,
     resetToLocked,
     fetchLink,
     startLiveCountdown,
   ]);
 
-  useEffect(() => {
-    verifyAdTime();
+  const processAdReturn = useCallback(() => {
+    if (!pendingAdAttemptRef.current || returnedAfterAdMsRef.current === null) return;
+    const session = pendingSessionRef.current;
+    if (!session) return;
 
-    const handleActive = () => {
-      verifyAdTime();
+    const awayMs = returnedAfterAdMsRef.current;
+    pendingAdAttemptRef.current = false;
+    pendingSessionRef.current = null;
+    adAttemptAtRef.current = null;
+    adAwayAtRef.current = null;
+    returnedAfterAdMsRef.current = null;
+
+    if (adAttemptTimeoutRef.current) {
+      clearTimeout(adAttemptTimeoutRef.current);
+      adAttemptTimeoutRef.current = null;
+    }
+
+    try {
+      localStorage.removeItem(adAttemptStorageKey);
+      localStorage.removeItem(adAwayStorageKey);
+    } catch {
+      /* noop */
+    }
+
+    if (awayMs < MIN_AD_RETURN_MS) {
+      resetToLocked();
+      setAdWarning("Ad එකේ තත්පර 5ක් රැඳී සිට නැවත Download ඔබන්න.");
+      return;
+    }
+
+    setAdWarning("");
+    setState("verifying");
+    startLiveCountdown(session.startedAt, session.sessionToken);
+  }, [adAttemptStorageKey, adAwayStorageKey, resetToLocked, startLiveCountdown]);
+
+  useEffect(() => {
+    const markPageAway = () => {
+      if (!pendingAdAttemptRef.current || adAwayAtRef.current !== null) return;
+      if (document.visibilityState !== "hidden" && document.hasFocus()) return;
+
+      const awayAt = Date.now();
+      adAwayAtRef.current = awayAt;
+      try {
+        localStorage.setItem(adAwayStorageKey, String(awayAt));
+      } catch {
+        /* noop */
+      }
     };
 
-    document.addEventListener("visibilitychange", handleActive);
-    window.addEventListener("focus", handleActive);
-    window.addEventListener("pageshow", handleActive);
+    const handlePageActive = () => {
+      if (document.visibilityState === "hidden") return;
+
+      if (pendingAdAttemptRef.current) {
+        if (returnedAfterAdMsRef.current === null) {
+          const awayAt = adAwayAtRef.current ?? adAttemptAtRef.current;
+          returnedAfterAdMsRef.current = awayAt
+            ? Math.max(0, Date.now() - awayAt)
+            : 0;
+        }
+        processAdReturn();
+        return;
+      }
+
+      void verifyAdTime();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        markPageAway();
+      } else {
+        handlePageActive();
+      }
+    };
+
+    // Recover a tab restored/reloaded while the user was away. Without a
+    // recorded away timestamp, do not assume time spent on this site was ad time.
+    const restorePendingAttempt = () => {
+      let attemptAt: number | null = null;
+      let awayAt: number | null = null;
+      let sessionToken: string | null = null;
+      let startTime: number | null = null;
+
+      try {
+        const attemptAtValue = localStorage.getItem(adAttemptStorageKey);
+        const awayAtValue = localStorage.getItem(adAwayStorageKey);
+        const startTimeValue = localStorage.getItem(timeStorageKey);
+        attemptAt = attemptAtValue ? Number(attemptAtValue) : null;
+        awayAt = awayAtValue ? Number(awayAtValue) : null;
+        startTime = startTimeValue ? Number(startTimeValue) : null;
+        sessionToken = localStorage.getItem(sessionTokenKey);
+      } catch {
+        /* noop */
+      }
+
+      if (attemptAt === null) {
+        void verifyAdTime();
+        return;
+      }
+
+      if (
+        awayAt === null ||
+        !Number.isFinite(awayAt) ||
+        !sessionToken ||
+        startTime === null ||
+        !Number.isFinite(startTime) ||
+        Date.now() - startTime > MAX_UNLOCK_VALIDITY_MS
+      ) {
+        resetToLocked();
+        setAdWarning("Ad එකේ තත්පර 5ක් රැඳී සිට නැවත Download ඔබන්න.");
+        return;
+      }
+
+      const awayMs = Date.now() - awayAt;
+      if (awayMs < MIN_AD_RETURN_MS) {
+        resetToLocked();
+        setAdWarning("Ad එකේ තත්පර 5ක් රැඳී සිට නැවත Download ඔබන්න.");
+        return;
+      }
+
+      try {
+        localStorage.removeItem(adAttemptStorageKey);
+        localStorage.removeItem(adAwayStorageKey);
+      } catch {
+        /* noop */
+      }
+      setAdWarning("");
+      setState("verifying");
+      startLiveCountdown(startTime, sessionToken);
+    };
+
+    restorePendingAttempt();
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", markPageAway);
+    window.addEventListener("focus", handlePageActive);
+    window.addEventListener("pageshow", handlePageActive);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleActive);
-      window.removeEventListener("focus", handleActive);
-      window.removeEventListener("pageshow", handleActive);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", markPageAway);
+      window.removeEventListener("focus", handlePageActive);
+      window.removeEventListener("pageshow", handlePageActive);
       if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
       if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
       if (tickerRef.current) clearInterval(tickerRef.current);
+      if (adAttemptTimeoutRef.current) clearTimeout(adAttemptTimeoutRef.current);
     };
-  }, [verifyAdTime]);
+  }, [
+    adAttemptStorageKey,
+    adAwayStorageKey,
+    timeStorageKey,
+    sessionTokenKey,
+    processAdReturn,
+    resetToLocked,
+    startLiveCountdown,
+    verifyAdTime,
+  ]);
 
   const handleButtonClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (state === "locked") {
+      setAdWarning("");
+      setErrorMsg("");
+      const attemptAt = Date.now();
+      pendingAdAttemptRef.current = true;
+      adAttemptAtRef.current = attemptAt;
+      adAwayAtRef.current = null;
+      returnedAfterAdMsRef.current = null;
+      pendingSessionRef.current = null;
+
+      try {
+        localStorage.removeItem(timeStorageKey);
+        localStorage.removeItem(sessionTokenKey);
+        localStorage.removeItem(adAwayStorageKey);
+        localStorage.setItem(adAttemptStorageKey, String(attemptAt));
+      } catch {
+        /* noop */
+      }
+
+      setState("awaiting-ad-return");
       const activeAdUrl = getRandomAdUrl();
       try {
         const w = window.open(activeAdUrl, "_blank", "noopener");
@@ -340,8 +568,23 @@ export function DownloadButton({
         /* noop */
       }
 
-      // A browser countdown alone is bypassable. Ask the server for a short-lived
-      // one-use session before starting the UI timer.
+      // If the browser blocks the new tab and this page never loses focus,
+      // show the same short warning instead of leaving the button stuck.
+      adAttemptTimeoutRef.current = setTimeout(() => {
+        if (
+          pendingAdAttemptRef.current &&
+          returnedAfterAdMsRef.current === null &&
+          adAwayAtRef.current === null &&
+          document.visibilityState === "visible" &&
+          document.hasFocus()
+        ) {
+          returnedAfterAdMsRef.current = 0;
+          processAdReturn();
+        }
+      }, AD_POPUP_FALLBACK_MS);
+
+      // The database starts its own five-second clock when this request arrives.
+      // Only start the visible countdown after the user returns from the ad tab.
       try {
         const response = await fetch("/api/download-link", {
           method: "POST",
@@ -354,24 +597,29 @@ export function DownloadButton({
         });
         const data = (await response.json()) as { sessionToken?: unknown; error?: unknown };
         if (!response.ok || typeof data.sessionToken !== "string") {
+          resetToLocked();
           setErrorMsg(typeof data.error === "string" ? data.error : "Verification ආරම්භ කළ නොහැක. නැවත උත්සාහ කරන්න.");
           setTimeout(() => setErrorMsg(""), 6000);
           return;
         }
 
-        const now = Date.now();
-        localStorage.setItem(timeStorageKey, String(now));
+        const sessionStartedAt = Date.now();
+        localStorage.setItem(timeStorageKey, String(sessionStartedAt));
         localStorage.setItem(sessionTokenKey, data.sessionToken);
-        setState("verifying");
-        startLiveCountdown(now, data.sessionToken);
+        pendingSessionRef.current = {
+          startedAt: sessionStartedAt,
+          sessionToken: data.sessionToken,
+        };
+        processAdReturn();
       } catch {
+        resetToLocked();
         setErrorMsg("Verification සේවාවට සම්බන්ධ විය නොහැක. නැවත උත්සාහ කරන්න.");
         setTimeout(() => setErrorMsg(""), 6000);
       }
       return;
     }
 
-    if (state === "verifying" || state === "downloading") {
+    if (state === "awaiting-ad-return" || state === "verifying" || state === "downloading") {
       return;
     }
 
@@ -431,6 +679,21 @@ export function DownloadButton({
           </>
         );
 
+      case "awaiting-ad-return":
+        return (
+          <>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col items-start text-left">
+              <span className="text-sm font-extrabold">Waiting for ad return</span>
+              <span className="text-[11px] font-medium opacity-80">
+                Ad එකේ තත්පර 5ක් රැඳී සිටින්න
+              </span>
+            </span>
+          </>
+        );
+
       case "verifying":
         return (
           <>
@@ -484,6 +747,7 @@ export function DownloadButton({
         return normalizedVariant === "telegram"
           ? base + " border-sky-400/30 bg-gradient-to-r from-sky-600 via-blue-600 to-blue-700 text-white focus-visible:ring-sky-400"
           : base + " border-rose-400/30 bg-gradient-to-r from-rose-600 via-rose-600 to-red-700 text-white focus-visible:ring-rose-400";
+      case "awaiting-ad-return":
       case "verifying":
         return base + " border-indigo-300/30 bg-gradient-to-r from-indigo-600 to-violet-700 text-white focus-visible:ring-indigo-400";
       case "ready":
@@ -510,6 +774,17 @@ export function DownloadButton({
       >
         {getButtonContent()}
       </button>
+
+      {adWarning && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-xs font-semibold text-amber-800 dark:text-amber-200"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{adWarning}</span>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="flex items-center gap-1.5 p-2 rounded-xl bg-destructive/15 text-destructive border border-destructive/30 text-xs font-semibold animate-shake">
