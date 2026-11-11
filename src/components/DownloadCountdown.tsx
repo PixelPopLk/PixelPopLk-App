@@ -483,8 +483,7 @@ export function DownloadButton({
         !Number.isFinite(awayAt) ||
         !sessionToken ||
         startTime === null ||
-        !Number.isFinite(startTime) ||
-        Date.now() - startTime > MAX_UNLOCK_VALIDITY_MS
+        !Number.isFinite(startTime)
       ) {
         resetToLocked();
         setAdWarning("Ad එකේ තත්පර 5ක් රැඳී සිට නැවත Download ඔබන්න.");
@@ -760,7 +759,7 @@ export function DownloadButton({
     <div className="flex w-full flex-col items-center gap-2.5">
       <span className="flex items-center justify-center gap-1.5 px-2 text-center text-[11px] font-medium leading-relaxed text-muted-foreground/90 select-none sm:text-xs">
         <Info className="h-3.5 w-3.5 shrink-0 text-primary" />
-        Unlock කර තත්පර 5ක් රැඳී සිට නැවත මෙම පිටුවට එන්න
+        Ad link එක open කර තත්පර 5ක් රැඳී සිට නැවත මෙම පිටුවට එන්න
       </span>
 
       <button
