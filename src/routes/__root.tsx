@@ -16,7 +16,7 @@ import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const MONETAG_CLICK_AD_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
 const ADSTERRA_CLICK_AD_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
-const CLICK_AD_COOLDOWN_MS = 15_000;
+const CLICK_AD_COOLDOWN_MS = 5_000;
 // Shared with Sidebar.tsx so one click cannot open two sponsor tabs.
 const LAST_CLICK_AD_STORAGE_KEY = "pxl_sidebar_last_ad_time";
 
@@ -297,9 +297,8 @@ function RootComponent() {
     };
   }, [isAdminPage, location.pathname]);
 
-  // Restore the site-wide smartlink trigger removed in the previous change.
-  // Keep it limited by a cooldown and exclude download, Telegram, modal and
-  // admin interactions. Sidebar.tsx shares the same key to avoid double opens.
+  // Open a smartlink for eligible site clicks, with a shared five-second
+  // cooldown. Sidebar.tsx uses the same storage key to prevent duplicate opens.
   useEffect(() => {
     if (isAdminPage || adBlockDetected) return;
 
@@ -343,27 +342,6 @@ function RootComponent() {
           // Ignore malformed link targets and continue with the normal checks.
         }
       }
-
-      const clickableText = clickable.textContent ?? "";
-      const isDownloadButton =
-        clickable.hasAttribute("download") ||
-        Boolean(clickable.closest("[download], [data-download], [data-no-ad='true']")) ||
-        (typeof clickable.className === "string" && /download/i.test(clickable.className)) ||
-        Boolean(clickable.id && /download/i.test(clickable.id)) ||
-        /download|බාගන්න/i.test(clickableText) ||
-        Boolean(
-          targetUrl &&
-            (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) ||
-              /download/i.test(targetUrl)),
-        );
-
-      const isTelegramButton =
-        Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
-        /telegram|ටෙලිග්‍රෑම්/i.test(clickableText) ||
-        (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
-        Boolean(clickable.id && /telegram/i.test(clickable.id));
-
-      if (isDownloadButton || isTelegramButton) return;
 
       const now = Date.now();
       try {
