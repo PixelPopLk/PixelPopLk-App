@@ -407,7 +407,7 @@ function RootComponent() {
               Adblocker Detected!
             </h2>
             <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
-              Adblocker හෝ VPN ඕෆ් කර නැවත උත්සාහ කරන්න.
+              Adblocker ඕෆ් කර නැවත උත්සාහ කරන්න.
             </p>
             <button
               type="button"
