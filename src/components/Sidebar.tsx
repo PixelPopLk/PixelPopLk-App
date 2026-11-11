@@ -14,18 +14,18 @@ import { TelegramIcon, FacebookIcon } from "./SocialIcons";
 const MONETAG_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
 const ADSTERRA_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
-const AD_COOLDOWN_MS = 15000; // තත්පර 15ක Cooldown කාලය (15,000 ms)
+const AD_COOLDOWN_MS = 5000; // තත්පර 5ක Cooldown කාලය (5,000 ms)
 const LAST_AD_STORAGE_KEY = "pxl_sidebar_last_ad_time";
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
-// 🚀 තත්පර 15කට වරක් පමණක් Ad එක Trigger වන Function එක
+// 🚀 තත්පර 5කට වරක් පමණක් Ad එක Trigger වන Function එක
 const triggerAdWithCooldown = () => {
   try {
     const lastAdTime = localStorage.getItem(LAST_AD_STORAGE_KEY);
     const now = Date.now();
 
-    // මුල්ම වතාවේ හෝ අවසන් වරට Ad එකක් පෙන්වා තත්පර 15ක් ගතවී ඇත්නම් පමණක් Ad එක Open කිරීම
+    // මුල්ම වතාවේ හෝ අවසන් Ad එකෙන් තත්පර 5ක් ගතවී ඇත්නම් පමණක් Ad එක Open කිරීම
     if (!lastAdTime || now - parseInt(lastAdTime, 10) >= AD_COOLDOWN_MS) {
       localStorage.setItem(LAST_AD_STORAGE_KEY, String(now));
       

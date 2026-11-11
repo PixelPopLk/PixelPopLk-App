@@ -16,7 +16,7 @@ import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
 const MONETAG_CLICK_AD_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
 const ADSTERRA_CLICK_AD_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
-const CLICK_AD_COOLDOWN_MS = 15_000;
+const CLICK_AD_COOLDOWN_MS = 5_000;
 // Shared with Sidebar.tsx so one click cannot open two sponsor tabs.
 const LAST_CLICK_AD_STORAGE_KEY = "pxl_sidebar_last_ad_time";
 
@@ -266,29 +266,39 @@ function RootComponent() {
     });
 
     const detectAdBlocker = () => {
-      const blocked = baits.some((bait) => {
+      // A single matching selector is not enough to block a visitor: some
+      // privacy tools or site-specific filters may hide one generic bait.
+      // Require multiple independent bait elements to be hidden.
+      const hiddenBaitCount = baits.filter((bait) => {
         const style = window.getComputedStyle(bait);
+        const rect = bait.getBoundingClientRect();
         return (
           bait.offsetHeight === 0 ||
           bait.offsetWidth === 0 ||
+          rect.width === 0 ||
+          rect.height === 0 ||
           style.display === "none" ||
-          style.visibility === "hidden"
+          style.visibility === "hidden" ||
+          style.visibility === "collapse"
         );
-      });
-      setAdBlockDetected(blocked);
+      }).length;
+
+      // Two or more blocked selectors indicate an ad-blocking filter with
+      // much lower false-positive risk than treating one selector as proof.
+      setAdBlockDetected(hiddenBaitCount >= 2);
       baits.forEach((bait) => bait.remove());
     };
 
-    const timer = window.setTimeout(detectAdBlocker, 150);
+    // Give browser extensions enough time to apply cosmetic filter rules.
+    const timer = window.setTimeout(detectAdBlocker, 500);
     return () => {
       window.clearTimeout(timer);
       baits.forEach((bait) => bait.remove());
     };
   }, [isAdminPage, location.pathname]);
 
-  // Restore the site-wide smartlink trigger removed in the previous change.
-  // Keep it limited by a cooldown and exclude download, Telegram, modal and
-  // admin interactions. Sidebar.tsx shares the same key to avoid double opens.
+  // Open a smartlink for eligible site clicks, with a shared five-second
+  // cooldown. Sidebar.tsx uses the same storage key to prevent duplicate opens.
   useEffect(() => {
     if (isAdminPage || adBlockDetected) return;
 
@@ -333,27 +343,6 @@ function RootComponent() {
         }
       }
 
-      const clickableText = clickable.textContent ?? "";
-      const isDownloadButton =
-        clickable.hasAttribute("download") ||
-        Boolean(clickable.closest("[download], [data-download], [data-no-ad='true']")) ||
-        (typeof clickable.className === "string" && /download/i.test(clickable.className)) ||
-        Boolean(clickable.id && /download/i.test(clickable.id)) ||
-        /download|බාගන්න/i.test(clickableText) ||
-        Boolean(
-          targetUrl &&
-            (/\.(srt|zip|rar|7z|sub)($|\?)/i.test(targetUrl) ||
-              /download/i.test(targetUrl)),
-        );
-
-      const isTelegramButton =
-        Boolean(targetUrl && /(t\.me|telegram\.me|telegram\.dog)/i.test(targetUrl)) ||
-        /telegram|ටෙලිග්‍රෑම්/i.test(clickableText) ||
-        (typeof clickable.className === "string" && /telegram/i.test(clickable.className)) ||
-        Boolean(clickable.id && /telegram/i.test(clickable.id));
-
-      if (isDownloadButton || isTelegramButton) return;
-
       const now = Date.now();
       try {
         const lastAdTime = Number(localStorage.getItem(LAST_CLICK_AD_STORAGE_KEY) || 0);
@@ -391,33 +380,19 @@ function RootComponent() {
           aria-labelledby="adblock-gate-title"
           aria-describedby="adblock-gate-description"
         >
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
             <h2 id="adblock-gate-title" className="text-xl font-bold text-foreground">
-              Adblocker එක ක්‍රියාත්මකයි
+              Adblocker Detected!
             </h2>
             <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
-              PixelPopLK පවත්වාගෙන යාමට දැන්වීම් උපකාරී වෙනවා. ඔබගේ browser එකේ හෝ ad-blocking extension එකේ
-              දැන්වීම් අවහිර කිරීම අක්‍රිය කර නැවත උත්සාහ කරන්න.
+              Adblocker ඕෆ් කර නැවත උත්සාහ කරන්න.
             </p>
-            <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 text-left text-sm leading-6 text-muted-foreground">
-              <p className="font-semibold text-foreground">Adblocker එක අක්‍රිය කරන්නේ කෙසේද?</p>
-              <p className="mt-2">
-                uBlock Origin හෝ AdGuard භාවිතා කරනවා නම් PixelPopLK සඳහා blocking එක අක්‍රිය කරන්න.
-                Brave භාවිතා කරනවා නම් Shields සකස් කරන්න. Firefox භාවිතා කරනවා නම් මෙම වෙබ් අඩවිය සඳහා
-                Enhanced Tracking Protection සැකසුම පරීක්ෂා කරන්න. ඉන්පසු නැවත පූරණය කරන්න.
-              </p>
-              <p className="mt-2">
-                මෙම පරීක්ෂාව browser එකේ ad-blocking filter එකක් හඳුනාගැනීමට උත්සාහ කරනවා. සියලුම blockers
-                හඳුනාගැනීම සහතික කළ නොහැකි අතර, සාමාන්‍ය ජාල දෝෂයක් පමණක් නිසා මෙම පණිවිඩය නොපෙන්වීමට
-                ad-script load failure එක මත පදනම් නොවේ.
-              </p>
-            </div>
             <button
               type="button"
               onClick={retryAfterDisablingAdBlocker}
               className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Adblocker ඕෆ් කර නැවත උත්සාහ කරන්න
+              නැවත උත්සාහ කරන්න
             </button>
           </div>
         </div>
