@@ -763,31 +763,61 @@ function Dashboard() {
       const status = isUpdate ? "🔄 UPDATE" : "🎬 NEW";
       const channelLine = `Join ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`;
 
-      // Default preserves the existing caption layout. Themes only change presentation.
+      // Each layout uses real newline characters and a distinct visual structure.
+      const details = [yearLine, ratingLine, genreLine, episodeLine].filter(Boolean);
+      const detailText = details.join("\n");
+      const storyBlock = desc ? `<b>📝 OVERVIEW</b>\n<i>${desc}</i>` : "";
       let caption = "";
+
       switch (tgPostLayout) {
         case "theme1":
-          caption = `<b>╭── ${status} ──╮</b>\n<b>${title}</b>\n\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("\\n")}\n\n${desc ? `<b>📝 STORY</b>\n<i>${desc}</i>\n\n` : ""}${channelLine}`;
+          caption = [
+            `╔════════════════════╗`,
+            `<b>  ${status}</b>`,
+            `<b>${title}</b>`,
+            `╚════════════════════╝`,
+            detailText,
+            storyBlock,
+            `<i>❤ ${channelLine}</i>`,
+          ].filter(Boolean).join("\n\n");
           break;
         case "theme2":
-          caption = `<b>✨ ${status}: ${title}</b>\n━━━━━━━━━━━━━━\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("\\n")}\n${desc ? `\n<b>📖 OVERVIEW</b>\n<i>${desc}</i>\n` : ""}\n━━━━━━━━━━━━━━\n${channelLine}`;
+          caption = [
+            `<b>✦ ${status} ✦</b>`,
+            `<b>${title}</b>`,
+            `━━━━━━━━━━━━━━━━`,
+            detailText,
+            storyBlock,
+            `━━━━━━━━━━━━━━━━`,
+            channelLine,
+          ].filter(Boolean).join("\n\n");
           break;
         case "theme3":
-          caption = `<b>🎞️ ${title}</b>\n< i>${status}</i>\n\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("  •  ")}${desc ? `\n\n📝 <i>${desc}</i>` : ""}\n\n❤️ ${channelLine}`;
+          caption = [
+            `<b>🎬 ${title}</b>`,
+            `<i>${status}</i>`,
+            `──────────────`,
+            details.map((line) => line.replace(/<b>|<\/b>/g, "")).join("  •  "),
+            desc ? `“${desc}”` : "",
+            `❤️ ${channelLine}`,
+          ].filter(Boolean).join("\n");
           break;
         case "theme4":
-          caption = `<b>${status} | ${title}</b>\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("\\n")}${desc ? `\n\n<i>${desc}</i>` : ""}\n\n${channelLine}`;
+          caption = [
+            `<b>${title}</b>`,
+            `${status}  ${row.year ? `· ${row.year}` : ""}`,
+            [ratingLine, genreLine, episodeLine].filter(Boolean).join("  |  "),
+            desc,
+            channelLine,
+          ].filter(Boolean).join("\n\n");
           break;
         default:
-          caption = isUpdate
-            ? `<b>🔄 UPDATE: ${title}</b>\n\n`
-            : `<b>🎬 NEW: ${title}</b>\n\n`;
-          if (row.year) caption += `📅 <b>Year:</b> ${row.year}\n`;
-          if (row.rating) caption += `⭐ <b>Rating:</b> ${row.rating}/10\n`;
-          if (row.genre) caption += `🎭 <b>Genres:</b> ${escapeHtml(row.genre)}\n`;
-          if (isSeries) caption += `📺 <b>Season:</b> ${row.season} | <b>Episode:</b> ${row.episode}\n`;
-          if (desc) caption += `\n📝 <b>Overview:</b>\n<i>${desc}</i>\n`;
-          caption += `\n${channelLine}`;
+          caption = [
+            isUpdate ? `<b>🔄 UPDATE: ${title}</b>` : `<b>🎬 NEW: ${title}</b>`,
+            detailText,
+            desc ? `📝 <b>Overview:</b>\n<i>${desc}</i>` : "",
+            `Join ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`,
+          ].filter(Boolean).join("\n\n");
       }
 
       await fetch(`https://api.telegram.org/bot${tgBotToken}/sendPhoto`, {
