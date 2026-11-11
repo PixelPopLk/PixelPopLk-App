@@ -266,20 +266,31 @@ function RootComponent() {
     });
 
     const detectAdBlocker = () => {
-      const blocked = baits.some((bait) => {
+      // A single matching selector is not enough to block a visitor: some
+      // privacy tools or site-specific filters may hide one generic bait.
+      // Require multiple independent bait elements to be hidden.
+      const hiddenBaitCount = baits.filter((bait) => {
         const style = window.getComputedStyle(bait);
+        const rect = bait.getBoundingClientRect();
         return (
           bait.offsetHeight === 0 ||
           bait.offsetWidth === 0 ||
+          rect.width === 0 ||
+          rect.height === 0 ||
           style.display === "none" ||
-          style.visibility === "hidden"
+          style.visibility === "hidden" ||
+          style.visibility === "collapse"
         );
-      });
-      setAdBlockDetected(blocked);
+      }).length;
+
+      // Two or more blocked selectors indicate an ad-blocking filter with
+      // much lower false-positive risk than treating one selector as proof.
+      setAdBlockDetected(hiddenBaitCount >= 2);
       baits.forEach((bait) => bait.remove());
     };
 
-    const timer = window.setTimeout(detectAdBlocker, 150);
+    // Give browser extensions enough time to apply cosmetic filter rules.
+    const timer = window.setTimeout(detectAdBlocker, 500);
     return () => {
       window.clearTimeout(timer);
       baits.forEach((bait) => bait.remove());
