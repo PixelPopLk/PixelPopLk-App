@@ -478,6 +478,10 @@ function Dashboard() {
   const [tgEnabled, setTgEnabled] = useState(() => localStorage.getItem("pixelpop_tg_enabled") === "true");
   const [tgBotToken, setTgBotToken] = useState(() => localStorage.getItem("pixelpop_tg_bot_token") || "");
   const [tgChatId, setTgChatId] = useState(() => localStorage.getItem("pixelpop_tg_chat_id") || "");
+  const [tgButtonColor, setTgButtonColor] = useState<"success" | "danger" | "primary">(() => {
+    const savedColor = localStorage.getItem("pixelpop_tg_button_color");
+    return savedColor === "danger" || savedColor === "primary" ? savedColor : "success";
+  });
 
   // Post to Telegram Checkbox (Default false on edit, true on new insert if tg configured)
   const [postToTelegram, setPostToTelegram] = useState(true);
@@ -747,9 +751,7 @@ function Dashboard() {
         caption += `\n📝 <b>Overview:</b>\n<i>${escapeHtml(desc)}</i>\n`;
       }
 
-      caption += `\n📥 <b>Download Sinhala Subtitle:</b>\n`;
-      caption += `<a href="${downloadTargetUrl}">Click Here to Download Subtitle</a>\n\n`;
-      caption += `Join ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`;
+      caption += `\nJoin ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`;
 
       await fetch(`https://api.telegram.org/bot${tgBotToken}/sendPhoto`, {
         method: "POST",
@@ -759,6 +761,11 @@ function Dashboard() {
           photo: row.image_url || "https://pixelpoplk.pages.dev/og-banner.png",
           caption: caption,
           parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [[
+              { text: "Download", url: downloadTargetUrl, style: tgButtonColor },
+            ]],
+          },
         }),
       });
     } catch (err) {
@@ -1438,6 +1445,28 @@ function Dashboard() {
                       }}
                       placeholder="e.g. @pixelpoplk or -100..."
                     />
+                  </div>
+                  <div className="max-w-sm pt-1">
+                    <label className="block text-xs font-semibold text-foreground mb-1.5" htmlFor="telegram-download-button-color">
+                      Download Button Color
+                    </label>
+                    <select
+                      id="telegram-download-button-color"
+                      value={tgButtonColor}
+                      onChange={(e) => {
+                        const color = e.target.value as "success" | "danger" | "primary";
+                        setTgButtonColor(color);
+                        localStorage.setItem("pixelpop_tg_button_color", color);
+                      }}
+                      className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value="success">🟢 Green</option>
+                      <option value="danger">🔴 Red</option>
+                      <option value="primary">🔵 Blue</option>
+                    </select>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Applies to new Telegram posts sent from this admin dashboard.
+                    </p>
                   </div>
                 </motion.div>
               )}
