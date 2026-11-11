@@ -731,7 +731,20 @@ function Dashboard() {
     try {
       const siteUrl = "https://pixelpoplk.pages.dev";
       const isSeries = row.season != null && row.episode != null;
-      const downloadTargetUrl = isSeries ? `${siteUrl}/episode/${row.id}` : `${siteUrl}/content/${row.id}`;
+      // Resolve the canonical TV-series landing page (S01E01 ID), not the individual episode URL.
+      const seriesItem = isSeries
+        ? buildGridItems([
+            ...((rows ?? []).filter((item: any) => String(item.id) !== String(row.id))),
+            row,
+          ]).find(
+            (item) =>
+              item.kind === "series" &&
+              item.episodes.some((episode) => String(episode.id) === String(row.id)),
+          )
+        : null;
+      const downloadTargetUrl = isSeries
+        ? `${siteUrl}/content/${seriesItem?.id ?? row.id}`
+        : `${siteUrl}/content/${row.id}`;
 
       let caption = isUpdate
         ? `<b>🔄 UPDATE: ${escapeHtml(row.title)}</b>\n\n`
