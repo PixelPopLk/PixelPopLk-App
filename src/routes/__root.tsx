@@ -402,33 +402,19 @@ function RootComponent() {
           aria-labelledby="adblock-gate-title"
           aria-describedby="adblock-gate-description"
         >
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
             <h2 id="adblock-gate-title" className="text-xl font-bold text-foreground">
-              Adblocker එක ක්‍රියාත්මකයි
+              Adblocker Detected!
             </h2>
             <p id="adblock-gate-description" className="mt-3 text-sm leading-6 text-muted-foreground">
-              PixelPopLK පවත්වාගෙන යාමට දැන්වීම් උපකාරී වෙනවා. ඔබගේ browser එකේ හෝ ad-blocking extension එකේ
-              දැන්වීම් අවහිර කිරීම අක්‍රිය කර නැවත උත්සාහ කරන්න.
+              Adblocker හෝ VPN ඕෆ් කර නැවත උත්සාහ කරන්න.
             </p>
-            <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 text-left text-sm leading-6 text-muted-foreground">
-              <p className="font-semibold text-foreground">Adblocker එක අක්‍රිය කරන්නේ කෙසේද?</p>
-              <p className="mt-2">
-                uBlock Origin හෝ AdGuard භාවිතා කරනවා නම් PixelPopLK සඳහා blocking එක අක්‍රිය කරන්න.
-                Brave භාවිතා කරනවා නම් Shields සකස් කරන්න. Firefox භාවිතා කරනවා නම් මෙම වෙබ් අඩවිය සඳහා
-                Enhanced Tracking Protection සැකසුම පරීක්ෂා කරන්න. ඉන්පසු නැවත පූරණය කරන්න.
-              </p>
-              <p className="mt-2">
-                මෙම පරීක්ෂාව browser එකේ ad-blocking filter එකක් හඳුනාගැනීමට උත්සාහ කරනවා. සියලුම blockers
-                හඳුනාගැනීම සහතික කළ නොහැකි අතර, සාමාන්‍ය ජාල දෝෂයක් පමණක් නිසා මෙම පණිවිඩය නොපෙන්වීමට
-                ad-script load failure එක මත පදනම් නොවේ.
-              </p>
-            </div>
             <button
               type="button"
               onClick={retryAfterDisablingAdBlocker}
               className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Adblocker ඕෆ් කර නැවත උත්සාහ කරන්න
+              නැවත උත්සාහ කරන්න
             </button>
           </div>
         </div>
