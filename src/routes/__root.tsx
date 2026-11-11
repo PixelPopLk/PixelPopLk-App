@@ -313,6 +313,16 @@ function RootComponent() {
       const target = event.target;
       if (!(target instanceof Element)) return;
 
+      // Download buttons have their own ad flow. Exclude them from the
+      // site-wide smartlink popup, including clicks on nested button content.
+      if (
+        target.closest(
+          '[data-download="true"], [data-download], [data-no-ad="true"], a[download]',
+        )
+      ) {
+        return;
+      }
+
       const isInsidePopup = target.closest(
         '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
           ".modal, .dialog, .popup, [data-radix-dialog-content], " +
