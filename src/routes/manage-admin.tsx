@@ -482,6 +482,12 @@ function Dashboard() {
     const savedColor = localStorage.getItem("pixelpop_tg_button_color");
     return savedColor === "danger" || savedColor === "primary" ? savedColor : "success";
   });
+  const [tgPostLayout, setTgPostLayout] = useState<"default" | "theme1" | "theme2" | "theme3" | "theme4">(() => {
+    const savedLayout = localStorage.getItem("pixelpop_tg_post_layout");
+    return savedLayout === "theme1" || savedLayout === "theme2" || savedLayout === "theme3" || savedLayout === "theme4"
+      ? savedLayout
+      : "default";
+  });
 
   // Post to Telegram Checkbox (Default false on edit, true on new insert if tg configured)
   const [postToTelegram, setPostToTelegram] = useState(true);
@@ -731,27 +737,58 @@ function Dashboard() {
     try {
       const siteUrl = "https://pixelpoplk.pages.dev";
       const isSeries = row.season != null && row.episode != null;
-      const downloadTargetUrl = isSeries ? `${siteUrl}/episode/${row.id}` : `${siteUrl}/content/${row.id}`;
+      // Resolve the canonical TV-series landing page (S01E01 ID), not the individual episode URL.
+      const seriesItem = isSeries
+        ? buildGridItems([
+            ...((rows ?? []).filter((item: any) => String(item.id) !== String(row.id))),
+            row,
+          ]).find(
+            (item) =>
+              item.kind === "series" &&
+              item.episodes.some((episode) => String(episode.id) === String(row.id)),
+          )
+        : null;
+      const downloadTargetUrl = isSeries
+        ? `${siteUrl}/content/${seriesItem?.id ?? row.id}`
+        : `${siteUrl}/content/${row.id}`;
 
-      let caption = isUpdate
-        ? `<b>🔄 UPDATE: ${escapeHtml(row.title)}</b>\n\n`
-        : `<b>🎬 NEW: ${escapeHtml(row.title)}</b>\n\n`;
+      const title = escapeHtml(row.title);
+      const desc = row.description
+        ? escapeHtml(row.description.length > 250 ? row.description.substring(0, 250) + "..." : row.description)
+        : "";
+      const yearLine = row.year ? `📅 <b>Year:</b> ${row.year}` : "";
+      const ratingLine = row.rating ? `⭐ <b>Rating:</b> ${row.rating}/10` : "";
+      const genreLine = row.genre ? `🎭 <b>Genres:</b> ${escapeHtml(row.genre)}` : "";
+      const episodeLine = isSeries ? `📺 <b>Season:</b> ${row.season} | <b>Episode:</b> ${row.episode}` : "";
+      const status = isUpdate ? "🔄 UPDATE" : "🎬 NEW";
+      const channelLine = `Join ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`;
 
-      if (row.year) caption += `📅 <b>Year:</b> ${row.year}\n`;
-      if (row.rating) caption += `⭐ <b>Rating:</b> ${row.rating}/10\n`;
-      if (row.genre) caption += `🎭 <b>Genres:</b> ${escapeHtml(row.genre)}\n`;
-      if (isSeries) {
-        caption += `📺 <b>Season:</b> ${row.season} | <b>Episode:</b> ${row.episode}\n`;
+      // Default preserves the existing caption layout. Themes only change presentation.
+      let caption = "";
+      switch (tgPostLayout) {
+        case "theme1":
+          caption = `<b>╭── ${status} ──╮</b>\n<b>${title}</b>\n\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("\\n")}\n\n${desc ? `<b>📝 STORY</b>\n<i>${desc}</i>\n\n` : ""}${channelLine}`;
+          break;
+        case "theme2":
+          caption = `<b>✨ ${status}: ${title}</b>\n━━━━━━━━━━━━━━\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("\\n")}\n${desc ? `\n<b>📖 OVERVIEW</b>\n<i>${desc}</i>\n` : ""}\n━━━━━━━━━━━━━━\n${channelLine}`;
+          break;
+        case "theme3":
+          caption = `<b>🎞️ ${title}</b>\n< i>${status}</i>\n\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("  •  ")}${desc ? `\n\n📝 <i>${desc}</i>` : ""}\n\n❤️ ${channelLine}`;
+          break;
+        case "theme4":
+          caption = `<b>${status} | ${title}</b>\n${[yearLine, ratingLine, genreLine, episodeLine].filter(Boolean).join("\\n")}${desc ? `\n\n<i>${desc}</i>` : ""}\n\n${channelLine}`;
+          break;
+        default:
+          caption = isUpdate
+            ? `<b>🔄 UPDATE: ${title}</b>\n\n`
+            : `<b>🎬 NEW: ${title}</b>\n\n`;
+          if (row.year) caption += `📅 <b>Year:</b> ${row.year}\n`;
+          if (row.rating) caption += `⭐ <b>Rating:</b> ${row.rating}/10\n`;
+          if (row.genre) caption += `🎭 <b>Genres:</b> ${escapeHtml(row.genre)}\n`;
+          if (isSeries) caption += `📺 <b>Season:</b> ${row.season} | <b>Episode:</b> ${row.episode}\n`;
+          if (desc) caption += `\n📝 <b>Overview:</b>\n<i>${desc}</i>\n`;
+          caption += `\n${channelLine}`;
       }
-      if (row.description) {
-        const desc =
-          row.description.length > 250
-            ? row.description.substring(0, 250) + "..."
-            : row.description;
-        caption += `\n📝 <b>Overview:</b>\n<i>${escapeHtml(desc)}</i>\n`;
-      }
-
-      caption += `\nJoin ${tgChatId.startsWith("@") ? tgChatId : "@pixelpoplk"} for more updates! ❤`;
 
       await fetch(`https://api.telegram.org/bot${tgBotToken}/sendPhoto`, {
         method: "POST",
@@ -1445,6 +1482,30 @@ function Dashboard() {
                       }}
                       placeholder="e.g. @pixelpoplk or -100..."
                     />
+                  </div>
+                  <div className="max-w-sm pt-1">
+                    <label className="block text-xs font-semibold text-foreground mb-1.5" htmlFor="telegram-post-layout">
+                      Telegram Post Layout
+                    </label>
+                    <select
+                      id="telegram-post-layout"
+                      value={tgPostLayout}
+                      onChange={(e) => {
+                        const layout = e.target.value as typeof tgPostLayout;
+                        setTgPostLayout(layout);
+                        localStorage.setItem("pixelpop_tg_post_layout", layout);
+                      }}
+                      className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value="default">Default (Current)</option>
+                      <option value="theme1">Theme 1 — Framed</option>
+                      <option value="theme2">Theme 2 — Classic</option>
+                      <option value="theme3">Theme 3 — Cinematic</option>
+                      <option value="theme4">Theme 4 — Minimal</option>
+                    </select>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Select the layout used for new Telegram posts. Default keeps the current format.
+                    </p>
                   </div>
                   <div className="max-w-sm pt-1">
                     <label className="block text-xs font-semibold text-foreground mb-1.5" htmlFor="telegram-download-button-color">
