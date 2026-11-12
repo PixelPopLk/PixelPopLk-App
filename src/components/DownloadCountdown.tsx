@@ -20,6 +20,7 @@ const RELOCK_DELAY_MS = 30 * 1000; // Download click කළ පසු නැව�
 const MAX_UNLOCK_VALIDITY_MS = 60 * 1000; // Unlock වූ පසු Download click කිරීමට තත්පර 60ක්
 const MIN_AD_RETURN_MS = REQUIRED_AD_SECONDS * 1000;
 const AD_POPUP_FALLBACK_MS = 8 * 1000;
+const DOWNLOAD_STATUS_SECONDS = 10;
 
 const getRandomAdUrl = () => (Math.random() < 0.5 ? MONETAG_URL : ADSTERRA_URL);
 
@@ -132,11 +133,13 @@ export function DownloadButton({
   const [downloadLink, setDownloadLink] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [adWarning, setAdWarning] = useState<string>("");
+  const [downloadStatusRemaining, setDownloadStatusRemaining] = useState<number>(DOWNLOAD_STATUS_SECONDS);
 
   const reLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const validityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adAttemptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const downloadStatusTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingAdAttemptRef = useRef(false);
   const adAttemptAtRef = useRef<number | null>(null);
   const adAwayAtRef = useRef<number | null>(null);
@@ -188,6 +191,11 @@ export function DownloadButton({
     setState("locked");
     setRemainingSec(REQUIRED_AD_SECONDS);
     setDownloadLink("");
+    setDownloadStatusRemaining(DOWNLOAD_STATUS_SECONDS);
+    if (downloadStatusTimerRef.current) {
+      clearInterval(downloadStatusTimerRef.current);
+      downloadStatusTimerRef.current = null;
+    }
     if (tickerRef.current) {
       clearInterval(tickerRef.current);
       tickerRef.current = null;
@@ -524,6 +532,7 @@ export function DownloadButton({
       if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
       if (tickerRef.current) clearInterval(tickerRef.current);
       if (adAttemptTimeoutRef.current) clearTimeout(adAttemptTimeoutRef.current);
+      if (downloadStatusTimerRef.current) clearInterval(downloadStatusTimerRef.current);
     };
   }, [
     adAttemptStorageKey,
@@ -658,8 +667,11 @@ export function DownloadButton({
           clearTimeout(validityTimerRef.current);
           validityTimerRef.current = null;
         }
+        setDownloadStatusRemaining(DOWNLOAD_STATUS_SECONDS);
         setState("downloading");
 
+        // Trigger the actual browser/host download immediately, at the start of
+        // the visible 10-second status countdown (not after the countdown).
         if (normalizedVariant === "telegram") {
           window.open(finalUrl.trim(), "_blank", "noopener,noreferrer");
         } else {
@@ -667,6 +679,20 @@ export function DownloadButton({
         }
 
         logDownload(subtitleId, normalizedVariant);
+
+        if (downloadStatusTimerRef.current) clearInterval(downloadStatusTimerRef.current);
+        downloadStatusTimerRef.current = setInterval(() => {
+          setDownloadStatusRemaining((current) => {
+            if (current <= 1) {
+              if (downloadStatusTimerRef.current) {
+                clearInterval(downloadStatusTimerRef.current);
+                downloadStatusTimerRef.current = null;
+              }
+              return 0;
+            }
+            return current - 1;
+          });
+        }, 1000);
 
         // ⏱️ Download click කළ පසු තත්පර 30කින් නැවත Lock කිරීම
         const expireAt = Date.now() + RELOCK_DELAY_MS;
@@ -763,8 +789,8 @@ export function DownloadButton({
               <CheckCircle2 className="h-5 w-5 animate-pulse" />
             </span>
             <span className="flex flex-1 flex-col items-start text-left">
-              <span className="text-sm font-extrabold">Starting download...</span>
-              <span className="text-[11px] font-medium opacity-80">Please wait</span>
+              <span className="text-sm font-extrabold">{downloadStatusRemaining > 0 ? "Downloading file..." : "Download started"}</span>
+              <span className="text-[11px] font-medium opacity-80">{downloadStatusRemaining > 0 ? `Please wait ${downloadStatusRemaining}s` : "Your download should be starting"}</span>
             </span>
           </>
         );
