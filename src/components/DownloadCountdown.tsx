@@ -789,8 +789,8 @@ export function DownloadButton({
               <CheckCircle2 className="h-5 w-5 animate-pulse" />
             </span>
             <span className="flex flex-1 flex-col items-start text-left">
-              <span className="text-sm font-extrabold">{downloadStatusRemaining > 0 ? "Downloading file..." : "Download started"}</span>
-              <span className="text-[11px] font-medium opacity-80">{downloadStatusRemaining > 0 ? `Please wait ${downloadStatusRemaining}s` : "Your download should be starting"}</span>
+              <span className="text-sm font-extrabold">{downloadStatusRemaining > 0 ? "Starting your download..." : "Download request sent"}</span>
+              <span className="text-[11px] font-medium opacity-80">{downloadStatusRemaining > 0 ? `Please wait ${downloadStatusRemaining}s` : "Check your browser downloads"}</span>
             </span>
           </>
         );
