@@ -560,11 +560,37 @@ export function DownloadButton({
 
       setState("awaiting-ad-return");
       const activeAdUrl = getRandomAdUrl();
+      // Open a blank tab synchronously during the user gesture, then detach
+      // it from this page before navigating to the ad URL. Using "noopener"
+      // in the window.open features can return null even when the tab opened,
+      // so it cannot be used to detect popup blocking.
+      let adWindow: Window | null = null;
       try {
-        const w = window.open(activeAdUrl, "_blank", "noopener");
-        if (w) w.opener = null;
+        adWindow = window.open("about:blank", "_blank");
+        if (adWindow) {
+          adWindow.opener = null;
+          adWindow.location.href = activeAdUrl;
+        }
       } catch {
-        /* noop */
+        try {
+          adWindow?.close();
+        } catch {
+          /* noop */
+        }
+        adWindow = null;
+      }
+
+      if (!adWindow) {
+        resetToLocked();
+        const inAppBrowser = /Telegram|FBAN|FBAV|Instagram|Line\\//i.test(
+          navigator.userAgent,
+        );
+        setAdWarning(
+          inAppBrowser
+            ? "Ad tab එක open වුණේ නැහැ. Telegram/Facebook menu එකෙන් Open in browser තෝරා නැවත උත්සාහ කරන්න."
+            : "Ad tab එක open වුණේ නැහැ. Browser popup permission ලබාදී නැවත උත්සාහ කරන්න.",
+        );
+        return;
       }
 
       // If the browser blocks the new tab and this page never loses focus,
