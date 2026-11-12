@@ -582,7 +582,7 @@ export function DownloadButton({
 
       if (!adWindow) {
         resetToLocked();
-        const inAppBrowser = /Telegram|FBAN|FBAV|Instagram|Line\\//i.test(
+        const inAppBrowser = /Telegram|FBAN|FBAV|Instagram|Line\//i.test(
           navigator.userAgent,
         );
         setAdWarning(
