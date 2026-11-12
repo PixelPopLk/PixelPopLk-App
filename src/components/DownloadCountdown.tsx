@@ -13,7 +13,7 @@ import { logDownload } from "@/integrations/supabase/client";
 const MONETAG_URL =
   "https://directyp.org/4/dc67dd9ce96dd9a20b59e14a01a6a093";
 const ADSTERRA_URL =
-  "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
+  "https://asiafilm.org/4/20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
 const RELOCK_DELAY_MS = 30 * 1000; // Download click කළ පසු නැවත Lock වීමට තත්පර 30ක්
