@@ -14,7 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PwaInstallPrompt } from "../components/PwaInstallPrompt";
 
-const MONETAG_CLICK_AD_URL = "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
+const MONETAG_CLICK_AD_URL = "https://directyp.org/4/dc67dd9ce96dd9a20b59e14a01a6a093";
 const ADSTERRA_CLICK_AD_URL = "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 const CLICK_AD_COOLDOWN_MS = 5_000;
 // Shared with Sidebar.tsx so one click cannot open two sponsor tabs.
