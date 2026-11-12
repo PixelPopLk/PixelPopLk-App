@@ -16,8 +16,8 @@ const ADSTERRA_URL =
   "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
 const REQUIRED_AD_SECONDS = 5;
-const RELOCK_DELAY_MS = 4000; // File එක download වූ පසු නැවත Lock වීමට ගතවන කාලය (තත්පර 8)
-const MAX_UNLOCK_VALIDITY_MS = 20 * 1000; // 🟢 Unlock කර තත්පර 20ක් ඇතුළත download නොකළහොත් නැවත auto-lock වේ
+const RELOCK_DELAY_MS = 30 * 1000; // Download click කළ පසු නැවත Lock වීමට තත්පර 30ක්
+const MAX_UNLOCK_VALIDITY_MS = 60 * 1000; // Unlock වූ පසු Download click කිරීමට තත්පර 60ක්
 const MIN_AD_RETURN_MS = REQUIRED_AD_SECONDS * 1000;
 const AD_POPUP_FALLBACK_MS = 8 * 1000;
 
@@ -652,6 +652,12 @@ export function DownloadButton({
       const finalUrl = downloadLink;
 
       if (finalUrl && isSafeUrl(finalUrl)) {
+        // Stop the unlock-click deadline once the user has started the download.
+        // Otherwise its old timeout can relock the button before the 30s delay.
+        if (validityTimerRef.current) {
+          clearTimeout(validityTimerRef.current);
+          validityTimerRef.current = null;
+        }
         setState("downloading");
 
         if (normalizedVariant === "telegram") {
@@ -662,7 +668,7 @@ export function DownloadButton({
 
         logDownload(subtitleId, normalizedVariant);
 
-        // ⏱️ File එක download වී තත්පර 8කින් නැවත Lock කිරීම
+        // ⏱️ Download click කළ පසු තත්පර 30කින් නැවත Lock කිරීම
         const expireAt = Date.now() + RELOCK_DELAY_MS;
         try {
           localStorage.setItem(lockExpiryKey, String(expireAt));
