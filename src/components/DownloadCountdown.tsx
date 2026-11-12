@@ -11,7 +11,7 @@ import {
 import { logDownload } from "@/integrations/supabase/client";
 
 const MONETAG_URL =
-  "https://acorntar.com/fncjyve9?key=a347a729277e7dcc5e07924adff80652";
+  "https://directyp.org/4/dc67dd9ce96dd9a20b59e14a01a6a093";
 const ADSTERRA_URL =
   "https://acorntar.com/b795sywmp?key=20b07ce2b76b7238eae7acf49dd3a534";
 
