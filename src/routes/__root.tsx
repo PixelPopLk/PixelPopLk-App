@@ -317,7 +317,7 @@ function RootComponent() {
       // site-wide smartlink popup, including clicks on nested button content.
       if (
         target.closest(
-          '[data-download="true"], [data-download], [data-no-ad="true"], a[download]',
+          '[data-download="true"], [data-download], [data-download-zone="true"], [data-no-ad="true"], a[download]',
         )
       ) {
         return;
