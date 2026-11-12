@@ -239,9 +239,9 @@ export function Navbar({
           {showBack ? (
             <Link
               to={backTo as any}
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition font-medium ml-2"
+              className="inline-flex min-w-0 max-w-[45vw] items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition font-medium ml-2"
             >
-              <ArrowLeft className="w-4 h-4" /> {backText}
+              <ArrowLeft className="w-4 h-4 shrink-0" /> <span className="min-w-0 truncate" title={backText}>{backText}</span>
             </Link>
           ) : (
             <div className="hidden md:flex items-center gap-2.5">
