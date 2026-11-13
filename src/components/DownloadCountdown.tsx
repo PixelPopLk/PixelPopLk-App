@@ -145,7 +145,7 @@ export function DownloadButton({
         diagnostic: { diagnosticId, event, stage, outcome, subtitleId: Number(subtitleId), variant: normalizedVariant, browserFamily, browserContext, ...extra },
       }),
     }).catch(() => { /* diagnostics are best-effort */ });
-  }, [subtitleId, normalizedVariant]);
+  }, [subtitleId, normalizedVariant, sendDiagnostic]);
 
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
@@ -180,6 +180,7 @@ export function DownloadButton({
           subtitleId: Number(subtitleId),
           variant: normalizedVariant,
           sessionToken,
+          diagnosticId: diagnosticIdRef.current,
         }),
       });
 
@@ -188,6 +189,7 @@ export function DownloadButton({
         error?: unknown;
       };
       if (!response.ok) {
+        sendDiagnostic("claim_failed", "claim", "failure", { httpStatus: response.status, errorCode: response.status === 403 ? "session_invalid" : response.status === 429 ? "rate_limited" : "claim_failed" });
         return {
           link: null,
           error:
@@ -197,6 +199,7 @@ export function DownloadButton({
         };
       }
       if (typeof data.link === "string" && data.link.trim()) {
+        sendDiagnostic("claim_success", "claim", "success", { httpStatus: response.status });
         return { link: data.link.trim() };
       }
     } catch {
@@ -412,6 +415,7 @@ export function DownloadButton({
     if (!session) return;
 
     const awayMs = returnedAfterAdMsRef.current;
+    sendDiagnostic("ad_return_detected", "return", awayMs >= MIN_AD_RETURN_MS ? "success" : "failure", { elapsedMs: Math.min(600000, Math.max(0, Math.round(awayMs))), errorCode: awayMs < MIN_AD_RETURN_MS ? "ad_wait_too_short" : undefined });
     pendingAdAttemptRef.current = false;
     pendingSessionRef.current = null;
     adAttemptAtRef.current = null;
@@ -439,7 +443,7 @@ export function DownloadButton({
     setAdWarning("");
     setState("verifying");
     startLiveCountdown(session.startedAt, session.sessionToken);
-  }, [adAttemptStorageKey, adAwayStorageKey, resetToLocked, startLiveCountdown]);
+  }, [adAttemptStorageKey, adAwayStorageKey, resetToLocked, startLiveCountdown, sendDiagnostic]);
 
   useEffect(() => {
     const markPageAway = () => {
@@ -571,6 +575,9 @@ export function DownloadButton({
       setAdWarning("");
       setErrorMsg("");
       const attemptAt = Date.now();
+      diagnosticIdRef.current = crypto.randomUUID();
+      attemptStartedAtRef.current = attemptAt;
+      sendDiagnostic("unlock_clicked", "client", "info");
       pendingAdAttemptRef.current = true;
       adAttemptAtRef.current = attemptAt;
       adAwayAtRef.current = null;
@@ -609,6 +616,7 @@ export function DownloadButton({
       }
 
       if (!adWindow) {
+        sendDiagnostic("ad_popup_blocked", "popup", "failure", { errorCode: "popup_blocked" });
         resetToLocked();
         const inAppBrowser = /Telegram|FBAN|FBAV|Instagram|Line\//i.test(
           navigator.userAgent,
@@ -646,16 +654,19 @@ export function DownloadButton({
             action: "start",
             subtitleId: Number(subtitleId),
             variant: normalizedVariant,
+            diagnosticId: diagnosticIdRef.current,
           }),
         });
         const data = (await response.json()) as { sessionToken?: unknown; error?: unknown };
         if (!response.ok || typeof data.sessionToken !== "string") {
+          sendDiagnostic("start_failed", "start", "failure", { httpStatus: response.status, errorCode: "session_start_failed" });
           resetToLocked();
           setErrorMsg(typeof data.error === "string" ? data.error : "Verification ආරම්භ කළ නොහැක. නැවත උත්සාහ කරන්න.");
           setTimeout(() => setErrorMsg(""), 6000);
           return;
         }
 
+        sendDiagnostic("start_success", "start", "success", { elapsedMs: attemptStartedAtRef.current === null ? undefined : Date.now() - attemptStartedAtRef.current });
         const sessionStartedAt = Date.now();
         localStorage.setItem(timeStorageKey, String(sessionStartedAt));
         localStorage.setItem(sessionTokenKey, data.sessionToken);
@@ -665,6 +676,7 @@ export function DownloadButton({
         };
         processAdReturn();
       } catch {
+        sendDiagnostic("start_network_error", "start", "failure", { errorCode: "network_error" });
         resetToLocked();
         setErrorMsg("Verification සේවාවට සම්බන්ධ විය නොහැක. නැවත උත්සාහ කරන්න.");
         setTimeout(() => setErrorMsg(""), 6000);
@@ -697,6 +709,7 @@ export function DownloadButton({
           triggerBrowserDownload(finalUrl, title);
         }
 
+        sendDiagnostic("download_initiated", "download", "success");
         logDownload(subtitleId, normalizedVariant);
 
         if (downloadStatusTimerRef.current) clearInterval(downloadStatusTimerRef.current);
