@@ -189,7 +189,6 @@ export function DownloadButton({
         error?: unknown;
       };
       if (!response.ok) {
-        sendDiagnostic("claim_failed", "claim", "failure", { httpStatus: response.status, errorCode: response.status === 403 ? "session_invalid" : response.status === 429 ? "rate_limited" : "claim_failed" });
         return {
           link: null,
           error:
@@ -199,11 +198,10 @@ export function DownloadButton({
         };
       }
       if (typeof data.link === "string" && data.link.trim()) {
-        sendDiagnostic("claim_success", "claim", "success", { httpStatus: response.status });
         return { link: data.link.trim() };
       }
     } catch {
-      /* noop */
+      sendDiagnostic("claim_network_error", "claim", "failure", { errorCode: "network_error" });
     }
     return { link: null };
   }, [subtitleId, normalizedVariant, sendDiagnostic]);
@@ -659,14 +657,12 @@ export function DownloadButton({
         });
         const data = (await response.json()) as { sessionToken?: unknown; error?: unknown };
         if (!response.ok || typeof data.sessionToken !== "string") {
-          sendDiagnostic("start_failed", "start", "failure", { httpStatus: response.status, errorCode: "session_start_failed" });
           resetToLocked();
           setErrorMsg(typeof data.error === "string" ? data.error : "Verification ආරම්භ කළ නොහැක. නැවත උත්සාහ කරන්න.");
           setTimeout(() => setErrorMsg(""), 6000);
           return;
         }
 
-        sendDiagnostic("start_success", "start", "success", { elapsedMs: attemptStartedAtRef.current === null ? undefined : Date.now() - attemptStartedAtRef.current });
         const sessionStartedAt = Date.now();
         localStorage.setItem(timeStorageKey, String(sessionStartedAt));
         localStorage.setItem(sessionTokenKey, data.sessionToken);
