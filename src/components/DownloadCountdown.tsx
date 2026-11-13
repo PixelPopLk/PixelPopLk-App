@@ -128,6 +128,25 @@ export function DownloadButton({
   const adAttemptStorageKey = `pxl_ad_attempt_${subId}_${titleSlug}_${normalizedVariant}`;
   const adAwayStorageKey = `pxl_ad_away_${subId}_${titleSlug}_${normalizedVariant}`;
 
+  const diagnosticIdRef = useRef<string | null>(null);
+  const attemptStartedAtRef = useRef<number | null>(null);
+  const sendDiagnostic = useCallback((event: string, stage: string, outcome: "info" | "success" | "failure", extra: Record<string, unknown> = {}) => {
+    const diagnosticId = diagnosticIdRef.current;
+    if (!diagnosticId || !subtitleId) return;
+    const ua = navigator.userAgent;
+    const browserFamily = /SamsungBrowser/i.test(ua) ? "samsung" : /Edg\//i.test(ua) ? "edge" : /Firefox\//i.test(ua) ? "firefox" : /Chrome\//i.test(ua) ? "chrome" : /Safari\//i.test(ua) ? "safari" : "other";
+    const browserContext = /Telegram/i.test(ua) ? "telegram" : /FBAN|FBAV/i.test(ua) ? "facebook" : /Instagram/i.test(ua) ? "instagram" : "browser";
+    void fetch("/api/download-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        action: "diagnostic", diagnosticId, subtitleId: Number(subtitleId), variant: normalizedVariant,
+        diagnostic: { diagnosticId, event, stage, outcome, subtitleId: Number(subtitleId), variant: normalizedVariant, browserFamily, browserContext, ...extra },
+      }),
+    }).catch(() => { /* diagnostics are best-effort */ });
+  }, [subtitleId, normalizedVariant]);
+
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
   const [downloadLink, setDownloadLink] = useState<string>("");
