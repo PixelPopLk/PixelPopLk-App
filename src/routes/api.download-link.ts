@@ -3,14 +3,26 @@ import { createFileRoute } from "@tanstack/react-router";
 const SUPABASE_URL = "https://gilnzvsnkwrnfbwhobow.supabase.co";
 const MAX_ID = 2_147_483_647;
 
-type DownloadRequest = {
+type DownloadRequest = {\n  diagnosticId?: unknown;\n  diagnostic?: DiagnosticPayload;
   action?: unknown;
   subtitleId?: unknown;
   variant?: unknown;
   sessionToken?: unknown;
 };
 
-function getClientKey(request: Request) {
+type DiagnosticPayload = { diagnosticId?: unknown; event?: unknown; stage?: unknown; outcome?: unknown; subtitleId?: unknown; variant?: unknown; browserFamily?: unknown; browserContext?: unknown; httpStatus?: unknown; errorCode?: unknown; elapsedMs?: unknown; };
+const allowed = (value: unknown, values: string[]) => typeof value === 'string' && values.includes(value) ? value : null;
+async function writeDiagnostic(serviceRoleKey: string, payload: DiagnosticPayload, defaults: { diagnosticId?: string; subtitleId?: number; variant?: string } = {}) {
+  const diagnosticId = typeof payload.diagnosticId === 'string' && /^[0-9a-f-]{36}$/i.test(payload.diagnosticId) ? payload.diagnosticId : defaults.diagnosticId;
+  const event = typeof payload.event === 'string' && /^[a-z][a-z0-9_]{1,63}$/.test(payload.event) ? payload.event : null;
+  const stage = allowed(payload.stage, ['client','popup','start','return','claim','download']);
+  const outcome = allowed(payload.outcome, ['info','success','failure']);
+  const variant = allowed(payload.variant ?? defaults.variant, ['direct','telegram']);
+  if (!diagnosticId || !event || !stage || !outcome || !variant) return;
+  const row = { diagnostic_id: diagnosticId, event, stage, outcome, subtitle_id: Number.isInteger(payload.subtitleId) && Number(payload.subtitleId) > 0 ? Number(payload.subtitleId) : defaults.subtitleId ?? null, variant, browser_family: allowed(payload.browserFamily, ['chrome','samsung','firefox','safari','edge','other']) ?? 'other', browser_context: allowed(payload.browserContext, ['telegram','facebook','instagram','browser','other']) ?? 'browser', http_status: Number.isInteger(payload.httpStatus) && Number(payload.httpStatus) >= 100 && Number(payload.httpStatus) <= 599 ? Number(payload.httpStatus) : null, error_code: typeof payload.errorCode === 'string' && /^[a-z][a-z0-9_]{1,63}$/.test(payload.errorCode) ? payload.errorCode : null, elapsed_ms: Number.isInteger(payload.elapsedMs) && Number(payload.elapsedMs) >= 0 && Number(payload.elapsedMs) <= 600000 ? Number(payload.elapsedMs) : null };
+  try { await fetch(SUPABASE_URL + '/rest/v1/download_diagnostics', { method: 'POST', headers: { apikey: serviceRoleKey, Authorization: 'Bearer ' + serviceRoleKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(row) }); } catch { /* diagnostics must not interrupt downloads */ }
+}
+\nfunction getClientKey(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for");
   const ip =
     request.headers.get("cf-connecting-ip") ??
@@ -58,7 +70,7 @@ export const Route = createFileRoute("/api/download-link")({
           return jsonResponse({ error: "Invalid subtitle or download type." }, 400);
         }
 
-        const clientKey = getClientKey(request);
+        const clientKey = getClientKey(request);\n        const diagnosticId = typeof body.diagnosticId === 'string' && /^[0-9a-f-]{36}$/i.test(body.diagnosticId) ? body.diagnosticId : undefined;\n        const logEvent = (event: string, stage: string, outcome: string, extra: Record<string, unknown> = {}) => writeDiagnostic(serviceRoleKey, { diagnosticId, event, stage, outcome, subtitleId, variant, ...extra });
         const headers = {
           apikey: serviceRoleKey,
           Authorization: `Bearer ${serviceRoleKey}`,
@@ -90,7 +102,7 @@ export const Route = createFileRoute("/api/download-link")({
               return jsonResponse({ error: "Verification could not be started. Try again." }, 503);
             }
 
-            return jsonResponse({ sessionToken }, 200);
+            await logEvent('start_success', 'start', 'success');\n            return jsonResponse({ sessionToken }, 200);
           }
 
           if (action !== "claim" || typeof body.sessionToken !== "string") {
