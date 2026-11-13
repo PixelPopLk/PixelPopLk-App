@@ -526,6 +526,10 @@ export function DownloadButton({
       }
     };
 
+    const handleWindowBlur = () => markPageAway("blur");
+    const handleWindowFocus = () => handlePageActive("focus");
+    const handlePageShow = () => handlePageActive("pageshow");
+
     // Recover a tab restored/reloaded while the user was away. Without a
     // recorded away timestamp, do not assume time spent on this site was ad time.
     const restorePendingAttempt = () => {
@@ -584,15 +588,15 @@ export function DownloadButton({
     restorePendingAttempt();
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", () => markPageAway("blur"));
-    window.addEventListener("focus", () => handlePageActive("focus"));
-    window.addEventListener("pageshow", () => handlePageActive("pageshow"));
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("pageshow", handlePageShow);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", markPageAway);
-      window.removeEventListener("focus", handlePageActive);
-      window.removeEventListener("pageshow", handlePageActive);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("pageshow", handlePageShow);
       if (reLockTimerRef.current) clearTimeout(reLockTimerRef.current);
       if (validityTimerRef.current) clearTimeout(validityTimerRef.current);
       if (tickerRef.current) clearInterval(tickerRef.current);
@@ -605,6 +609,7 @@ export function DownloadButton({
     timeStorageKey,
     sessionTokenKey,
     processAdReturn,
+    sendDiagnostic,
     resetToLocked,
     startLiveCountdown,
     verifyAdTime,
