@@ -128,6 +128,25 @@ export function DownloadButton({
   const adAttemptStorageKey = `pxl_ad_attempt_${subId}_${titleSlug}_${normalizedVariant}`;
   const adAwayStorageKey = `pxl_ad_away_${subId}_${titleSlug}_${normalizedVariant}`;
 
+  const diagnosticIdRef = useRef<string | null>(null);
+  const attemptStartedAtRef = useRef<number | null>(null);
+  const sendDiagnostic = useCallback((event: string, stage: string, outcome: "info" | "success" | "failure", extra: Record<string, unknown> = {}) => {
+    const diagnosticId = diagnosticIdRef.current;
+    if (!diagnosticId || !subtitleId) return;
+    const ua = navigator.userAgent;
+    const browserFamily = /SamsungBrowser/i.test(ua) ? "samsung" : /Edg\//i.test(ua) ? "edge" : /Firefox\//i.test(ua) ? "firefox" : /Chrome\//i.test(ua) ? "chrome" : /Safari\//i.test(ua) ? "safari" : "other";
+    const browserContext = /Telegram/i.test(ua) ? "telegram" : /FBAN|FBAV/i.test(ua) ? "facebook" : /Instagram/i.test(ua) ? "instagram" : "browser";
+    void fetch("/api/download-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        action: "diagnostic", diagnosticId, subtitleId: Number(subtitleId), variant: normalizedVariant,
+        diagnostic: { diagnosticId, event, stage, outcome, subtitleId: Number(subtitleId), variant: normalizedVariant, browserFamily, browserContext, ...extra },
+      }),
+    }).catch(() => { /* diagnostics are best-effort */ });
+  }, [subtitleId, normalizedVariant]);
+
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
   const [downloadLink, setDownloadLink] = useState<string>("");
@@ -161,6 +180,7 @@ export function DownloadButton({
           subtitleId: Number(subtitleId),
           variant: normalizedVariant,
           sessionToken,
+          diagnosticId: diagnosticIdRef.current,
         }),
       });
 
@@ -181,10 +201,10 @@ export function DownloadButton({
         return { link: data.link.trim() };
       }
     } catch {
-      /* noop */
+      sendDiagnostic("claim_network_error", "claim", "failure", { errorCode: "network_error" });
     }
     return { link: null };
-  }, [subtitleId, normalizedVariant]);
+  }, [subtitleId, normalizedVariant, sendDiagnostic]);
 
   // Lock තත්ත්වයට reset කිරීම
   const resetToLocked = useCallback(() => {
@@ -393,6 +413,7 @@ export function DownloadButton({
     if (!session) return;
 
     const awayMs = returnedAfterAdMsRef.current;
+    sendDiagnostic("ad_return_detected", "return", awayMs >= MIN_AD_RETURN_MS ? "success" : "failure", { elapsedMs: Math.min(600000, Math.max(0, Math.round(awayMs))), errorCode: awayMs < MIN_AD_RETURN_MS ? "ad_wait_too_short" : undefined });
     pendingAdAttemptRef.current = false;
     pendingSessionRef.current = null;
     adAttemptAtRef.current = null;
@@ -420,7 +441,7 @@ export function DownloadButton({
     setAdWarning("");
     setState("verifying");
     startLiveCountdown(session.startedAt, session.sessionToken);
-  }, [adAttemptStorageKey, adAwayStorageKey, resetToLocked, startLiveCountdown]);
+  }, [adAttemptStorageKey, adAwayStorageKey, resetToLocked, startLiveCountdown, sendDiagnostic]);
 
   useEffect(() => {
     const markPageAway = () => {
@@ -552,6 +573,9 @@ export function DownloadButton({
       setAdWarning("");
       setErrorMsg("");
       const attemptAt = Date.now();
+      diagnosticIdRef.current = crypto.randomUUID();
+      attemptStartedAtRef.current = attemptAt;
+      sendDiagnostic("unlock_clicked", "client", "info");
       pendingAdAttemptRef.current = true;
       adAttemptAtRef.current = attemptAt;
       adAwayAtRef.current = null;
@@ -590,6 +614,7 @@ export function DownloadButton({
       }
 
       if (!adWindow) {
+        sendDiagnostic("ad_popup_blocked", "popup", "failure", { errorCode: "popup_blocked" });
         resetToLocked();
         const inAppBrowser = /Telegram|FBAN|FBAV|Instagram|Line\//i.test(
           navigator.userAgent,
@@ -627,6 +652,7 @@ export function DownloadButton({
             action: "start",
             subtitleId: Number(subtitleId),
             variant: normalizedVariant,
+            diagnosticId: diagnosticIdRef.current,
           }),
         });
         const data = (await response.json()) as { sessionToken?: unknown; error?: unknown };
@@ -646,6 +672,7 @@ export function DownloadButton({
         };
         processAdReturn();
       } catch {
+        sendDiagnostic("start_network_error", "start", "failure", { errorCode: "network_error" });
         resetToLocked();
         setErrorMsg("Verification සේවාවට සම්බන්ධ විය නොහැක. නැවත උත්සාහ කරන්න.");
         setTimeout(() => setErrorMsg(""), 6000);
@@ -678,6 +705,7 @@ export function DownloadButton({
           triggerBrowserDownload(finalUrl, title);
         }
 
+        sendDiagnostic("download_initiated", "download", "success");
         logDownload(subtitleId, normalizedVariant);
 
         if (downloadStatusTimerRef.current) clearInterval(downloadStatusTimerRef.current);
