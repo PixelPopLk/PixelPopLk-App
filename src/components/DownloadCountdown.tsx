@@ -135,7 +135,25 @@ export function DownloadButton({
     if (!diagnosticId || !subtitleId) return;
     const ua = navigator.userAgent;
     const browserFamily = /SamsungBrowser/i.test(ua) ? "samsung" : /Edg\//i.test(ua) ? "edge" : /Firefox\//i.test(ua) ? "firefox" : /Chrome\//i.test(ua) ? "chrome" : /Safari\//i.test(ua) ? "safari" : "other";
-    const browserContext = /Telegram/i.test(ua) ? "telegram" : /FBAN|FBAV/i.test(ua) ? "facebook" : /Instagram/i.test(ua) ? "instagram" : "browser";
+    const browserWindow = window as Window & {
+      TelegramWebviewProxy?: unknown;
+      TelegramWebviewProxyProto?: unknown;
+      Telegram?: { WebApp?: unknown };
+    };
+    const isTelegramWebView =
+      /Telegram/i.test(ua) ||
+      Boolean(
+        browserWindow.TelegramWebviewProxy ||
+        browserWindow.TelegramWebviewProxyProto ||
+        browserWindow.Telegram?.WebApp,
+      );
+    const browserContext = isTelegramWebView
+      ? "telegram"
+      : /FBAN|FBAV/i.test(ua)
+        ? "facebook"
+        : /Instagram/i.test(ua)
+          ? "instagram"
+          : "browser";
     void fetch("/api/download-link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -444,12 +462,23 @@ export function DownloadButton({
   }, [adAttemptStorageKey, adAwayStorageKey, resetToLocked, startLiveCountdown, sendDiagnostic]);
 
   useEffect(() => {
-    const markPageAway = () => {
+    const markPageAway = (source: "visibilitychange" | "blur") => {
       if (!pendingAdAttemptRef.current || adAwayAtRef.current !== null) return;
       if (document.visibilityState !== "hidden" && document.hasFocus()) return;
 
       const awayAt = Date.now();
       adAwayAtRef.current = awayAt;
+      sendDiagnostic(
+        source === "visibilitychange" ? "page_away_visibility" : "page_away_blur",
+        "popup",
+        "info",
+        {
+          elapsedMs: Math.min(
+            600000,
+            Math.max(0, Math.round(awayAt - (adAttemptAtRef.current ?? awayAt))),
+          ),
+        },
+      );
       try {
         localStorage.setItem(adAwayStorageKey, String(awayAt));
       } catch {
@@ -457,7 +486,7 @@ export function DownloadButton({
       }
     };
 
-    const handlePageActive = () => {
+    const handlePageActive = (source: "visibilitychange" | "focus" | "pageshow") => {
       if (document.visibilityState === "hidden") return;
 
       if (pendingAdAttemptRef.current) {
@@ -466,6 +495,21 @@ export function DownloadButton({
           returnedAfterAdMsRef.current = awayAt
             ? Math.max(0, Date.now() - awayAt)
             : 0;
+          sendDiagnostic(
+            source === "visibilitychange"
+              ? "page_return_visibility"
+              : source === "pageshow"
+                ? "page_return_pageshow"
+                : "page_return_focus",
+            "return",
+            "info",
+            {
+              elapsedMs: Math.min(
+                600000,
+                Math.max(0, Math.round(returnedAfterAdMsRef.current)),
+              ),
+            },
+          );
         }
         processAdReturn();
         return;
@@ -476,9 +520,9 @@ export function DownloadButton({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        markPageAway();
+        markPageAway("visibilitychange");
       } else {
-        handlePageActive();
+        handlePageActive("visibilitychange");
       }
     };
 
@@ -540,9 +584,9 @@ export function DownloadButton({
     restorePendingAttempt();
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", markPageAway);
-    window.addEventListener("focus", handlePageActive);
-    window.addEventListener("pageshow", handlePageActive);
+    window.addEventListener("blur", () => markPageAway("blur"));
+    window.addEventListener("focus", () => handlePageActive("focus"));
+    window.addEventListener("pageshow", () => handlePageActive("pageshow"));
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -603,6 +647,9 @@ export function DownloadButton({
         if (adWindow) {
           adWindow.opener = null;
           adWindow.location.href = activeAdUrl;
+          // This confirms the browser created a popup and navigation was requested;
+          // it does not prove that the ad destination finished loading.
+          sendDiagnostic("ad_popup_navigation_requested", "popup", "success");
         }
       } catch {
         try {
@@ -638,6 +685,10 @@ export function DownloadButton({
           document.hasFocus()
         ) {
           returnedAfterAdMsRef.current = 0;
+          sendDiagnostic("ad_popup_no_departure_signal", "popup", "failure", {
+            errorCode: "no_departure_signal",
+            elapsedMs: AD_POPUP_FALLBACK_MS,
+          });
           processAdReturn();
         }
       }, AD_POPUP_FALLBACK_MS);
