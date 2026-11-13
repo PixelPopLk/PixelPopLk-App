@@ -145,7 +145,7 @@ export function DownloadButton({
         diagnostic: { diagnosticId, event, stage, outcome, subtitleId: Number(subtitleId), variant: normalizedVariant, browserFamily, browserContext, ...extra },
       }),
     }).catch(() => { /* diagnostics are best-effort */ });
-  }, [subtitleId, normalizedVariant, sendDiagnostic]);
+  }, [subtitleId, normalizedVariant]);
 
   const [state, setState] = useState<ButtonState>("locked");
   const [remainingSec, setRemainingSec] = useState<number>(REQUIRED_AD_SECONDS);
@@ -206,7 +206,7 @@ export function DownloadButton({
       /* noop */
     }
     return { link: null };
-  }, [subtitleId, normalizedVariant]);
+  }, [subtitleId, normalizedVariant, sendDiagnostic]);
 
   // Lock තත්ත්වයට reset කිරීම
   const resetToLocked = useCallback(() => {
