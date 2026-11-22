@@ -983,6 +983,7 @@ function Hero({
                     <Link
                       to="/content/$id"
                       params={{ id: String(current.id) }}
+                      hash={tv ? "episodes" : undefined}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow hover:opacity-95 transition cursor-pointer"
                     >
                       <Download className="w-4 h-4" /> {tv ? "View Episodes" : "Get Subtitle"}
