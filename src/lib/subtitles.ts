@@ -51,6 +51,58 @@ function num(v: unknown): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+/** Normalize a series name so harmless case and punctuation differences match. */
+export function normalizeShowName(raw: string): string {
+  return cleanShowName(raw)
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/** Stable identity for an episode, using the series title plus season and episode numbers. */
+export function getSeriesEpisodeKey(
+  row: Pick<Subtitle, "title" | "season" | "episode">,
+): string | null {
+  const parsed = parseTitle(row.title ?? "");
+  const season = num(row.season) ?? parsed.episode?.season ?? null;
+  const episode = num(row.episode) ?? parsed.episode?.episode ?? null;
+  const showKey = normalizeShowName(parsed.showName);
+  if (!showKey || season == null || episode == null) return null;
+  return `${showKey}|s${season}|e${episode}`;
+}
+
+/** Keep the newest row for each season/episode pair in a single series. */
+export function dedupeSeriesEpisodes<T extends Subtitle>(episodes: T[]): T[] {
+  const latestByEpisode = new Map<string, T>();
+  for (const episode of episodes) {
+    const parsed = parseTitle(episode.title ?? "");
+    const season = num(episode.season) ?? parsed.episode?.season;
+    const episodeNumber = num(episode.episode) ?? parsed.episode?.episode;
+    if (season == null || episodeNumber == null) continue;
+    const key = `s${season}|e${episodeNumber}`;
+    const existing = latestByEpisode.get(key);
+    if (!existing) {
+      latestByEpisode.set(key, episode);
+      continue;
+    }
+    const currentTime = Date.parse(episode.created_at || "") || 0;
+    const existingTime = Date.parse(existing.created_at || "") || 0;
+    const currentId = Number(episode.id) || 0;
+    const existingId = Number(existing.id) || 0;
+    if (currentTime > existingTime || (currentTime === existingTime && currentId > existingId)) {
+      latestByEpisode.set(key, episode);
+    }
+  }
+  return Array.from(latestByEpisode.values()).sort((a, b) => {
+    const ap = parseTitle(a.title ?? "").episode;
+    const bp = parseTitle(b.title ?? "").episode;
+    return (num(a.season) ?? ap?.season ?? 0) - (num(b.season) ?? bp?.season ?? 0)
+      || (num(a.episode) ?? ap?.episode ?? 0) - (num(b.episode) ?? bp?.episode ?? 0);
+  });
+}
+
 /** Series row if explicit season/episode cols present, OR title parses S/E AND genre is not "Movie". */
 function isSeriesRow(s: Subtitle): EpisodeInfo | null {
   const sNum = num(s.season);
@@ -71,7 +123,7 @@ export function buildGridItems(subs: Subtitle[]): GridItem[] {
   for (const s of subs) {
     const ep = isSeriesRow(s);
     if (ep) {
-      const key = parseTitle(s.title).showName.toLowerCase();
+      const key = normalizeShowName(parseTitle(s.title).showName);
       const list = groups.get(key) ?? [];
       list.push({ ...s, season: ep.season, episode: ep.episode, epTitle: ep.episodeTitle });
       groups.set(key, list);
@@ -81,7 +133,7 @@ export function buildGridItems(subs: Subtitle[]): GridItem[] {
   }
 
   const seriesItems: GridItem[] = Array.from(groups.entries()).map(([key, eps]) => {
-    const sorted = [...eps].sort((a, b) => a.season - b.season || a.episode - b.episode);
+    const sorted = dedupeSeriesEpisodes(eps) as SeriesEpisode[];
     const latest = [...eps].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))[0];
     const canonical = sorted.find((e) => e.season === 1 && e.episode === 1) ?? sorted[0];
     const showName = cleanShowName(parseTitle(latest.title).showName);
