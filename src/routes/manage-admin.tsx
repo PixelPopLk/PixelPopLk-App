@@ -446,11 +446,13 @@ function CSVUploader({ refetch }: CSVUploaderProps) {
       {message && (
         <p
           className={`text-xs font-semibold flex items-center gap-1.5 ${
-            message.includes("Successfully") ? "text-green-500" : "text-primary"
+            message.includes("Successfully") ? "text-green-500" : message.includes("Failed") ? "text-destructive" : "text-primary"
           }`}
         >
           {message.includes("Successfully") ? (
             <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : message.includes("Failed") ? (
+            <AlertCircle className="w-3.5 h-3.5" />
           ) : (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           )}
