@@ -696,7 +696,7 @@ function Hero({
           </div>
 
           {description ? (
-            <div className="mt-6 min-w-0">
+            <div id="episodes" className="mt-6 min-w-0 scroll-mt-24">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                 Overview
               </h3>
