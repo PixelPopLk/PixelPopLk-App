@@ -215,8 +215,7 @@ function buildContentHead({
       s.year != null && s.year !== ""
         ? String(s.year)
         : new Date(s.created_at).getFullYear().toString();
-    const telegramTitleSuffix = s.has_telegram ? " | Telegram Link" : "";
-    const titleText = `${s.title} Sinhala Subtitles${telegramTitleSuffix} | PixelPopLK`;
+    const titleText = `${s.title} Sinhala Subtitle | ${s.title} සිංහල උපසිරැසි | PixelPopLK`;
     const descText = buildSeoDescription({
       metatags: s.metatags,
       description: s.description,
@@ -264,7 +263,7 @@ function buildContentHead({
       ? String(withYear.year)
       : new Date(item.latestDate).getFullYear().toString();
   const description = s1e1?.description ?? null;
-  const titleText = `${item.showName} Sinhala Subtitles | TV Series Download | PixelPopLK`;
+  const titleText = `${item.showName} Sinhala Subtitle | ${item.showName} සිංහල උපසිරැසි | PixelPopLK`;
   const descText = buildSeoDescription({
     metatags: item.episodes.map((episode) => episode.metatags).find(Boolean),
     description,
