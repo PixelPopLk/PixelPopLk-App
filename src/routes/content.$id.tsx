@@ -375,12 +375,53 @@ function ContentPage() {
       }
     : null;
 
+  // Structured data for the actual movie or TV series represented by this page.
+  // Keep this separate from BreadcrumbList so search engines can identify the page entity.
+  const contentSchema = item
+    ? {
+        "@context": "https://schema.org",
+        "@type": item.kind === "movie" ? "Movie" : "TVSeries",
+        "@id": `${BASE_URL}/content/${item.id}#${item.kind}`,
+        name: titleName,
+        url: `${BASE_URL}/content/${item.id}`,
+        image: shareImage(item.kind === "movie" ? item.sub.image_url : item.poster),
+        description:
+          item.kind === "movie"
+            ? buildSeoDescription({
+                metatags: item.sub.metatags,
+                description: item.sub.description,
+                title: item.sub.title,
+                year: item.sub.year,
+                genres: splitGenres(item.sub.genre),
+                kind: "movie",
+              })
+            : buildSeoDescription({
+                metatags: item.episodes.map((episode) => episode.metatags).find(Boolean),
+                description: item.episodes.find((episode) => episode.season === 1 && episode.episode === 1)?.description,
+                title: item.showName,
+                genres: splitGenres(item.episodes[0]?.genre),
+                kind: "series",
+              }),
+        genre:
+          item.kind === "movie"
+            ? splitGenres(item.sub.genre)
+            : splitGenres(item.episodes[0]?.genre),
+        inLanguage: "si-LK",
+      }
+    : null;
+
   return (
     <Shell>
       {breadcrumbSchema && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
+      )}
+      {contentSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(contentSchema) }}
         />
       )}
 
