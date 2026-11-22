@@ -172,8 +172,7 @@ function buildEpisodeHead({
   const poster = shareImage(ep.image_url || series.poster);
   const episodeTitle =
     ep.epTitle || `Episode ${String(ep.episode).padStart(2, "0")}`;
-  const telegramTitleSuffix = ep.has_telegram ? " | Telegram Link" : "";
-  const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitles${telegramTitleSuffix} | ${episodeTitle} | PixelPopLK`;
+  const titleText = `${series.showName} S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} Sinhala Subtitle | ${series.showName} සිංහල උපසිරැසි | PixelPopLK`;
   const descText = buildSeoDescription({
     metatags: ep.metatags,
     description: ep.description,

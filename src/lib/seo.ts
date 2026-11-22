@@ -11,15 +11,7 @@ type SeoDescriptionInput = {
   episodeTitle?: string;
 };
 
-const MIN_DESCRIPTION_LENGTH = 150;
 const MAX_DESCRIPTION_LENGTH = 160;
-
-function cleanText(value?: string | null) {
-  return (value ?? "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function truncateDescription(value: string) {
   if (value.length <= MAX_DESCRIPTION_LENGTH) return value;
@@ -29,44 +21,24 @@ function truncateDescription(value: string) {
   return `${(lastSpace > 80 ? truncated.slice(0, lastSpace) : truncated).trim()}…`;
 }
 
-function addContext(value: string, context: string) {
-  const withContext = `${value} ${context}`.trim();
-  if (withContext.length >= MIN_DESCRIPTION_LENGTH) return withContext;
-  return `${withContext} නවතම චිත්‍රපට සහ TV series උපසිරැසි සඳහා PixelPopLK වෙත අදම පිවිසෙන්න.`;
-}
-
-/** Uses the editor-controlled Supabase `metatags` field before fallbacks. */
+/** Builds consistent, page-type-specific SEO descriptions for PixelPopLK. */
 export function buildSeoDescription(input: SeoDescriptionInput) {
-  const editorDescription = cleanText(input.metatags);
-  const contentDescription = cleanText(input.description);
-  const genreText = input.genres?.filter(Boolean).slice(0, 2).join(" and ");
-  const yearText = input.year ? ` (${input.year})` : "";
-
-  const seoContext =
-    "PixelPopLK වෙතින් Sinhala subtitles සහ Telegram download link ලබාගන්න.";
-  const sourceDescription = editorDescription || contentDescription;
-
-  // Preserve the editor's story summary from Supabase, then add a short
-  // Sinhala SEO context when it needs more detail for a search snippet.
-  if (sourceDescription) {
-    return truncateDescription(addContext(sourceDescription, seoContext));
-  }
+  const name = input.kind === "episode" ? (input.showName || input.title) : input.title;
 
   if (input.kind === "episode") {
-    const episodeCode = `Season ${input.season} Episode ${input.episode}`;
-    const episodeName = input.episodeTitle ? `, ${input.episodeTitle}` : "";
+    const code = `S${String(input.season ?? 1).padStart(2, "0")}E${String(input.episode ?? 1).padStart(2, "0")}`;
     return truncateDescription(
-      `${input.showName} ${episodeCode}${episodeName} සඳහා සිංහල උපසිරැසි ලබාගන්න. මෙම episode එකට ගැළපෙන Sinhala subtitle සහ Telegram download link PixelPopLK වෙතින් ලබාගත හැක.`,
+      `${name} ${code} සිංහල උපසිරැසි සමඟ බලන්න. Free Download with Sinhala Subtitles. Download ${name} ${code} Sinhala Subtitles on PixelPopLK.`,
     );
   }
 
   if (input.kind === "series") {
     return truncateDescription(
-      `${input.title}${yearText} TV Series සඳහා සිංහල උපසිරැසි බලන්න. සියලු seasons සහ episodes${genreText ? ` (${genreText})` : ""} සඳහා Sinhala subtitles සහ Telegram download links PixelPopLK වෙතින් ලබාගන්න.`,
+      `${name} සිංහල උපසිරැසි සමඟ බලන්න. All Seasons Free Download with Sinhala Subtitles. Download ${name} Sinhala Subtitles on PixelPopLK.`,
     );
   }
 
   return truncateDescription(
-    `${input.title}${yearText}${genreText ? ` ${genreText} චිත්‍රපටය සඳහා` : " සඳහා"} සිංහල උපසිරැසි ලබාගන්න. ගැළපෙන Sinhala subtitle සහ Telegram download link PixelPopLK වෙතින් පහසුවෙන් බාගත කරන්න, නවතම updates සමඟ.`,
+    `${name} සිංහල උපසිරැසි සමඟ බලන්න. Free Download with Sinhala Subtitles. Download ${name} Sinhala Subtitles on PixelPopLK.`,
   );
 }
