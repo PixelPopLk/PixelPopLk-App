@@ -48,7 +48,7 @@ import {
   FastForward,
 } from "lucide-react";
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
-import { splitGenres, genreBadgeClass, buildGridItems, parseTitle, cleanShowName } from "@/lib/subtitles";
+import { splitGenres, genreBadgeClass, buildGridItems, parseTitle, cleanShowName, getSeriesEpisodeKey, normalizeShowName } from "@/lib/subtitles";
 
 export const Route = createFileRoute("/manage-admin")({
   head: () => ({
@@ -377,6 +377,27 @@ function CSVUploader({ refetch }: CSVUploaderProps) {
 
         if (parsedData.length === 0) {
           throw new Error('No valid records containing both "title" and "download_link" were found.');
+        }
+
+        // Validate the CSV batch against both the existing catalogue and itself.
+        const { data: existingRows, error: existingError } = await supabase
+          .from(SUBTITLES_TABLE)
+          .select("id, title, season, episode, created_at");
+        if (existingError) throw existingError;
+
+        const seen = new Map<string, string>();
+        for (const row of existingRows ?? []) {
+          const key = getSeriesEpisodeKey(row as any);
+          if (key) seen.set(key, `${row.title} (ID: ${row.id})`);
+        }
+        for (const row of parsedData) {
+          const key = getSeriesEpisodeKey(row as any);
+          if (!key) continue;
+          const existing = seen.get(key);
+          if (existing) {
+            throw new Error(`Duplicate episode in CSV/database: ${row.title}. Existing record: ${existing}. Remove the duplicate row or update the existing episode.`);
+          }
+          seen.set(key, `${row.title} (CSV row)`);
         }
 
         setMessage(`Uploading ${parsedData.length} records to Database...`);
@@ -817,8 +838,33 @@ function Dashboard() {
       return;
     }
 
-    setStatus({ type: "saving" });
     const payload = buildPayload();
+
+    // Prevent duplicate episodes before attempting an insert. Match normalized
+    // show name + season + episode, but never compare a record against itself on edit.
+    if (!editing && mediaMode === "tv") {
+      const candidate = {
+        title: payload.title,
+        season: payload.season,
+        episode: payload.episode,
+      } as Pick<Subtitle, "title" | "season" | "episode">;
+      const candidateKey = getSeriesEpisodeKey(candidate);
+      if (candidateKey) {
+        const duplicate = (rows ?? []).find((row: any) => {
+          if (getSeriesEpisodeKey(row) !== candidateKey) return false;
+          return true;
+        });
+        if (duplicate) {
+          setStatus({
+            type: "error",
+            msg: `Duplicate episode: ${duplicate.title} already exists (ID: ${duplicate.id}). Use Edit to update it instead.`,
+          });
+          return;
+        }
+      }
+    }
+
+    setStatus({ type: "saving" });
 
     const query = editing
       ? supabase.from(SUBTITLES_TABLE).update(payload).eq("id", form.id as Subtitle["id"]).select()
