@@ -40,6 +40,7 @@ import {
 import {
   buildGridItems,
   dedupeSeriesEpisodes,
+  normalizeShowName,
   formatRating,
   genreBadgeClass,
   splitGenres,
@@ -110,7 +111,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
 
   if (isSeries) {
     const parsed = parseTitle(targetItem.title ?? "");
-    const targetShowName = parsed.showName.toLowerCase().trim();
+    const targetShowName = normalizeShowName(parsed.showName);
     const safeShowPrefix = (parsed.showName || targetItem.title || "")
       .replace(/[%_\\]/g, "\\$&")
       .trim();
@@ -141,7 +142,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
 
     const exactEpisodes = allEpisodes.filter(
       (episode) =>
-        parseTitle(episode.title ?? "").showName.toLowerCase().trim() ===
+        normalizeShowName(parseTitle(episode.title ?? "").showName) ===
         targetShowName,
     );
     const scopedEpisodes =
