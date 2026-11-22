@@ -48,7 +48,7 @@ import {
   FastForward,
 } from "lucide-react";
 import { supabase, SUBTITLES_TABLE, type Subtitle } from "@/integrations/supabase/client";
-import { splitGenres, genreBadgeClass, buildGridItems, parseTitle, cleanShowName, getSeriesEpisodeKey, normalizeShowName } from "@/lib/subtitles";
+import { splitGenres, genreBadgeClass, buildGridItems, parseTitle, cleanShowName, getSeriesEpisodeKey } from "@/lib/subtitles";
 
 export const Route = createFileRoute("/manage-admin")({
   head: () => ({
