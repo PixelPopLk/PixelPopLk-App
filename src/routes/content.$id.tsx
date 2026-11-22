@@ -39,6 +39,7 @@ import {
 } from "@/integrations/supabase/client";
 import {
   buildGridItems,
+  dedupeSeriesEpisodes,
   formatRating,
   genreBadgeClass,
   splitGenres,
@@ -143,8 +144,9 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
         parseTitle(episode.title ?? "").showName.toLowerCase().trim() ===
         targetShowName,
     );
-    const episodes =
-      (exactEpisodes.length > 0 ? exactEpisodes : [targetItem]) as Subtitle[];
+    const scopedEpisodes =
+      exactEpisodes.length > 0 ? exactEpisodes : [targetItem];
+    const episodes = dedupeSeriesEpisodes(scopedEpisodes as Subtitle[]);
 
     // Episode IDs under /content/* are legacy aliases for the series landing
     // page. Redirect them to one stable URL so Google sees one canonical page.
