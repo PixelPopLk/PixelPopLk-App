@@ -7,6 +7,7 @@ import {
   itemPoster,
   itemDate,
   formatDate,
+  optimizePosterUrl,
   type GridItem,
 } from "@/lib/subtitles";
 import { Navbar } from "@/components/Navbar";
@@ -177,7 +178,9 @@ function LatestCard({ item }: { item: GridItem }) {
       <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden shrink-0">
         {poster ? (
           <img
-            src={poster}
+            src={optimizePosterUrl(poster, 342)}
+            srcSet={`${optimizePosterUrl(poster, 185)} 185w, ${optimizePosterUrl(poster, 342)} 342w`}
+            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 220px"
             alt={`${title} Sinhala Subtitle Poster`}
             width={300}
             height={450}

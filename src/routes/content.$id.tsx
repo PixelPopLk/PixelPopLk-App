@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect, useLocation } from "@tanstack/react-router";
 import AdBanner from "@/components/AdBanner";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -39,6 +39,8 @@ import {
 } from "@/integrations/supabase/client";
 import {
   buildGridItems,
+  dedupeSeriesEpisodes,
+  normalizeShowName,
   formatRating,
   genreBadgeClass,
   splitGenres,
@@ -109,7 +111,7 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
 
   if (isSeries) {
     const parsed = parseTitle(targetItem.title ?? "");
-    const targetShowName = parsed.showName.toLowerCase().trim();
+    const targetShowName = normalizeShowName(parsed.showName);
     const safeShowPrefix = (parsed.showName || targetItem.title || "")
       .replace(/[%_\\]/g, "\\$&")
       .trim();
@@ -140,11 +142,12 @@ async function fetchContentData(id: string): Promise<Subtitle[]> {
 
     const exactEpisodes = allEpisodes.filter(
       (episode) =>
-        parseTitle(episode.title ?? "").showName.toLowerCase().trim() ===
+        normalizeShowName(parseTitle(episode.title ?? "").showName) ===
         targetShowName,
     );
-    const episodes =
-      (exactEpisodes.length > 0 ? exactEpisodes : [targetItem]) as Subtitle[];
+    const scopedEpisodes =
+      exactEpisodes.length > 0 ? exactEpisodes : [targetItem];
+    const episodes = dedupeSeriesEpisodes(scopedEpisodes as Subtitle[]);
 
     // Episode IDs under /content/* are legacy aliases for the series landing
     // page. Redirect them to one stable URL so Google sees one canonical page.
@@ -525,19 +528,19 @@ function ShareBar({
 }) {
   const [copied, setCopied] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
+  // Read the router pathname during SSR and hydration so share links are never empty.
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const pageUrl = `${BASE_URL}${pathname}`;
 
   const handleCopy = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(pageUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const shareUrl =
-    typeof window !== "undefined"
-      ? encodeURIComponent(window.location.href)
-      : "";
+  const shareUrl = encodeURIComponent(pageUrl);
   const shareText = encodeURIComponent(
     `${title} Sinhala Subtitle | PixelPopLK`,
   );
@@ -693,7 +696,7 @@ function Hero({
           </div>
 
           {description ? (
-            <div className="mt-6 min-w-0">
+            <div id="episodes" className="mt-6 min-w-0 scroll-mt-24">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                 Overview
               </h3>
