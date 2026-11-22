@@ -844,7 +844,11 @@ function Dashboard() {
 
     // Prevent duplicate episodes before attempting an insert. Match normalized
     // show name + season + episode, but never compare a record against itself on edit.
-    if (!editing && mediaMode === "tv") {
+    if (mediaMode === "tv") {
+      if (!rows) {
+        setStatus({ type: "error", msg: "Episode records are still loading. Please try again in a moment." });
+        return;
+      }
       const candidate = {
         title: payload.title,
         season: payload.season,
@@ -852,14 +856,14 @@ function Dashboard() {
       } as Pick<Subtitle, "title" | "season" | "episode">;
       const candidateKey = getSeriesEpisodeKey(candidate);
       if (candidateKey) {
-        const duplicate = (rows ?? []).find((row: any) => {
-          if (getSeriesEpisodeKey(row) !== candidateKey) return false;
-          return true;
-        });
+        const duplicate = rows.find((row: any) =>
+          String(row.id) !== String(form.id ?? "") &&
+          getSeriesEpisodeKey(row) === candidateKey
+        );
         if (duplicate) {
           setStatus({
             type: "error",
-            msg: `Duplicate episode: ${duplicate.title} already exists (ID: ${duplicate.id}). Use Edit to update it instead.`,
+            msg: `Duplicate episode: ${duplicate.title} already exists (ID: ${duplicate.id}). ${editing ? "This record cannot be updated to the same episode." : "Use Edit to update the existing record instead."}`,
           });
           return;
         }
