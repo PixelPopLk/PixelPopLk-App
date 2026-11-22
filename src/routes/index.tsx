@@ -94,10 +94,10 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK.",
+          "Get free Sinhala subtitles for movies and TV series on PixelPopLK. Find movie and TV series download links on our Telegram channel and enjoy your favourite entertainment.",
       },
       { property: "og:title", content: "Free Sinhala Subtitles for Movies & TV Series | සිංහල උපසිරැසි | Sinhala Sub" },
-      { property: "og:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
+      { property: "og:description", content: "Get free Sinhala subtitles for movies and TV series on PixelPopLK. Find movie and TV series download links on our Telegram channel and enjoy your favourite entertainment." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://pixelpoplk.pages.dev/" },
       { property: "og:site_name", content: "PixelPopLK" },
@@ -113,7 +113,7 @@ export const Route = createFileRoute("/")({
       },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Free Sinhala Subtitles for Movies & TV Series | සිංහල උපසිරැසි | Sinhala Sub" },
-      { name: "twitter:description", content: "Download the latest premium Sinhala subtitles for movies and TV series. Curated, fast, and secure on PixelPopLK." },
+      { name: "twitter:description", content: "Get free Sinhala subtitles for movies and TV series on PixelPopLK. Find movie and TV series download links on our Telegram channel and enjoy your favourite entertainment." },
       { name: "twitter:image", content: "https://pixelpoplk.pages.dev/og-banner.png" },
       { name: "twitter:image:alt", content: "Free Sinhala Subtitles for Movies & TV Series | සිංහල උපසිරැසි | Sinhala Sub" },
     ],
