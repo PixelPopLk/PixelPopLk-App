@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Calendar,
@@ -247,19 +247,19 @@ function EpisodeShareBar({
 }) {
   const [copied, setCopied] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
+  // Read the router pathname during SSR and hydration so share links are never empty.
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const pageUrl = `${BASE_URL}${pathname}`;
 
   const handleCopy = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(pageUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const shareUrl =
-    typeof window !== "undefined"
-      ? encodeURIComponent(window.location.href)
-      : "";
+  const shareUrl = encodeURIComponent(pageUrl);
   const shareText = encodeURIComponent(
     `${title} Sinhala Subtitle | PixelPopLK`,
   );
