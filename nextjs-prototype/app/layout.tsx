@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PixelPop — Sinhala Subtitles",
-  description: "Find Sinhala subtitles for your favourite movies and TV series.",
+  title: "PixelPop — Sinhala Subtitles for Every Story",
+  description: "Discover Sinhala subtitles for movies and TV series on PixelPop.",
   applicationName: "PixelPop",
+  themeColor: "#0a0b0d",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
